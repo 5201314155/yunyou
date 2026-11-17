@@ -11,9 +11,14 @@ echo "☁ 云悠安装器"
 # 1) 优先：下载官方预编译二进制（无需 Rust 工具链）
 #    预编译包随 gitee Release 发布（资产名：yunyou-<版本>-x86_64-linux.tar.gz）
 if command -v curl >/dev/null 2>&1; then
-  LATEST_URL="https://gitee.com/yiyuai/yunyou/releases/latest"
-  # gitee release API 不需鉴权；取资产下载链接
-  ASSET=$(curl -fsSL "$LATEST_URL/api" 2>/dev/null | grep -o 'https://gitee.com/yiyuai/yunyou/releases/download/[^"]*x86_64-linux.tar.gz' | head -1 || true)
+  # 双源探测：github Release 资产直链（开源发布面）→ gitee Release（开发主仓）
+  GH="https://github.com/5201314155/yunyou/releases/latest/download/yunyou-v0.1.0-x86_64-linux.tar.gz"
+  ASSET=""
+  curl -fsSLI -o /dev/null "$GH" && ASSET="$GH"
+  if [ -z "$ASSET" ]; then
+    LATEST_URL="https://gitee.com/yiyuai/yunyou/releases/latest"
+    ASSET=$(curl -fsSL "$LATEST_URL/api" 2>/dev/null | grep -o 'https://gitee.com/yiyuai/yunyou/releases/download/[^"]*x86_64-linux.tar.gz' | head -1 || true)
+  fi
   if [ -n "$ASSET" ]; then
     echo "→ 下载预编译二进制：$ASSET"
     TMP=$(mktemp -d)
