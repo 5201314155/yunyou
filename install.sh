@@ -1,24 +1,21 @@
 #!/bin/sh
 # 云悠（YunYou）一条命令全局安装
-# 用法：curl -fsSL https://gitee.com/yiyuai/yunyou/raw/main/install.sh | sh
+# 用法：curl -fsSL https://github.com/5201314155/yunyou/raw/main/install.sh | sh
 set -e
 
-REPO="https://gitee.com/yiyuai/yunyou.git"
+REPO="https://github.com/5201314155/yunyou.git"
 BIN_DIR="${YUNYOU_INSTALL_DIR:-$HOME/.local/bin}"
 
 echo "☁ 云悠安装器"
 
 # 1) 优先：下载官方预编译二进制（无需 Rust 工具链）
-#    预编译包随 gitee Release 发布（资产名：yunyou-<版本>-x86_64-linux.tar.gz）
+#    预编译包随 GitHub Release 发布（资产名：yunyou-<版本>-x86_64-linux.tar.gz）
 if command -v curl >/dev/null 2>&1; then
-  # 双源探测：github Release 资产直链（开源发布面）→ gitee Release（开发主仓）
+  # Release 资产直链（github 开源发布面）
   GH="https://github.com/5201314155/yunyou/releases/latest/download/yunyou-v0.1.0-x86_64-linux.tar.gz"
   ASSET=""
   curl -fsSLI -o /dev/null "$GH" && ASSET="$GH"
-  if [ -z "$ASSET" ]; then
-    LATEST_URL="https://gitee.com/yiyuai/yunyou/releases/latest"
-    ASSET=$(curl -fsSL "$LATEST_URL/api" 2>/dev/null | grep -o 'https://gitee.com/yiyuai/yunyou/releases/download/[^"]*x86_64-linux.tar.gz' | head -1 || true)
-  fi
+
   if [ -n "$ASSET" ]; then
     echo "→ 下载预编译二进制：$ASSET"
     TMP=$(mktemp -d)
@@ -36,7 +33,7 @@ fi
 if ! command -v cargo >/dev/null 2>&1; then
   echo "✗ 未找到预编译包，且本机无 cargo。"
   echo "  安装 Rust：curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
-  echo "  或到 https://gitee.com/yiyuai/yunyou/releases 手动下载二进制。"
+  echo "  或到 https://github.com/5201314155/yunyou/releases 手动下载二进制。"
   exit 1
 fi
 echo "→ 未见预编译包，走源码安装（cargo install --git，1-2 分钟）"

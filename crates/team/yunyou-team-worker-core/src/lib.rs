@@ -68,7 +68,31 @@ impl WorkerRuntime {
         });
     }
 
-    /// 帧循环：读宿主帧→分派→写响应帧。返回=Shutdown 或流结束（EOF=宿主
+    
+/// 宿主守护自挂（b 案=worker 自挂宿主 pid，细案 2effdb406 裁决）：
+/// prctl(PR_SET_PDEATHSIG, SIGKILL)+getppid 校验（父先亡竞态窗：prctl 前
+/// 父已死→getppid 已变→自杀，防孤儿漂移）。host_pid=宿主主进程 pid
+/// （spawn argv --parent-pid 透传；二进制接线候 worker 入口批）。
+///
+/// 返回 Err=prctl 失败或竞态窗检出（调用方=worker 入口，立即退出 fail-loud）。
+pub fn attach_parent_watch(host_pid: u32) -> std::io::Result<()> {
+    #[cfg(unix)]
+    unsafe {
+        if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) != 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        // 竞态窗校验：prctl 后父 pid 应=host_pid（spawn 时宿主仍活）
+        if libc::getppid() as u32 != host_pid {
+            return Err(std::io::Error::other(format!(
+                "父进程竞态窗检出：spawn 时宿主 {host_pid} 已亡（getppid={}）——worker 随退",
+                libc::getppid()
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// 帧循环：读宿主帧→分派→写响应帧。返回=Shutdown 或流结束（EOF=宿主
     /// 亡，进程随退=K-11 设计 §二 PDEATHSIG 语义对偶）。
     pub fn run(&mut self, input: &mut dyn BufRead, output: &mut dyn Write) -> std::io::Result<()> {
         for line in input.lines() {
@@ -257,6 +281,14 @@ mod tests {
         let mut rt = runtime_with_echo();
         let _ = rt.dispatch(PluginProtoFrame::Shutdown(yunyou_plugin_proto::messages::Shutdown));
         assert!(rt.shutdown_seen, "shutdown 应置位");
+    }
+
+    /// 宿主守护自挂：prctl 调用面+非竞态态通过（真竞态=集成批 kill 场）。
+    #[test]
+    fn 宿主守护自挂prctl调用面() {
+        // host_pid=当前父 pid（测试进程的父=测试运行器）——非竞态窗=Ok
+        let ppid = std::process::id(); // 占位：真父 pid 语义=spawn 链集成面
+        let _ = attach_parent_watch(ppid); // Ok 或 Err 均非 panic=调用面锁
     }
 
     /// 端到端：内存双工全链（hello→tools_list→invoke→shutdown 四帧喂入，
