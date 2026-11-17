@@ -43,7 +43,7 @@ fn template_cargo_toml(name: &str) -> String {
 name = "{name}"
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+license = "Apache-2.0"
 
 [[bin]]
 name = "{name}"

@@ -3,7 +3,7 @@ name = "yunyou-plugin-sdk"
 description = "云悠插件开发 SDK：插件作者唯一依赖——声明工具+一个 main 自带子进程协议服务，编译产物=独立可执行，被内核 spawn 即用（零依赖内核源码）"
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+license = "Apache-2.0"
 
 [dependencies]
 # 依赖上界（lead 裁决 2026-11-18，硬验收=cargo tree 断言锁死）：

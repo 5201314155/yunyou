@@ -20,7 +20,6 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -99,15 +98,12 @@ pub trait HooksRegistryService: Send + Sync {
 
 struct HookEntry {
     hook: Arc<dyn PreComposeHook>,
-    /// 注册序（同 order 稳定排序键）。
-    seq: usize,
 }
 
 /// 钩子注册表（线程安全；runner 与服务面共享同一实例）。
 #[derive(Default)]
 pub struct HooksRegistry {
     entries: RwLock<Vec<HookEntry>>,
-    seq_next: AtomicUsize,
     /// 连败计数（按钩子名；成功清零，达阈值摘除）。
     failures: Mutex<HashMap<String, u32>>,
 }
@@ -122,8 +118,7 @@ impl HooksRegistry {
                 format!("钩子「{}」重复注册（同名 fail-loud）", hook.name()),
             ));
         }
-        let seq = self.seq_next.fetch_add(1, Ordering::Relaxed);
-        entries.push(HookEntry { hook, seq });
+        entries.push(HookEntry { hook });
         Ok(())
     }
 

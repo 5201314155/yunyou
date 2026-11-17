@@ -11,18 +11,17 @@ echo "☁ 云悠安装器"
 # 1) 优先：下载官方预编译二进制（无需 Rust 工具链）
 #    预编译包随 GitHub Release 发布（资产名：yunyou-<版本>-x86_64-linux.tar.gz）
 if command -v curl >/dev/null 2>&1; then
-  # Release 资产直链（github 开源发布面）
-  GH="https://github.com/5201314155/yunyou/releases/latest/download/yunyou-v0.1.0-x86_64-linux.tar.gz"
+  # 主路径：release-bin 分支直拉预编译二进制（raw，免 Release 网页操作）
+  GH="https://raw.githubusercontent.com/5201314155/yunyou/release-bin/yunyou"
   ASSET=""
   curl -fsSLI -o /dev/null "$GH" && ASSET="$GH"
 
   if [ -n "$ASSET" ]; then
     echo "→ 下载预编译二进制：$ASSET"
     TMP=$(mktemp -d)
-    curl -fsSL "$ASSET" -o "$TMP/yunyou.tar.gz"
-    tar -xzf "$TMP/yunyou.tar.gz" -C "$TMP"
+    curl -fsSL "$GH" -o "$TMP/yunyou.tar.gz"
     mkdir -p "$BIN_DIR"
-    install -m 755 "$TMP/yunyou" "$BIN_DIR/yunyou"
+    install -m 755 "$TMP/yunyou.tar.gz" "$BIN_DIR/yunyou"
     rm -rf "$TMP"
     echo "✓ 已安装到 $BIN_DIR/yunyou（预编译）"
     exit 0

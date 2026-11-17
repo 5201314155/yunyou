@@ -118,4 +118,4 @@ and `sdk/yunyou-plugin-sdk/SDK.md` for the capability matrix.
 
 ## License
 
-MIT — see THIRD_PARTY_NOTICES.md for third-party license register.
+Apache-2.0 — see THIRD_PARTY_NOTICES.md for third-party license register.

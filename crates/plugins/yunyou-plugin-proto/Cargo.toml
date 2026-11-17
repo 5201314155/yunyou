@@ -3,7 +3,7 @@ name = "yunyou-plugin-proto"
 description = "L2 外部装载缝协议类型单源（K-19 刀1，宿主↔插件子进程双端共用；封闭枚举+tag type+JSON Lines+版本握手——纪律复用 ipc-types 做法不复用其类型）"
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+license = "Apache-2.0"
 
 
 [dependencies]

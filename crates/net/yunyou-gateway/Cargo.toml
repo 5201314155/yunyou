@@ -3,7 +3,7 @@ name = "yunyou-gateway"
 description = "网关（K-12 阶段 A）：两段式令牌/配对双式/失败锁定/审计/存储纯逻辑层（无网络；http/ws/ipc-client 随阶段 B）"
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+license = "Apache-2.0"
 
 
 [dependencies]

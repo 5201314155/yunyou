@@ -3,7 +3,7 @@ name = "yunyou-ipc-types"
 description = "网关↔大 agent IPC 消息类型单源（K-12 阶段 A，serde+schemars 唯一真源；帧常量与凭证路径约定）"
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+license = "Apache-2.0"
 
 
 [dependencies]

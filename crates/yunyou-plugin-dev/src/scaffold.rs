@@ -74,7 +74,7 @@ fn cargo_toml(id: &str) -> String {
 name = "{id}"
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+license = "Apache-2.0"
 
 [dependencies]
 yunyou-plugin-sdk = {{ path = "../../plugins/yunyou-plugin-sdk", version = "0.1.0" }}

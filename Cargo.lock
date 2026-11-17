@@ -3037,6 +3037,7 @@ version = "0.1.0"
 name = "yunyou-team-worker-core"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "yunyou-plugin-proto",
 ]
 
