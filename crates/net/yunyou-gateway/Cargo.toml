@@ -1,0 +1,27 @@
+[package]
+name = "yunyou-gateway"
+description = "网关（K-12 阶段 A）：两段式令牌/配对双式/失败锁定/审计/存储纯逻辑层（无网络；http/ws/ipc-client 随阶段 B）"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+
+[dependencies]
+yunyou-ipc-types = { path = "../yunyou-ipc-types" }
+rusqlite = { version = "0.31", features = ["bundled"] }
+sha2 = "0.10"
+getrandom = "0.2"
+# 阶段 B（方案 §9.1 已批清单）：HTTP/WS 服务+鉴权中间件层
+axum = { version = "0.7", features = ["ws"] }
+tower = { version = "0.4", features = ["util"] }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync", "macros"] }
+serde_json = "1"
+# 阶段 C 候选：qrcode（扫码 QR 渲染，§4.1 载荷已阶段 A 组装）
+
+[dev-dependencies]
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+# K-14 第 1 步/观察期：继承 workspace lints（unwrap_used/expect_used=warn）
+[lints]
+workspace = true

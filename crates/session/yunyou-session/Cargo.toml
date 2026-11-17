@@ -1,0 +1,22 @@
+[package]
+name = "yunyou-session"
+description = "会话事件模型 + SessionStore 服务 + JSONL 追加存储与重启恢复（方案 §2.5）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+yunyou = { workspace = true }
+yunyou-util = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+schemars = "1"
+# 跨进程会话排他锁（task-36① 方案 A）：flock 原语（锁随进程死自动释放，零尸锁）
+libc = "0.2"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+# K-14 第 1 步/观察期：继承 workspace lints（unwrap_used/expect_used=warn）
+[lints]
+workspace = true

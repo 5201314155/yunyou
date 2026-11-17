@@ -1,0 +1,19 @@
+# yunyou-config：yunyou.toml 加载与校验（任务 3B，方案 §2.5 纯库组件，无服务句柄）
+[package]
+name = "yunyou-config"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# 内核复用：ValidationError 聚合与 jsonschema 校验器（对齐内核错误风格，方案 §2.2）
+yunyou = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+# schema：schemars 1.x 生成 JSON Schema 2020-12，与 jsonschema 0.61 同套词汇（方案 §2.8）
+schemars = { version = "1", features = ["derive"] }
+# yunyou.toml 文本解析（TOML 是 JSON 值子集，可直接反序列化进 serde_json::Value）
+toml = "0.9"
+# K-14 第 1 步/观察期：继承 workspace lints（unwrap_used/expect_used=warn）
+[lints]
+workspace = true

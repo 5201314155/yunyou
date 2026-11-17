@@ -1,0 +1,18 @@
+# 命令注册缝（任务29 C1）：CommandsService 服务缝 + 注册表实现 + 缝插件。
+# 依赖方向：yunyou-commands → yunyou 内核 → yunyou-util（单向，方案 §2.6）；
+# 本 crate 与 yunyou-agent-loop 无依赖边——命令面零进模型的结构保证。
+[package]
+name = "yunyou-commands"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+yunyou = { workspace = true }
+yunyou-util = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+# K-14 第 1 步/观察期：继承 workspace lints（unwrap_used/expect_used=warn）
+[lints]
+workspace = true

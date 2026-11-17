@@ -1,0 +1,16 @@
+[package]
+name = "yunyou-llm"
+description = "Llm 服务契约：消息/内容块/流增量类型与 object-safe trait（Service Definition，方案 §2.1.3）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+yunyou = { workspace = true }
+yunyou-util = { workspace = true }
+tokio-util = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+# K-14 第 1 步/观察期：继承 workspace lints（unwrap_used/expect_used=warn）
+[lints]
+workspace = true

@@ -1,0 +1,64 @@
+# yunyou 依赖门禁（cargo deny check）
+# 背景：方案 §2.6 / 风险 7——团队运行时中「不依赖内核」的角色（team-launcher、
+# team-probe、修复模式 worker）禁止依赖 yunyou 内核（救援链不背内核）。
+# 当前 team crates 尚未创建（任务 5 落地时建），本文件先给出可通过的结构：
+# yunyou 此刻无任何依赖者，wrapper 白名单不触发违规，`cargo deny check` 通过；
+# 未来一旦出现 `team-launcher → yunyou` 之类的边，bans 检查即失败。
+
+[licenses]
+# 依赖许可白名单（当前依赖均为 MIT / Apache-2.0 系）。
+# ISC / MIT-0：ring、referencing（jsonschema 传递依赖）等组件的许可，均属宽松系
+allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "Unicode-3.0", "Zlib", "CDLA-Permissive-2.0", "ISC", "MIT-0"]
+confidence-threshold = 0.93
+
+[bans]
+# 过渡期允许多版本并存，只告警（收敛后改 deny）。
+multiple-versions = "warn"
+# workspace path 依赖（`{ workspace = true }`）在 cargo-deny 的版本请求视角
+# 即 wildcard——这是 workspace 内部开发的标准形态，故只告警；
+# 核心门禁（yunyou 内核的 wrappers 白名单）保持 deny 不放松。
+wildcards = "warn"
+
+# ── 团队二进制 ↔ 内核依赖门禁（方案 §2.7.2 的依赖边界）──────────────────
+# 机制：wrappers 白名单——yunyou 内核只允许被下列 crate **直接**依赖。
+# 名单 = 组件 crate（任务 3 起）+ 宿主 yunyou-cli + 团队运行时中允许持有内核的
+# 两个角色（team-orchestrator / team-worker，蓝图二-2、三-3）。
+# team-launcher、team-probe、修复模式 worker 二进制不在名单内，出现依赖即失败。
+[[bans.deny]]
+name = "yunyou"
+wrappers = [
+    # 内核组件 crate（方案 §2.5 第一批；dsh-config/dsh-cli 为云门辖区旧名，改名由其自理）
+    "yunyou-config",
+    "yunyou-llm",
+    "yunyou-llm-openai",
+    "yunyou-session",
+    "yunyou-tools",
+    "yunyou-system-prompt",
+    "yunyou-agent-loop",
+    "yunyou-cli",
+    # 任务 29/C1：命令注册缝（主板加强项，与 yunyou-tools 同级的缝服务 crate）
+    "yunyou-commands",
+    # [基线纠偏 2026-11-14 云伍] yunyou-credentials 随 d969162 入库但本表漏登记，
+    # bans 门禁基线即红（非 S10 引入）；补登记恢复门禁语义，知会匠二/lead。
+    "yunyou-credentials",
+    # 任务18/S10（云伍）：重试策略插件（第一张实战卡）
+    "yunyou-retry",
+    # 任务26/K-7（云络）：团队插件 yunyou-team（teammate fiber+工具面，2026-11-16）
+    "yunyou-team",
+    # [deps-gate 注记 2026-11-16 task-21/K-12] yunyou-gateway/yunyou-ipc-types
+    # 刻意不入本名单：网关与协议类型 crate 不依赖内核（方案 §9.1 黑名单语义），
+    # 名单缺席即禁止——若未来出现依赖需求=方案修订（评审线一）。
+    # [豁免留痕 2026-11-14 D-5/云点] 团队运行时两角色（蓝图二-2/三-3，对应池卡
+    # K-11/task-20 二期）的 crate 尚未创建，「登记先于实体」在本机 cargo-deny
+    # 0.20.2 下产生 unused-wrapper 告警（检查 exit 0，实测 18:2x；告警噪音=门禁
+    # 假绿温床）。按 lead 暂裁先撤出白名单止噪；K-11 开工建 crate 后恢复登记
+    # 转正——deny 语义不变，恢复时补回下面两行即可：
+    # "team-orchestrator",
+    # "team-worker",
+]
+
+# ── 漏洞扫描（advisories）环境受限说明 ─────────────────────────────
+# RustSec advisory-db 托管在 github（RustSec/advisory-db），本机网络不可达
+# （rsproxy 可达、github 不可达，实测 2026-11-13），故本文件不配置 [advisories]，
+# `cargo deny check` 默认跑 licenses/bans/sources 三项；漏洞扫描在有网环境
+# 或 CI 补跑 `cargo deny check advisories` 即可，与本门禁的依赖边界目标无重叠。

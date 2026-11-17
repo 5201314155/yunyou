@@ -1,0 +1,19 @@
+[package]
+name = "scheduler-sample"
+description = "scheduler.v1 S3 三工具样板（池 task-14）：schedule_create/list/delete——模型自主定时的模型交互面（真会话投递候 proto v1.1 开闸，S4 durable 持久化另批）"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+yunyou-plugin-sdk = { path = "../../yunyou-plugin-sdk", version = "0.1.0" }
+schemars = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[[bin]]
+name = "scheduler-sample"
+path = "src/main.rs"
+
+[lints]
+workspace = true

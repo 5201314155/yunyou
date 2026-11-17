@@ -1,0 +1,10 @@
+[package]
+name = "yunyou-team-launcher"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }

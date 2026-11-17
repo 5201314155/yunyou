@@ -1,0 +1,47 @@
+# yunyou-web：web 启动形态（`yunyou web` 浏览器界面；云幕独占 crate）
+# 形态裁决（lead 业主令）：web 面 = cli 的并列前端——同一装配、同一会话、同一
+# agent-loop；本 crate 只做 HTTP+WS 的壳，不改装配序列、不加内核机制。
+[package]
+name = "yunyou-web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "yunyou_web"
+path = "src/lib.rs"
+
+[dependencies]
+# 内核服务缝（root/ServiceId）：装配产物经 run.rs 回调注入——本 crate **不依赖
+# yunyou-cli**（cli 接线侧依赖本 crate，反向即循环），当前会话 root 走回调取
+yunyou = { workspace = true }
+yunyou-agent-loop = { path = "../../core/yunyou-agent-loop" }
+yunyou-commands = { path = "../../shell/yunyou-commands" }
+yunyou-session = { workspace = true }
+yunyou-util = { workspace = true }
+# HTTP+WebSocket 一体（依赖预批：axum，tokio 系；前端零 node 构建链——
+# vanilla JS/CSS 静态资产 include_str! 嵌入二进制，改完重编译即生效）
+axum = { workspace = true }
+# 运行时（Ctrl-C 信号）与取消令牌（stop 收场令牌）
+tokio = { workspace = true, features = ["signal"] }
+tokio-util = { workspace = true }
+# WS 协议序列化 + 访问令牌铸造（uuid v4）+ command_id 配对键（命令缝 D2）
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+
+[build-dependencies]
+# build.rs 解析设计 token 单源（docs/设计/tokens.json，云鉴产出；与 yunyou-cli
+# 的 palette.rs 同机制同纪律：样式值只从 tokens 派生一处，Web 端不得私设色值）
+serde_json = "1"
+
+[dev-dependencies]
+# 真机 HTTP 自测（token 鉴权 403/200 两态 + 资产可达；不 mock 通道）
+reqwest = { workspace = true }
+# WS 端到端自测（hello/回合失败路径）：两者皆 axum/hyper 的既有传递依赖，
+# 提为 dev 只补测试引用，零新增编译产物（依赖纪律内说明见 P2 简报）
+tokio-tungstenite = "0.29"
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+# K-14 第 1 步/观察期：继承 workspace lints（unwrap_used/expect_used=warn）
+[lints]
+workspace = true

@@ -1,0 +1,18 @@
+[package]
+name = "yunyou-plugin-dev"
+description = "插件开发工具族（K-2/K-2-①）：plugin_contract_read + plugin_validate——manifest 声明面在开发时即可验证（不依赖 REPL 装载报错回环）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+yunyou = { workspace = true }
+yunyou-util = { workspace = true }
+yunyou-tools = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+
+[lints]
+workspace = true

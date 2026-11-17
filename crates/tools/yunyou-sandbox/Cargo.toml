@@ -1,0 +1,24 @@
+[package]
+name = "yunyou-sandbox"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+yunyou = { path = "../../core/yunyou" }
+yunyou-tools = { path = "../yunyou-tools" }
+yunyou-system-prompt = { path = "../../shell/yunyou-system-prompt" }
+landlock = "0.4.4"
+seccompiler = "0.5.0"
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+schemars = "1"
+serde_json = "1"
+yunyou-util = { path = "../../core/yunyou-util" }
+# K-14 第 1 步/观察期：继承 workspace lints（unwrap_used/expect_used=warn）
+[lints]
+workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true }
+serde_json = { workspace = true }

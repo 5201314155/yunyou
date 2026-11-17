@@ -1,0 +1,5 @@
+[K  [38;5;71m✓[0m [1m[38;5;96medit[0m [2m·[0m 改 crates/yunyou/src/fiber.rs · 替换 1 处[0m
+    [2m▎[0m [2m⋮ 上下文 2 行[0m
+    [2m▎[0m [38;5;167m−[0m let epoch = self.epochs[id];
+    [2m▎[0m [38;5;71m+[0m let epoch = self.recompute_epoch(id);
+    [2m▎[0m [38;5;71m+[0m epoch_gate(epoch)?;

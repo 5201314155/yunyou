@@ -1,0 +1,108 @@
+import { jsx as _jsx } from "react/jsx-runtime";
+import { QuotePreview } from '@deepseek-ai/dsh-client-ui-primitives';
+import { formatQuoteText } from '@deepseek-ai/dsh-client-ui-primitives';
+import { createCommand, DecoratorNode } from 'lexical';
+const EMPTY_LABELS = { remove: '' };
+/** Remove one quote occurrence by its Lexical identity. */
+export const REMOVE_QUOTE_COMMAND = createCommand('REMOVE_QUOTE_COMMAND');
+/** Pure React face of one quote node. */
+export function QuoteNodeView({ editor, nodeKey, text, summary, labels }) {
+    return (_jsx(QuotePreview, { text: text, summary: summary, removal: {
+            label: labels.remove,
+            onRemove: () => { editor.dispatchCommand(REMOVE_QUOTE_COMMAND, nodeKey); },
+        } }));
+}
+/** One selected transcript range represented as an atomic inline decorator. */
+export class QuoteNode extends DecoratorNode {
+    __text;
+    __summary;
+    __labels;
+    /** Lexical node registry type tag. */
+    static getType() {
+        return 'quote';
+    }
+    /** @param node - node to clone. @returns a copy carrying the same NodeKey. */
+    static clone(node) {
+        return new QuoteNode(node.__text, node.__labels, node.__summary, node.__key);
+    }
+    /** @param json - serialized editor node. @returns a fresh node with default runtime labels. */
+    static importJSON(json) {
+        return new QuoteNode(json.text, EMPTY_LABELS, json.summary);
+    }
+    /**
+     * @param text - selected text.
+     * @param labels - runtime-only localized labels.
+     * @param summary - readable display shown instead of the text.
+     * @param key - Lexical clone-path key; absent for fresh nodes.
+     */
+    constructor(text, labels = EMPTY_LABELS, summary, key) {
+        super(key);
+        this.__text = text;
+        this.__summary = summary;
+        this.__labels = labels;
+    }
+    /** Serialize the quote data without its runtime presentation state. */
+    exportJSON() {
+        return {
+            ...super.exportJSON(),
+            type: 'quote',
+            version: 1,
+            text: this.__text,
+            ...(this.__summary === undefined ? {} : { summary: this.__summary }),
+        };
+    }
+    /** Mount one non-editable inline host. */
+    createDOM(_config) {
+        const element = document.createElement('span');
+        element.setAttribute('data-composer-quote', '');
+        element.setAttribute('contenteditable', 'false');
+        return element;
+    }
+    /** Updates reuse the existing host element. */
+    updateDOM() {
+        return false;
+    }
+    /** Quotes flow with draft text and wrap at their own text boundary. */
+    isInline() {
+        return true;
+    }
+    /** Arrow movement crosses the quote without entering a NodeSelection. */
+    isKeyboardSelectable() {
+        return false;
+    }
+    /** Clipboard text is the exact model-visible Markdown blockquote. */
+    getTextContent() {
+        return formatQuoteText(this.__text);
+    }
+    /** Selected visible quote text. */
+    getQuoteText() {
+        return this.getLatest().__text;
+    }
+    /** Readable display the inserting owner supplied, if any. */
+    getQuoteSummary() {
+        return this.getLatest().__summary;
+    }
+    /** Update the localized remove label without changing persisted quote data. */
+    setLabels(labels) {
+        if (this.getLatest().__labels.remove !== labels.remove)
+            this.getWritable().__labels = labels;
+    }
+    /** Render the quote body and its independent close control. */
+    decorate(editor) {
+        return (_jsx(QuoteNodeView, { editor: editor, nodeKey: this.__key, text: this.__text, summary: this.__summary, labels: this.__labels }));
+    }
+}
+/**
+ * @param text - selected quote text.
+ * @param labels - runtime labels.
+ * @param summary - readable display shown instead of the text.
+ * @returns a fresh node.
+ */
+export function $createQuoteNode(text, labels, summary) {
+    return new QuoteNode(text, labels, summary);
+}
+/** @param node - possible Lexical node. @returns whether it is a QuoteNode. */
+export function $isQuoteNode(node) {
+    return node instanceof QuoteNode;
+}
+//# sourceMappingURL=QuoteNode.js.map

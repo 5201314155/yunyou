@@ -1,0 +1,282 @@
+/* 云悠 web 壳层样式（P1 骨架）。
+   纪律：本文件只消费 /app.css 拼装头部的令牌变量（build.rs 从
+   docs/设计/tokens.json 生成），不私设色值/字号/间距；系统色（Canvas/
+   CanvasText）承接 token 未定值的「正文不设色」语义，并自适应系统深浅色。 */
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  background: Canvas;
+  color: CanvasText;
+  font-family: ui-sans-serif, system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: var(--yunyou-typo-body-size);
+  font-weight: var(--yunyou-typo-body-weight);
+  line-height: 1.65;
+}
+
+/* ── 顶栏：品牌 + 模型 + 连接状态 ─────────────────────────────── */
+.topbar {
+  position: relative; /* 会话下拉的定位锚 */
+  display: flex;
+  align-items: center;
+  gap: var(--yunyou-space-3);
+  padding: var(--yunyou-space-2) var(--yunyou-space-4);
+  border-bottom: 1px solid color-mix(in srgb, var(--yunyou-color-text-secondary) 30%, transparent);
+}
+
+.brand {
+  font-size: var(--yunyou-typo-display-size);
+  font-weight: var(--yunyou-typo-display-weight);
+  color: var(--yunyou-color-brand-primary);
+}
+
+.model {
+  color: var(--yunyou-color-text-secondary);
+  font-size: var(--yunyou-typo-caption-size);
+}
+
+.status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--yunyou-space-1);
+  color: var(--yunyou-color-text-secondary);
+  font-size: var(--yunyou-typo-caption-size);
+}
+
+/* P4 会话面：会话按钮 + 下拉列表（描边式，纯令牌取值） */
+.ghost-btn {
+  padding: var(--yunyou-space-1) var(--yunyou-space-2);
+  border: 1px solid color-mix(in srgb, var(--yunyou-color-text-secondary) 40%, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: CanvasText;
+  font-size: var(--yunyou-typo-caption-size);
+  cursor: pointer;
+}
+.ghost-btn:disabled { opacity: 0.5; cursor: default; }
+.session-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: var(--yunyou-space-4);
+  z-index: 10;
+  min-width: 260px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: Canvas;
+  border: 1px solid color-mix(in srgb, var(--yunyou-color-text-secondary) 40%, transparent);
+  border-radius: 8px;
+  padding: var(--yunyou-space-1);
+  box-shadow: 0 4px 16px color-mix(in srgb, CanvasText 14%, transparent);
+}
+.session-menu.open { display: block; }
+.session-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--yunyou-space-1) var(--yunyou-space-2);
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: CanvasText;
+  font-size: var(--yunyou-typo-caption-size);
+  cursor: pointer;
+}
+.session-item:hover { background: color-mix(in srgb, var(--yunyou-color-brand-primary) 14%, transparent); }
+.session-empty { padding: var(--yunyou-space-2); color: var(--yunyou-color-text-secondary); font-size: var(--yunyou-typo-caption-size); }
+
+/* §4.13 回放头与系统消息（烟灰系） */
+.session-head, .msg-system {
+  color: var(--yunyou-color-text-secondary);
+  font-size: var(--yunyou-typo-caption-size);
+  margin: var(--yunyou-space-2) 0;
+}
+
+/* 状态灯：就绪=苔绿，失败=绯红，连接中=秋香黄（语义映射，不私设新色） */
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--yunyou-color-feedback-warning);
+  transition: background var(--yunyou-duration-fast) var(--yunyou-ease-standard);
+}
+.dot.ok   { background: var(--yunyou-color-feedback-success); }
+.dot.err  { background: var(--yunyou-color-feedback-danger); }
+
+/* ── 对话流（P2 承载逐字渲染；P1 只放 hello 卡） ─────────────── */
+.stream {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--yunyou-space-4);
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.card {
+  border: 1px solid color-mix(in srgb, var(--yunyou-color-text-secondary) 25%, transparent);
+  border-radius: 10px;
+  padding: var(--yunyou-space-4);
+  margin-bottom: var(--yunyou-space-4);
+}
+
+.card h1 {
+  font-size: var(--yunyou-typo-heading1-size);
+  font-weight: var(--yunyou-typo-heading1-weight);
+  color: var(--yunyou-color-brand-primary);
+  margin: 0 0 var(--yunyou-space-2);
+}
+
+.card p { margin: 0 0 var(--yunyou-space-2); }
+
+.caption {
+  color: var(--yunyou-color-text-secondary);
+  font-size: var(--yunyou-typo-caption-size);
+}
+
+code {
+  font-family: var(--yunyou-typo-code-family);
+  font-size: var(--yunyou-typo-code-size);
+  color: var(--yunyou-color-brand-secondary);
+}
+
+/* ── 输入栏（P3 接线；P1 置灰说明状态，不假装可用） ──────────── */
+.inputbar {
+  display: flex;
+  gap: var(--yunyou-space-2);
+  padding: var(--yunyou-space-2) var(--yunyou-space-4) var(--yunyou-space-3);
+  border-top: 1px solid color-mix(in srgb, var(--yunyou-color-text-secondary) 30%, transparent);
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.inputbar textarea {
+  flex: 1;
+  resize: none;
+  padding: var(--yunyou-space-2) var(--yunyou-space-3);
+  border: 1px solid color-mix(in srgb, var(--yunyou-color-text-secondary) 40%, transparent);
+  border-radius: 8px;
+  background: Canvas;
+  color: CanvasText;
+  font: inherit;
+}
+
+.inputbar textarea:focus-visible {
+  outline: 2px solid var(--yunyou-color-brand-bright);
+  outline-offset: -1px;
+}
+
+.inputbar textarea:disabled { opacity: 0.55; }
+
+/* 按钮：描边式——文字用系统前景色、边框用品牌色，全部取自令牌/系统色
+   （不私设「on-brand 文字色」；如需实心底按钮，先在 tokens.json 加语义色） */
+.inputbar button {
+  padding: var(--yunyou-space-2) var(--yunyou-space-4);
+  border: 1px solid var(--yunyou-color-brand-primary);
+  border-radius: 8px;
+  background: transparent;
+  color: CanvasText;
+  font: inherit;
+  cursor: pointer;
+  transition: background var(--yunyou-duration-fast) var(--yunyou-ease-standard);
+}
+
+.inputbar button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--yunyou-color-brand-primary) 18%, transparent);
+}
+.inputbar button:disabled { opacity: 0.55; cursor: default; }
+
+/* ── 对话流视觉块（与 CLI 规范 §4 同构；正文不设色=系统前景色） ── */
+
+/* §4.3 用户消息回显：❯ 云青 + 正文常规 */
+.msg-user {
+  display: flex;
+  gap: var(--yunyou-space-2);
+  margin: var(--yunyou-space-4) 0 var(--yunyou-space-2);
+}
+.msg-user .sym.prompt { color: var(--yunyou-color-brand-primary); }
+.msg-user .text { white-space: pre-wrap; word-break: break-word; }
+
+/* §4.5 流式回复：pre-wrap 逐字追加；等待指示烟灰 */
+.msg-assistant { margin: var(--yunyou-space-2) 0; }
+.msg-assistant .text { white-space: pre-wrap; word-break: break-word; }
+.waiting { color: var(--yunyou-color-brand-bright); }
+
+/* 思考收敛：折叠条烟灰；展开正文烟灰缩进 */
+.msg-thinking {
+  color: var(--yunyou-color-text-secondary);
+  font-size: var(--yunyou-typo-caption-size);
+  margin: var(--yunyou-space-2) 0;
+  padding-left: var(--yunyou-space-3);
+}
+.msg-thinking summary { cursor: pointer; list-style: none; }
+.msg-thinking .think-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-left: 2px solid color-mix(in srgb, var(--yunyou-color-text-secondary) 40%, transparent);
+  padding-left: var(--yunyou-space-2);
+  margin-top: var(--yunyou-space-1);
+}
+
+/* §4.6/4.7 工具卡：行首两空格起；工具名着重；参数/结果摘要烟灰 */
+.tool-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--yunyou-space-1);
+  margin: var(--yunyou-space-2) 0 var(--yunyou-space-2) var(--yunyou-space-3);
+  font-size: var(--yunyou-typo-caption-size);
+}
+.tool-card .spinner { color: var(--yunyou-color-brand-bright); }
+.tool-card .sym.ok { color: var(--yunyou-color-feedback-success); }
+.tool-card .sym.err { color: var(--yunyou-color-feedback-danger); }
+.tool-name { font-weight: 700; }
+.tool-args { color: var(--yunyou-color-text-secondary); }
+.tool-detail {
+  flex-basis: 100%;
+  margin-left: var(--yunyou-space-4);
+}
+.tool-detail summary {
+  cursor: pointer;
+  color: var(--yunyou-color-text-secondary);
+}
+.tool-detail pre {
+  margin: var(--yunyou-space-1) 0 0;
+  padding: var(--yunyou-space-2) var(--yunyou-space-3);
+  max-height: 240px;
+  overflow: auto;
+  border-left: 2px solid color-mix(in srgb, var(--yunyou-color-text-secondary) 30%, transparent);
+  font-family: var(--yunyou-typo-code-family);
+  font-size: var(--yunyou-typo-code-size);
+  white-space: pre;
+}
+
+/* §4.12 状态落款行：烟灰全行；截断告示秋香黄 */
+.turn-done {
+  color: var(--yunyou-color-text-secondary);
+  font-size: var(--yunyou-typo-caption-size);
+  margin: var(--yunyou-space-2) 0 var(--yunyou-space-4);
+}
+.turn-truncated { color: var(--yunyou-color-feedback-warning); font-size: var(--yunyou-typo-caption-size); }
+
+/* 壳层词汇：命令输出等宽块 / 错误绯红 / 断别烟灰 */
+.msg-command {
+  font-family: var(--yunyou-typo-code-family);
+  font-size: var(--yunyou-typo-code-size);
+  white-space: pre-wrap;
+  border-left: 2px solid var(--yunyou-color-brand-primary);
+  padding-left: var(--yunyou-space-2);
+  margin: var(--yunyou-space-2) 0;
+}
+.msg-command.failed { border-left-color: var(--yunyou-color-feedback-danger); }
+.msg-error { color: var(--yunyou-color-feedback-danger); margin: var(--yunyou-space-2) 0; }
+.msg-bye { color: var(--yunyou-color-text-secondary); margin: var(--yunyou-space-2) 0; }

@@ -1,0 +1,27 @@
+/*
+ * Safe-area adaptation (task-40 P5 defect D2): with viewport-fit=cover the
+ * page paints under notches and home indicators; these four-way env() rules
+ * keep the app chrome clear of them. The variables are the single source the
+ * app frame consumes, so embedded or desktop faces without insets stay at 0.
+ */
+
+:root {
+  --yunyou-safe-area-top: env(safe-area-inset-top, 0px);
+  --yunyou-safe-area-right: env(safe-area-inset-right, 0px);
+  --yunyou-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --yunyou-safe-area-left: env(safe-area-inset-left, 0px);
+}
+
+html {
+  padding:
+    var(--yunyou-safe-area-top)
+    var(--yunyou-safe-area-right)
+    var(--yunyou-safe-area-bottom)
+    var(--yunyou-safe-area-left);
+}
+
+body {
+  /* Fixed-viewport app layout: subtract the consumed insets instead of
+     stacking a second 100vh band beneath the html padding. */
+  height: calc(100vh - var(--yunyou-safe-area-top) - var(--yunyou-safe-area-bottom));
+}

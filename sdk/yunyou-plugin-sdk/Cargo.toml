@@ -1,0 +1,24 @@
+[package]
+name = "yunyou-plugin-sdk"
+description = "云悠插件开发 SDK：插件作者唯一依赖——声明工具+一个 main 自带子进程协议服务，编译产物=独立可执行，被内核 spawn 即用（零依赖内核源码）"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+# 依赖上界（lead 裁决 2026-11-18，硬验收=cargo tree 断言锁死）：
+# 只许 yunyou-plugin-proto（契约冻结面）+serde 家族。禁运内核包清单见 tests/sdk_zero_kernel_dep.rs。
+# cron 0.12=lead 追加批复（scheduler.v1 S1 报批项销号：纯 Rust 零重依赖口径；
+# 传递依赖 chrono 为其既有依赖，随批入白名单——零内核依赖口径不变）。
+yunyou-plugin-proto = { path = "../../crates/plugins/yunyou-plugin-proto", version = "0.1.0" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+schemars = "1"
+cron = "0.12"
+chrono = "0.4"
+
+[dev-dependencies]
+# 无
+
+[lints]
+workspace = true

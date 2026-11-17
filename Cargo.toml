@@ -1,0 +1,101 @@
+# yunyou-rs 工作区定义（任务 2：内核与工具库；任务 3A：组件五件套；
+# crates/team/ 与 yunyou-config/yunyou-cli 由后续任务按方案 §2.6 逐步加入）
+[workspace]
+resolver = "2"
+members = [
+    "crates/core/yunyou",
+    "crates/core/yunyou-util",
+    "crates/llm/yunyou-llm",
+    "crates/llm/yunyou-llm-openai",
+    "crates/session/yunyou-session",
+    "crates/tools/yunyou-tools",
+    "crates/shell/yunyou-system-prompt",
+    "crates/core/yunyou-agent-loop",
+    # 任务 3B（云门）：配置库 + CLI 外壳
+    "crates/infra/yunyou-config",
+    "crates/shell/yunyou-cli",
+    # 任务 13/S5+S8（匠二）：凭据服务 + settings 投影
+    "crates/infra/yunyou-credentials",
+    # 任务18/S10（云伍）：重试策略插件（第一张实战卡）
+    "crates/llm/yunyou-retry",
+    "crates/tools/yunyou-sandbox",
+    # 任务 29/C1（云键）：命令注册缝（主板面，命令体系设计 §一）
+    "crates/shell/yunyou-commands",
+    # web 启动形态（云幕）：`yunyou web` 浏览器界面对标官方 web 端——
+    # cli 的并列前端（同一装配/会话/agent-loop），不动装配序列不加内核机制
+    "crates/net/yunyou-web",
+    # 任务26/K-7（云络）：团队插件 yunyou-team（teammate fiber+名册/任务板/消息三件套）
+    "crates/team/yunyou-team",
+    # 任务21/K-12 阶段 A（云络）：网关协议类型单源+网关纯逻辑层（独立 bin 前身）
+    "crates/net/yunyou-ipc-types",
+    "crates/net/yunyou-gateway",
+    # 任务68/K-19 刀1（云络）：L2 外部装载缝协议类型单源（宿主↔插件双端）
+    "crates/plugins/yunyou-plugin-proto",
+    # task-10（云_gen）：插件开发 SDK（插件作者唯一依赖，零内核依赖 CI 断言锁死）
+    "sdk/yunyou-plugin-sdk",
+    # task-10（云_gen）：hello-sdk 自举示例（SDK 写→独立编译→install→spawn→真调用）
+    "sdk/examples/hello-sdk",
+    # K-2/①② 共享（云愈骨架+云刺 scaffold）：插件开发工具族（contract_read/validate/scaffold）
+    "crates/yunyou-plugin-dev",
+    "crates/team/yunyou-team-launcher",
+    "crates/team/yunyou-team-procmgr",
+    "crates/team/yunyou-team-worker-core",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+# 内部依赖（单向：组件 crates → yunyou 内核 → yunyou-util，方案 §2.6 依赖规则 1）
+yunyou = { path = "crates/core/yunyou" }
+yunyou-util = { path = "crates/core/yunyou-util" }
+yunyou-llm = { path = "crates/llm/yunyou-llm" }
+yunyou-session = { path = "crates/session/yunyou-session" }
+yunyou-tools = { path = "crates/tools/yunyou-tools" }
+yunyou-system-prompt = { path = "crates/shell/yunyou-system-prompt" }
+# 凭据服务（S5）依赖配置模型（迁移器读 DshConfig；依赖方向 credentials → config 单向）
+yunyou-config = { path = "crates/infra/yunyou-config" }
+yunyou-credentials = { path = "crates/infra/yunyou-credentials" }
+# 异步运行时：多线程调度（方案 §2.3）
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "process", "io-util", "fs"] }
+tokio-util = { version = "0.7", default-features = false, features = ["rt"] }
+# 配置与 schema（方案 §2.2：serde + schemars/JSON Schema 2020-12）
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+jsonschema = { version = "0.61", default-features = false }
+# yunyou.toml / credentials.toml 的 TOML 解析（版本收敛统一在此定义）
+toml = "0.9"
+# 团队插件（任务26/K-7）：teammate fiber+工具面+三件套，消息面走内核 MessageHub
+yunyou-team = { path = "crates/team/yunyou-team" }
+# L2 外部装载缝协议单源（K-19 刀1）：插件↔宿主双端契约（禁依赖内核纪律同款）
+yunyou-plugin-proto = { path = "crates/plugins/yunyou-plugin-proto" }
+# 命令配对键与新会话 id 的铸造（任务29 D2/§六：command_id=UUID）
+uuid = { version = "1", features = ["v4"] }
+# 组件实现用：HTTP/SSE（yunyou-llm-openai）、文本检索（yunyou-tools 内置 grep）
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+regex = "1"
+glob = "0.3"
+# web 启动形态（云幕，lead 依赖预批）：HTTP+WebSocket 一体（tokio 系）——
+# 前端零 node 构建链，静态资产 include_str! 嵌入；特性收窄只留 http1/tokio/ws
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "ws"] }
+
+# K-14 第 1 步/观察期（2026-11-16，云稽，lead 批准）：unwrap/expect 闸刀先 warn 给能见度，
+# 门禁不红；分级豁免口径（A 锁类归 K-9/B 不变量断言/C 清零）见
+# docs/架构/参照/工程化标准四专题-K14.md §四。第 2/3 步候波收点令。
+[workspace.lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+
+[profile.release]
+# 后续 yunyou-cli 交付用的基础配置，先收敛告警面
+lto = "thin"
+# S-ISO-3（《插件崩溃隔离设计》§5，云枢裁决 2026-11-16）：显式钉死 unwind——
+# 内核 panic 边界（装卸/waterfall/工具/事件监听）依赖 unwind 捕获，abort=全部
+# 隔离机制静默失效；编译期硬门另在 crates/yunyou/src/lib.rs（const assert）双保险。
+panic = "unwind"
+
+[profile.dev]
+# 同上：默认虽是 unwind，显式化防误改（test/bench 继承本档）。
+panic = "unwind"

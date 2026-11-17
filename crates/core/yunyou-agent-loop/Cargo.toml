@@ -1,0 +1,28 @@
+[package]
+name = "yunyou-agent-loop"
+description = "主循环组件：取输入 → 组请求 → LLM 流式 → 工具执行 → 结果回填 → 会话落盘（方案 §2.5）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+yunyou = { workspace = true }
+yunyou-util = { workspace = true }
+yunyou-llm = { workspace = true }
+yunyou-session = { workspace = true }
+yunyou-tools = { workspace = true }
+yunyou-system-prompt = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+schemars = "1"
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+yunyou-commands = { path = "../../shell/yunyou-commands" }
+yunyou-retry = { path = "../../llm/yunyou-retry" }
+# K-14 第 1 步/观察期：继承 workspace lints（unwrap_used/expect_used=warn）
+[lints]
+workspace = true

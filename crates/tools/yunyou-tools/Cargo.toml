@@ -1,0 +1,28 @@
+[package]
+name = "yunyou-tools"
+description = "ToolDefinition 契约 + 注册表 + 执行器（超时/取消/路径约束）+ 六个内置工具（方案 §2.5）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+yunyou = { workspace = true }
+yunyou-util = { workspace = true }
+yunyou-llm = { workspace = true }
+yunyou-commands = { path = "../../shell/yunyou-commands" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+regex = { workspace = true }
+glob = { workspace = true }
+schemars = "1"
+# killpg/kill 探活（task-14 组收割；版本对齐 cli crate 直引先例——libc workspace
+# 单源化系台账挂账 52 行既有事项，不在本卡范围）
+libc = "0.2"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+# K-14 第 1 步/观察期：继承 workspace lints（unwrap_used/expect_used=warn）
+[lints]
+workspace = true

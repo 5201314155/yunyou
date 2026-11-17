@@ -1,0 +1,39 @@
+<!doctype html>
+<!-- 云悠 web 前端（vanilla，零 node 构建链；include_str! 嵌入二进制）。
+     本页能渲染即 token 鉴权已通过（服务端无匿名通道）；对话走 /ws（同 token）。
+     脚本顺序即依赖顺序：令牌常量 → 渲染层 → 连接层 → 装配入口。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>云悠 · web</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header class="topbar">
+  <span class="brand">☁ 云悠</span>
+  <span class="model" id="model"></span>
+  <span class="status"><i class="dot" id="dot"></i><span id="status-text">连接中…</span></span>
+  <button id="sessions-btn" class="ghost-btn" type="button" disabled>会话 ▾</button>
+  <div id="session-menu" class="session-menu"></div>
+</header>
+
+<main class="stream" id="stream">
+  <section class="card hello">
+    <h1>正在连接云悠…</h1>
+    <p>这是 <code>yunyou web</code> 的浏览器界面——与终端版同一装配、同一会话、同一对话引擎。</p>
+    <p class="caption">连接成功后本卡让位于对话流；直接说需求，云悠替你干活。</p>
+  </section>
+</main>
+
+<footer class="inputbar">
+  <textarea id="input" rows="1" placeholder="说需求，云悠替你干活（连接后可发送）" disabled></textarea>
+  <button id="send" type="button" disabled>发送</button>
+</footer>
+
+<script src="/tokens.js"></script>
+<script src="/render.js"></script>
+<script src="/ws-client.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>

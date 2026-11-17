@@ -1,0 +1,19 @@
+[package]
+name = "hello-sdk"
+description = "task-10 hello-sdk 自举示例：yunyou-plugin-sdk 写的独立可执行插件（SDK 写→独立编译→install→内核扫描 spawn→工具注册→真调用）"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+yunyou-plugin-sdk = { path = "../../yunyou-plugin-sdk", version = "0.1.0" }
+schemars = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[[bin]]
+name = "hello-sdk"
+path = "src/main.rs"
+
+[lints]
+workspace = true

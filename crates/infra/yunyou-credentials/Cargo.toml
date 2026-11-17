@@ -1,0 +1,26 @@
+# yunyou-credentials：S5 凭据服务（契约⑤，插件化方案 §3-⑤/§6.1 S5）+ S8 settings 投影服务（契约④）
+[package]
+name = "yunyou-credentials"
+description = "凭据服务（resolve/describe，密钥永不过插件的手）+ role('secret') 结构性脱敏 + settings 表单投影（并入理由见 lib.rs 模块注释）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# 内核：Plugin trait/服务注册/错误类型（样版对齐 yunyou-session）
+yunyou = { workspace = true }
+yunyou-util = { workspace = true }
+# 配置模型：存量明文 key 迁移读 DshConfig（依赖方向：credentials → config，单向）
+yunyou-config = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+# 凭据存储文件（credentials.toml）与迁移校验的 TOML 解析（版本收敛 workspace 统一定义）
+toml = { workspace = true }
+schemars = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+# #[tokio::test] 需 macros；workspace 定义已含，test-util 未用不引（审二轮 nit 收敛）
+tokio = { workspace = true }
+# K-14 第 1 步/观察期：继承 workspace lints（unwrap_used/expect_used=warn）
+[lints]
+workspace = true

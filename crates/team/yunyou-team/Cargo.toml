@@ -1,0 +1,23 @@
+[package]
+name = "yunyou-team"
+description = "团队插件（K-7/任务26 T2）：teammate 独立 fiber+名册/任务板/消息三件套+工具面（AI 自拉人/成员互联/完工自动汇报），消息面走内核 MessageHub（message.v1）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+yunyou = { workspace = true }
+yunyou-util = { workspace = true }
+yunyou-llm = { workspace = true }
+yunyou-session = { workspace = true }
+yunyou-tools = { workspace = true }
+yunyou-system-prompt = { workspace = true }
+yunyou-agent-loop = { path = "../../core/yunyou-agent-loop" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+schemars = "1"
+# K-14 第 1 步/观察期：继承 workspace lints（unwrap_used/expect_used=warn）
+[lints]
+workspace = true

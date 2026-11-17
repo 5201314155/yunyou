@@ -1,0 +1,25 @@
+[package]
+name = "yunyou-llm-openai"
+description = "OpenAI 兼容 LLM Provider：SSE 流式实现（可被同类 crate 替换，方案 §2.6 规则 3）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+yunyou = { workspace = true }
+yunyou-util = { workspace = true }
+yunyou-llm = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+reqwest = { workspace = true }
+schemars = "1"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+# 投影消费断言（测试用）：schema role=secret 标注经 credentials redact/投影面消费生效
+yunyou-credentials = { workspace = true }
+# K-14 第 1 步/观察期：继承 workspace lints（unwrap_used/expect_used=warn）
+[lints]
+workspace = true

@@ -1,0 +1,60 @@
+# yunyou-cli：yunyou-rs 唯一二进制入口（任务 3B，方案 §2.5 装配序列 + REPL）
+[package]
+name = "yunyou-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "yunyou_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "yunyou"
+path = "src/main.rs"
+
+[dependencies]
+toml = "0.8"
+serde = { workspace = true }
+yunyou-plugin-proto = { workspace = true }
+# 内核与配置
+yunyou = { workspace = true }
+yunyou-config = { path = "../../infra/yunyou-config" }
+yunyou-credentials = { path = "../../infra/yunyou-credentials" }
+yunyou-util = { workspace = true }
+serde_json = { workspace = true }
+# §2.5 装配的组件五件套（3A；契约 crate + Provider + 服务组件）
+yunyou-llm = { workspace = true }
+yunyou-llm-openai = { path = "../../llm/yunyou-llm-openai" }
+yunyou-session = { workspace = true }
+yunyou-tools = { workspace = true }
+yunyou-system-prompt = { workspace = true }
+yunyou-agent-loop = { path = "../../core/yunyou-agent-loop" }
+yunyou-retry = { path = "../../llm/yunyou-retry" }
+yunyou-sandbox = { path = "../../tools/yunyou-sandbox" }
+# 取消令牌（REPL Ctrl-C → run_turn 中断）
+tokio-util = { workspace = true }
+# 命令行参数（--config/--home/--task）
+clap = { version = "4", features = ["derive"] }
+# 命令注册缝（任务29：壳三命令 register+补全面板 list/find 数据源）
+yunyou-commands = { path = "../yunyou-commands" }
+yunyou-team = { workspace = true }
+# web 启动形态（云幕）：`yunyou web` 子命令的 serve 底座（并列前端，同装配同会话）
+yunyou-web = { path = "../../net/yunyou-web" }
+# 补全面板单行编辑态的 termios 原语（任务29 C3：raw mode 逐字符读+回显自管）
+libc = "0.2"
+# 字符显示宽度标准件（任务30 四期 2.3，依赖已批）：Unicode 宽度权威表——
+# 手撸表漏 emoji/组合序列/全角变体，宽度算错=截断点漂移（D-UI-1 同类土壤）
+unicode-width = "0.2"
+# command_id 与 /new 新会话 id 铸造（任务29 D2/§六）
+uuid = { workspace = true }
+# 运行时：workspace 已含 rt-multi-thread/sync/time/macros/process/io-util/fs，
+# 此处补 REPL 用的 stdin 读取与 Ctrl-C 信号
+tokio = { workspace = true, features = ["io-std", "signal"] }
+
+[build-dependencies]
+# build.rs 解析设计 token 单源（docs/设计/tokens.json）用
+serde_json = "1"
+# K-14 第 1 步/观察期：继承 workspace lints（unwrap_used/expect_used=warn）
+[lints]
+workspace = true

@@ -1,0 +1,22 @@
+[package]
+name = "yunyou"
+description = "yunyou 组件内核：Context/Plugin/Fiber/事件/配置（对标 vendor/cordis）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+yunyou-util = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+jsonschema = { workspace = true }
+# volatile 配置底座（契约⑧ / 内核方案 §2.2：ArcSwap 快照，MIT/Apache-2.0）
+arc-swap = "1"
+
+[dev-dependencies]
+schemars = "1"
+# K-14 第 1 步/观察期：继承 workspace lints（unwrap_used/expect_used=warn）
+[lints]
+workspace = true

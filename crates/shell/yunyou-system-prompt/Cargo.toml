@@ -1,0 +1,23 @@
+[package]
+name = "yunyou-system-prompt"
+description = "系统提示词组装服务（工具描述注入，方案 §2.5）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+yunyou = { workspace = true }
+yunyou-util = { workspace = true }
+yunyou-llm = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+schemars = "1"
+# 变量插值「未注册变量」的显式处理走告警通道（契约③，官方同类语义见 interpolate.rs）
+tracing = "0.1"
+
+[dev-dependencies]
+# 异步 disposer 的注销断言（对齐 agent-loop/session 的 dev-dependencies 范式）
+tokio = { workspace = true }
+# K-14 第 1 步/观察期：继承 workspace lints（unwrap_used/expect_used=warn）
+[lints]
+workspace = true
