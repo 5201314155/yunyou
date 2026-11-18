@@ -1,0 +1,18 @@
+# web-search 落盘 manifest（market v2 形态；L2 设计 §3.1 字段）
+id = "web-search"
+version = "0.1.0"
+format = 2
+level = "market"
+contracts = ["tools.v1"]
+category = "tools"
+auto_enable = true
+
+[runtime]
+type = "subprocess"
+entry = ["web-search"]          # 相对插件目录=cargo build 产物名
+request_timeout_ms = 30000
+
+[permissions]
+writable = ["$SELF"]
+credentials = ["brave_api_key", "tavily_api_key"]   # 凭据缝⑨开闸后迁移（现走 env）
+network = true   # 本插件的申请核心项：搜索=HTTP 出站（network 缝⑨第一个客户）
