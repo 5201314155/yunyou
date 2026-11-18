@@ -2,6 +2,8 @@
 //! 折成 SearchHit（dsh「normalized search result」同职责）；dedupe by url 在
 //! 插件层统一做（design §二：收拢一层防四实现各写一遍）。
 
+pub mod baidu;
+pub mod bing;
 pub mod brave;
 pub mod duckduckgo;
 pub mod searxng;
@@ -116,9 +118,13 @@ pub(crate) fn build_providers(cfg: &crate::plugin::WebSearchConfig) -> Vec<Box<d
         .clone()
         .or_else(|| std::env::var("TAVILY_API_KEY").ok());
     let _ = key; // key 闭包已被上两行取代（留痕：env 名单=brave/tavily）
+    // 表序=国内优先（2026-11-19 业主令重排：cn.bing/baidu 直连 200，DDG/searx.be
+    // 国内直连 000——海外用户/翻墙场景走显式 provider 配置降位序）
     vec![
-        Box::new(duckduckgo::DuckDuckGoProvider),
+        Box::new(bing::BingProvider),
+        Box::new(baidu::BaiduProvider),
         Box::new(searxng::SearxngProvider { base_url: cfg.searxng_base_url.clone() }),
+        Box::new(duckduckgo::DuckDuckGoProvider),
         Box::new(brave::BraveProvider { api_key: brave_key }),
         Box::new(tavily::TavilyProvider { api_key: tavily_key }),
     ]

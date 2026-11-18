@@ -94,7 +94,6 @@ impl PreComposeHook for ToolArchiveHook {
         // 双入参生命周期归一歧义即消失）；同步 IO 在 poll 内完成（小文件、
         // 幂等，超 200ms 由 hooks 缝超时兜底=弃刀不阻塞轮次）
         let candidates: Vec<String> = request.messages.iter().filter(|m| m.tool_call_id.is_some()).map(|m| format!("{}|{}", m.tool_call_id.clone().unwrap_or_default(), m.content.starts_with(STUB_PREFIX))).collect();
-        eprintln!("[hook-diag] call={:?} msgs={:?} tools={:?} cut={:?}", self.store_dir, request.messages.len(), candidates, self.pick_cut(request.messages).as_ref().map(|c| c.call_id.clone()));
         let cut = self.pick_cut(request.messages);
         let cut = cut.filter(|candidate| {
             // 双保险：pick_cut 已排除记忆集；此处再核（多钩子场景下防御）

@@ -11,6 +11,7 @@ use yunyou_util::BoxFut;
 use std::sync::Arc;
 
 /// 检索产物（SDK web-search 外部插件复用面；citations 已按三纪律收口）。
+#[derive(Debug)]
 pub struct SearchOutcome {
     pub provider: String,
     pub hits: Vec<crate::provider::SearchHit>,
@@ -43,7 +44,16 @@ pub async fn search(
         .timeout(std::time::Duration::from_secs(PROVIDER_TIMEOUT_SECS))
         .build()
         .map_err(|err| format!("HTTP 客户端构建失败：{err}"))?;
-    let chain = candidate_chain(cfg);
+    search_with_chain(candidate_chain(cfg), &client, query, cfg.max_results).await
+}
+
+/// 链注入形态（测试面：伪造失败链驱动全失败聚合，不依赖真实网络态）。
+pub(crate) async fn search_with_chain(
+    chain: Vec<Box<dyn SearchProvider>>,
+    client: &reqwest::Client,
+    query: &str,
+    max_results: usize,
+) -> Result<SearchOutcome, String> {
     let mut attempts: Vec<String> = Vec::new();
     for provider in &chain {
         if !provider.available() {
@@ -53,7 +63,7 @@ pub async fn search(
         let mut backoff = std::time::Duration::from_millis(500);
         for attempt in 0..=RETRY_MAX {
             let result = provider
-                .search(&client, query, cfg.max_results.min(MAX_RESULTS))
+                .search(&client, query, max_results.min(MAX_RESULTS))
                 .await;
             match result {
                 Ok(hits) => {
@@ -165,9 +175,8 @@ impl ToolDefinition for WebSearchTool {
 
 #[cfg(test)]
 mod tests {
-    use super::candidate_chain;
+    use super::{candidate_chain, run_search, search_with_chain};
     use crate::plugin::WebSearchConfig;
-    use super::run_search;
     use yunyou_tools::contract::ToolOutcome;
 
     /// 候选链：显式 provider 打头；未指定按表序（免费优先）。
@@ -175,7 +184,7 @@ mod tests {
     fn 候选链序() {
         let mut cfg = WebSearchConfig::default();
         let chain = candidate_chain(&cfg);
-        assert_eq!(chain[0].id(), "duckduckgo", "零配置默认=DDG");
+        assert_eq!(chain[0].id(), "bing", "零配置默认=Bing CN（国内直连，2026-11-19 重排）");
         cfg.provider = Some("tavily".into());
         cfg.tavily_api_key = Some("k".into());
         let chain = candidate_chain(&cfg);
@@ -192,31 +201,65 @@ mod tests {
         assert!(!brave.available());
     }
 
-    /// run_search 全失败=结构化错误含逐候选尝试记录（不吞错不假结果）。
+    /// 全失败=结构化错误含逐候选尝试记录（链注入伪造失败 provider，不依赖
+    /// 真实网络态——国内重排后 Bing 真网可用，原「真网全失败」前提取消）。
     #[tokio::test(flavor = "multi_thread")]
     async fn 全失败结构化错误() {
-        let mut cfg = WebSearchConfig::default();
-        cfg.searxng_base_url = "http://127.0.0.1:1".into(); // 必然连接失败
-        let out = run_search(&cfg, "test query").await;
-        match out {
-            ToolOutcome::Err(err) => {
-                assert!(err.message.contains("全部搜索后端失败"));
-                assert!(err.message.contains("duckduckgo"), "逐候选尝试留痕：{}", err.message);
+        use crate::provider::{SearchError, SearchProvider};
+        struct FailingProvider(&'static str, bool);
+        impl SearchProvider for FailingProvider {
+            fn id(&self) -> &'static str {
+                self.0
             }
-            other => panic!("全失败应 Err：{other:?}"),
+            fn needs_key(&self) -> bool {
+                false
+            }
+            fn search<'a>(
+                &'a self,
+                _client: &'a reqwest::Client,
+                _query: &'a str,
+                _limit: usize,
+            ) -> yunyou_util::BoxFut<'a, Result<Vec<crate::provider::SearchHit>, SearchError>> {
+                Box::pin(async move {
+                    Err(SearchError {
+                        provider: self.0,
+                        message: format!("{} 不可用", self.0),
+                        rate_limited: self.1,
+                    })
+                })
+            }
         }
+        let client = reqwest::Client::new();
+        let chain: Vec<Box<dyn SearchProvider>> = vec![
+            Box::new(FailingProvider("bing", false)),
+            Box::new(FailingProvider("baidu", false)),
+            Box::new(FailingProvider("duckduckgo", true)),
+        ];
+        let err = search_with_chain(chain, &client, "test query", 8).await.unwrap_err();
+        assert!(err.contains("bing"), "逐候选尝试留痕：{err}");
+        assert!(err.contains("baidu"));
+        assert!(err.contains("duckduckgo"));
+        assert!(err.contains("duckduckgo#2"), "限速类重试计数留痕：{err}");
     }
 
-    /// 验收①（活测，#[ignore]：需网络；交卷时显式跑一次取证据）——
-    /// 零配置 DDG 真搜带 citations。
+    /// 真网回归锁（国内直连）：默认链首=bing 且真搜可用（run_search 全链
+    /// 冒烟；网络异常环境的 CI 由 外部禁用面处理——本仓门禁含网络）。
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "需网络；验收①显式跑"]
+    async fn 默认链真搜冒烟() {
+        let cfg = WebSearchConfig::default();
+        let out = run_search(&cfg, "rust programming").await;
+        assert!(matches!(out, ToolOutcome::Ok(_)), "国内直连真搜应成功：{out:?}");
+    }
+
+    /// 验收①（活测；国内网络直连 cn.bing.com，lead 交卷后直接跑补验）——
+    /// 零配置 Bing CN 真搜带 citations。
+    #[tokio::test(flavor = "multi_thread")]
     async fn 零配置真搜带citations() {
         let cfg = WebSearchConfig::default();
         let out = run_search(&cfg, "rust landlock").await;
         match out {
             ToolOutcome::Ok(v) => {
-                assert_eq!(v["provider"], "duckduckgo");
+                assert_eq!(v["provider"], "bing");
                 assert!(v["count"].as_u64().unwrap_or(0) > 0, "应出结果：{v:?}");
                 assert!(v["citations"].as_array().is_some_and(|c| !c.is_empty()), "应带 citations");
                 assert!(v["results"].as_str().unwrap().contains("来源："), "url+摘要绑定渲染");

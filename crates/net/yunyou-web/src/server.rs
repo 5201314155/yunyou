@@ -52,6 +52,8 @@ pub(crate) struct WebState {
     pub(crate) scheduler: Arc<yunyou_plugin_sdk::scheduler::Scheduler>,
     /// 配置修订写（W5 settings 域；revision 单源+原子写——config_store.rs）。
     pub(crate) config_store: Arc<crate::config_store::ConfigStore>,
+    /// 监听地址回环性（devices/current loopback；W6——instance 解析后传入）。
+    pub(crate) loopback: bool,
 }
 
 /// 路由表：全部路由先过 token 鉴权中间件（from_fn_with_state），无匿名通道。

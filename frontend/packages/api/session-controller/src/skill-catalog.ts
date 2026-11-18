@@ -3,6 +3,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry/types'
 import { SessionQueryError } from '@deepseek-ai/dsh-session-query'
+import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { SkillRegistry, SkillSummary } from '@deepseek-ai/dsh-skill'
 import { isUserInvocable } from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-working-directory'
@@ -108,7 +109,7 @@ export class SessionSkillCatalog extends TypertRemoteService {
   }
 
   /** Resolve one Session's cwd, viewing scope, and skill registry. */
-  private async compositionView(sessionId: string, signal: AbortSignal | undefined): Promise<SkillCompositionView> {
+  private async compositionView(sessionId: SessionId, signal: AbortSignal | undefined): Promise<SkillCompositionView & AsyncDisposable> {
     let cwd: string
     let agentPreset: string | undefined
     try {
@@ -146,12 +147,16 @@ export class SessionSkillCatalog extends TypertRemoteService {
       )
     }
     const lease = live === undefined ? await this.scopeFor(agentPreset) : undefined
-    return {
+    const view: SkillCompositionView = {
       cwd,
       scope: live ?? lease?.key,
       registry,
       ...(lease === undefined ? {} : { lease }),
     }
+    // `await using` releases the standing preset scope when the read settles.
+    return Object.assign(view, {
+      [Symbol.asyncDispose]: () => lease?.[Symbol.asyncDispose]() ?? Promise.resolve(),
+    })
   }
 
   /** The user-invocable summaries of one composition. */

@@ -91,6 +91,7 @@ export declare const zh: {
     'toast.pinFailed': string;
     'toast.unpinFailed': string;
     'toast.createFailed': string;
+    'toast.openResumed': string;
     'toast.forkRequiresOpen': string;
     'toast.openForkSource': string;
     'sessions.count.one': string;
@@ -215,6 +216,7 @@ export declare const en: {
     'toast.pinFailed': string;
     'toast.unpinFailed': string;
     'toast.createFailed': string;
+    'toast.openResumed': string;
     'toast.forkRequiresOpen': string;
     'toast.openForkSource': string;
     'sessions.count.one': string;
@@ -337,6 +339,7 @@ export declare const ja: {
     'toast.pinFailed': string;
     'toast.unpinFailed': string;
     'toast.createFailed': string;
+    'toast.openResumed': string;
     'toast.forkRequiresOpen': string;
     'toast.openForkSource': string;
     'sessions.count.one': string;
@@ -459,6 +462,7 @@ export declare const es: {
     'toast.pinFailed': string;
     'toast.unpinFailed': string;
     'toast.createFailed': string;
+    'toast.openResumed': string;
     'toast.forkRequiresOpen': string;
     'toast.openForkSource': string;
     'sessions.count.one': string;
@@ -581,6 +585,7 @@ export declare const fr: {
     'toast.pinFailed': string;
     'toast.unpinFailed': string;
     'toast.createFailed': string;
+    'toast.openResumed': string;
     'toast.forkRequiresOpen': string;
     'toast.openForkSource': string;
     'sessions.count.one': string;
@@ -703,6 +708,7 @@ export declare const de: {
     'toast.pinFailed': string;
     'toast.unpinFailed': string;
     'toast.createFailed': string;
+    'toast.openResumed': string;
     'toast.forkRequiresOpen': string;
     'toast.openForkSource': string;
     'sessions.count.one': string;
@@ -825,6 +831,7 @@ export declare const ru: {
     'toast.pinFailed': string;
     'toast.unpinFailed': string;
     'toast.createFailed': string;
+    'toast.openResumed': string;
     'toast.forkRequiresOpen': string;
     'toast.openForkSource': string;
     'sessions.count.one': string;
@@ -947,6 +954,7 @@ export declare const pt: {
     'toast.pinFailed': string;
     'toast.unpinFailed': string;
     'toast.createFailed': string;
+    'toast.openResumed': string;
     'toast.forkRequiresOpen': string;
     'toast.openForkSource': string;
     'sessions.count.one': string;

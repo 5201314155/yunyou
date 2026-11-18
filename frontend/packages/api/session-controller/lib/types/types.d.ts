@@ -210,6 +210,9 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
         'session/fork-unavailable': {
             readonly sessionId: SessionId;
         };
+        'skills/unknown-id': {
+            readonly id: string;
+        };
         'session/migration-required': {
             readonly sessionId: SessionId;
         };
@@ -245,6 +248,17 @@ export interface SkillEntry {
 export interface SkillListValue {
     readonly skills: readonly SkillEntry[];
 }
+/** Skill body read request: the composition's Session plus the skill id. */
+export interface SessionSkillGetRequest {
+    readonly sessionId: SessionId;
+    readonly id: string;
+}
+/** One skill's full body for human viewing and explicit fill-back (web.v1 §9.2). */
+export interface SessionSkillGetValue {
+    readonly name: string;
+    readonly description: string;
+    readonly body: string;
+}
 /** Session list request. */
 export interface SessionListRequest {
     readonly cursor?: string;
@@ -252,6 +266,18 @@ export interface SessionListRequest {
 /** Session list response value. */
 export interface SessionListValue {
     readonly items: readonly SessionSummary[];
+}
+/** Session resume request: switch the addressed Session to the active, prompt-able one. */
+export interface SessionOpenRequest {
+    readonly sessionId: SessionId;
+}
+/** Session resume outcome. `ingested`/`skipped` are replay-ring bridge facts: an
+ * official Host reports honest zeros (its follow streams history directly). */
+export interface SessionOpenValue {
+    readonly sessionId: SessionId;
+    readonly ingested: number;
+    readonly skipped: number;
+    readonly skippedNote: string;
 }
 /** Session search request. */
 export interface SessionSearchRequest {

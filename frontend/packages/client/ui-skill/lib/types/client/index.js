@@ -51,6 +51,11 @@ export function apply(ctx) {
     // Session-keyed catalog cache; single-flight per key. Plugin-closure state:
     // the fiber effect below is its teardown boundary.
     const fetches = new Map();
+    // Session-keyed skill-body cache (web.v1 §3: a skill executes by the user
+    // editing its expanded body and sending it explicitly). Filled best-effort
+    // alongside the catalog; a deployment without `skills/get` keeps the
+    // literal `/name` pick path.
+    const bodies = new Map();
     // Per-session lexicon invalidation listeners (subscribeLexicon consumers).
     const lexiconListeners = new Map();
     const notifyLexicon = (sessionId) => {
@@ -95,6 +100,7 @@ export function apply(ctx) {
         (skills) => {
             entry.settled = skills;
             notifyLexicon(sessionId);
+            void prefetchBodies(sessionId, skills);
         }, 
         // A failed fetch must not poison the key: the next consumer retries.
         () => {
@@ -103,11 +109,35 @@ export function apply(ctx) {
         });
         return entry;
     };
+    /**
+     * Best-effort body prefetch for one session's catalog: each failure is
+     * contained (a missing body only keeps that skill's literal pick path).
+     * @param sessionId - owning session.
+     * @param catalogEntries - the settled catalog entries.
+     */
+    const prefetchBodies = (sessionId, catalogEntries) => {
+        const cache = bodies.get(sessionId) ?? new Map();
+        bodies.set(sessionId, cache);
+        for (const skill of catalogEntries) {
+            if (cache.has(skill.name))
+                continue;
+            void sessions.using(sessionId, { source: 'skillCatalog' }, async (reference) => {
+                const state = reference.binding.session.getSnapshot();
+                if (state.openState !== 'open')
+                    throw state.openError ?? new Error('session is not open');
+                const result = await skills.get({ sessionId, id: skill.name });
+                if (!result.ok)
+                    throw new Error(result.error.message);
+                cache.set(skill.name, result.value.body);
+            }).then(() => { }, () => { });
+        }
+    };
     const invalidate = (key) => {
         const entry = fetches.get(key);
         if (entry === undefined)
             return;
         fetches.delete(key);
+        bodies.delete(key);
         entry.abort.abort();
         notifyLexicon(key);
     };
@@ -185,15 +215,15 @@ export function apply(ctx) {
             });
             return true;
         },
-        onPick({ candidate }) {
-            // Plain-text-reference decision (web-input-machine note): the pick
-            // lands plain text and the prompt ships the same
-            // literal. Determinism lives host-side — the host's
-            // pre-step boundary (dsh-tool-skill) recognizes the leading /name and
-            // injects the rendered body for every entry point. A name shared with a
-            // host command still resolves to the command: adjudication claims the
-            // line client-side before it ever becomes a prompt.
-            return { text: `/${candidate.name} ` };
+        onPick({ candidate, session }) {
+            // web.v1 §3: the expanded body fills the composer for the user to edit
+            // and send explicitly. Without a served body (an official Host keeps the
+            // literal path) the pick lands the literal and the prompt ships the same
+            // literal — host-side determinism (the dsh-tool-skill pre-step) stays
+            // intact. A name shared with a host command still resolves to the
+            // command: adjudication claims the line client-side first.
+            const body = bodies.get(session.sessionId)?.get(candidate.name);
+            return { text: body ?? `/${candidate.name} ` };
         },
     };
     ctx.slots.inject('conversation.user.text.node', () => ctx.slots.register({

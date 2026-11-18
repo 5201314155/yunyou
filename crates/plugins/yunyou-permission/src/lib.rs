@@ -14,6 +14,7 @@
 //!   L8 Ask 兜底的 suggestions 持久化归 S5）。
 
 mod authorization;
+mod boundary;
 mod denylist;
 mod gate;
 mod matchers;

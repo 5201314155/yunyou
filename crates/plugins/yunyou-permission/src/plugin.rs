@@ -33,6 +33,14 @@ pub struct PermissionConfig {
     /// 放行；true=装配失败拒启——公网/强管制部署可拧）。
     #[serde(default)]
     pub strict: bool,
+    /// 工作区根（缺省=进程 cwd 投影；acceptEdits/default「区内写免审」判定面，
+    /// S4 经 GateContext.workspace_root 透传——运行期真源候 workspace 服务接线）。
+    #[serde(default)]
+    pub workspace_root: Option<String>,
+    /// L4 沙箱穿越开关（默认 false；true=愿进沙箱的命令穿越 ask 规则自动
+    /// 放行——claude autoAllowBashIfSandboxed 同律，设计稿 §一 L4）。
+    #[serde(default)]
+    pub auto_allow_sandboxed: bool,
 }
 
 fn default_enabled() -> bool {
@@ -100,7 +108,16 @@ impl Plugin for PermissionPlugin {
             let registry = ctx
                 .get::<dyn GateRegistryService>(ServiceId::of::<dyn GateRegistryService>())
                 .map_err(|err| CordisError::new(ErrorKind::Internal, format!("permission/审批缝不可见: {err}")))?;
-            registry.register(Arc::new(PermissionGate::new(rules)))?;
+            let mut gate = PermissionGate::new(rules);
+            gate.set_auto_allow_sandboxed(cfg.auto_allow_sandboxed);
+            registry.register(Arc::new(gate))?;
+            // workspace_root 投影（S4）：config 显式 > cwd；经 GateContext 透传的
+            // 接线在 runner 侧（GateContext::default 现不带 root——执行面接线候
+            // workspace 服务注入，此处落配置面）。
+            if cfg.workspace_root.is_some() {
+                // 值随 cfg 生命周期存 GateHub 外无状态——S4 注记：接线点在此，
+                // runner 侧 GateContext 组装候 workspace 服务提供真源
+            }
             Ok(FiberOutput)
         })
     }

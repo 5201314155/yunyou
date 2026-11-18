@@ -93,11 +93,14 @@ let SessionSkillCatalog = (() => {
     let _classSuper = TypertRemoteService;
     let _instanceExtraInitializers = [];
     let _list_decorators;
+    let _get_decorators;
     return class SessionSkillCatalog extends _classSuper {
         static {
             const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
             _list_decorators = [Remote];
+            _get_decorators = [Remote];
             __esDecorate(this, null, _list_decorators, { kind: "method", name: "list", static: false, private: false, access: { has: obj => "list" in obj, get: obj => obj.list }, metadata: _metadata }, null, _instanceExtraInitializers);
+            __esDecorate(this, null, _get_decorators, { kind: "method", name: "get", static: false, private: false, access: { has: obj => "get" in obj, get: obj => obj.get }, metadata: _metadata }, null, _instanceExtraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
         static inject = ['agents', 'sessionQuery', 'typert', 'workingDirectory'];
@@ -117,49 +120,9 @@ let SessionSkillCatalog = (() => {
             const env_1 = { stack: [], error: void 0, hasError: false };
             try {
                 const { sessionId } = request;
-                let cwd;
-                let agentPreset;
+                const view = __addDisposableResource(env_1, await this.compositionView(sessionId, signal), true);
                 try {
-                    const env_2 = { stack: [], error: void 0, hasError: false };
-                    try {
-                        const observation = __addDisposableResource(env_2, await this.ctx.sessionQuery.observeSession(sessionId), false);
-                        if (observation.projections === undefined) {
-                            throw new Error('skill catalog requires a projected Session observation');
-                        }
-                        cwd = observation.projections.values.workingDirectory
-                            ?? observation.header.cwd
-                            ?? this.ctx.workingDirectory.defaultDirectory;
-                        agentPreset = observation.projections.values.agentPreset ?? undefined;
-                        const live = this.ctx.agents.get(sessionId);
-                        if (live !== undefined)
-                            cwd = await this.ctx.workingDirectory.ensure(live, signal);
-                    }
-                    catch (e_1) {
-                        env_2.error = e_1;
-                        env_2.hasError = true;
-                    }
-                    finally {
-                        __disposeResources(env_2);
-                    }
-                }
-                catch (error) {
-                    if (error instanceof SessionQueryError
-                        && error.code === 'SESSION_QUERY_SESSION_NOT_FOUND') {
-                        throw new RemoteError('session/not-found', `session "${sessionId}" not found`, { sessionId });
-                    }
-                    throw new RemoteError('gateway/internal', `session "${sessionId}" could not be inspected: ${String(error)}`, {});
-                }
-                const live = this.ctx.agents.get(sessionId);
-                const presets = this.ctx.get('agentPresets');
-                const scoped = live === undefined ? undefined : presets?.serviceFor(live, 'skills');
-                const skillRegistry = scoped ?? this.ctx.get('skills');
-                if (skillRegistry === undefined) {
-                    throw new RemoteError('gateway/internal', 'skill registry is absent: neither this session\'s agent preset nor the host composition mounts @deepseek-ai/dsh-skill', {});
-                }
-                const lease = __addDisposableResource(env_1, live === undefined ? await this.scopeFor(agentPreset) : undefined, true);
-                const scope = live ?? lease?.key;
-                try {
-                    const skills = (await skillRegistry.list({ cwd, scope })).filter(isUserInvocable);
+                    const skills = (await view.registry.list({ cwd: view.cwd, scope: view.scope })).filter(isUserInvocable);
                     return {
                         skills: skills.map(skill => ({
                             name: skill.name,
@@ -174,14 +137,53 @@ let SessionSkillCatalog = (() => {
                     throw new RemoteError('gateway/internal', `skill listing failed: ${String(error)}`, {});
                 }
             }
-            catch (e_2) {
-                env_1.error = e_2;
+            catch (e_1) {
+                env_1.error = e_1;
                 env_1.hasError = true;
             }
             finally {
                 const result_1 = __disposeResources(env_1);
                 if (result_1)
                     await result_1;
+            }
+        }
+        /**
+         * Read one user-invocable skill's full body for human viewing and explicit
+         * fill-back (web.v1 §9.2: a skill is a read-only catalog entry, never an
+         * executable RPC).
+         * @param request - Session identity selecting the composition and the skill id.
+         * @returns the skill metadata and its raw body text.
+         * @throws RemoteError when the skill is absent from the Session's composition.
+         */
+        async get(request) {
+            const env_2 = { stack: [], error: void 0, hasError: false };
+            try {
+                const { sessionId, id } = request;
+                const view = __addDisposableResource(env_2, await this.compositionView(sessionId, undefined), true);
+                const matches = await this.visibleSkills(view);
+                const match = matches.find(skill => skill.name === id)
+                    ?? matches.find(skill => skill.path !== undefined && skill.path.endsWith(`/${id}`));
+                if (match === undefined) {
+                    throw new RemoteError('skills/unknown-id', `skill "${id}" is not visible in session "${sessionId}"`, { id });
+                }
+                const definition = await view.registry.get(match.name, { cwd: view.cwd, scope: view.scope });
+                if (definition === undefined) {
+                    throw new RemoteError('skills/unknown-id', `skill "${id}" could not be loaded`, { id });
+                }
+                return {
+                    name: definition.name,
+                    description: definition.description,
+                    body: definition.content,
+                };
+            }
+            catch (e_2) {
+                env_2.error = e_2;
+                env_2.hasError = true;
+            }
+            finally {
+                const result_2 = __disposeResources(env_2);
+                if (result_2)
+                    await result_2;
             }
         }
         /** Resolve a live or standing preset scope without creating an Agent. */
@@ -196,6 +198,63 @@ let SessionSkillCatalog = (() => {
                 // An unknown or unusable recorded preset falls back to the global registry.
                 return undefined;
             }
+        }
+        /** Resolve one Session's cwd, viewing scope, and skill registry. */
+        async compositionView(sessionId, signal) {
+            let cwd;
+            let agentPreset;
+            try {
+                const env_3 = { stack: [], error: void 0, hasError: false };
+                try {
+                    const observation = __addDisposableResource(env_3, await this.ctx.sessionQuery.observeSession(sessionId), false);
+                    if (observation.projections === undefined) {
+                        throw new Error('skill catalog requires a projected Session observation');
+                    }
+                    cwd = observation.projections.values.workingDirectory
+                        ?? observation.header.cwd
+                        ?? this.ctx.workingDirectory.defaultDirectory;
+                    agentPreset = observation.projections.values.agentPreset ?? undefined;
+                    const live = this.ctx.agents.get(sessionId);
+                    if (live !== undefined && signal !== undefined)
+                        cwd = await this.ctx.workingDirectory.ensure(live, signal);
+                }
+                catch (e_3) {
+                    env_3.error = e_3;
+                    env_3.hasError = true;
+                }
+                finally {
+                    __disposeResources(env_3);
+                }
+            }
+            catch (error) {
+                if (error instanceof SessionQueryError
+                    && error.code === 'SESSION_QUERY_SESSION_NOT_FOUND') {
+                    throw new RemoteError('session/not-found', `session "${sessionId}" not found`, { sessionId });
+                }
+                throw new RemoteError('gateway/internal', `session "${sessionId}" could not be inspected: ${String(error)}`, {});
+            }
+            const live = this.ctx.agents.get(sessionId);
+            const presets = this.ctx.get('agentPresets');
+            const scoped = live === undefined ? undefined : presets?.serviceFor(live, 'skills');
+            const registry = scoped ?? this.ctx.get('skills');
+            if (registry === undefined) {
+                throw new RemoteError('gateway/internal', 'skill registry is absent: neither this session\'s agent preset nor the host composition mounts @deepseek-ai/dsh-skill', {});
+            }
+            const lease = live === undefined ? await this.scopeFor(agentPreset) : undefined;
+            const view = {
+                cwd,
+                scope: live ?? lease?.key,
+                registry,
+                ...(lease === undefined ? {} : { lease }),
+            };
+            // `await using` releases the standing preset scope when the read settles.
+            return Object.assign(view, {
+                [Symbol.asyncDispose]: () => lease?.[Symbol.asyncDispose]() ?? Promise.resolve(),
+            });
+        }
+        /** The user-invocable summaries of one composition. */
+        async visibleSkills(view) {
+            return (await view.registry.list({ cwd: view.cwd, scope: view.scope })).filter(isUserInvocable);
         }
     };
 })();

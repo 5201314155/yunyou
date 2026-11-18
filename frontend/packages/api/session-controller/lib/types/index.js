@@ -91,6 +91,7 @@ import { Service } from '@deepseek-ai/cordis';
 import z from '@deepseek-ai/schemastery';
 import { errorChain, ReasoningEffortId } from '@deepseek-ai/dsh-llm';
 import { canOpenNativePath, nativeFileManager, nativeFileApplications, openNativeFileApplication, openNativeAssociatedPath, revealNativePath } from '@deepseek-ai/dsh-native-command';
+import { SessionQueryError } from '@deepseek-ai/dsh-session-query';
 import { Remote, RemoteError, TypertRemoteService, principalOf } from '@deepseek-ai/dsh-typert-protocol';
 import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time';
 import { assertNever } from '@deepseek-ai/dsh-util-values';
@@ -143,6 +144,7 @@ let SessionController = (() => {
     let _classSuper = TypertRemoteService;
     let _instanceExtraInitializers = [];
     let _list_decorators;
+    let _open_decorators;
     let _search_decorators;
     let _create_decorators;
     let _selectModel_decorators;
@@ -171,6 +173,7 @@ let SessionController = (() => {
         static {
             const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
             _list_decorators = [Remote('list')];
+            _open_decorators = [Remote('open')];
             _search_decorators = [Remote('search')];
             _create_decorators = [Remote('create')];
             _selectModel_decorators = [Remote('selectModel')];
@@ -196,6 +199,7 @@ let SessionController = (() => {
             _projections_decorators = [Remote('projections')];
             _control_decorators = [Remote({ mode: 'stream' })];
             __esDecorate(this, null, _list_decorators, { kind: "method", name: "list", static: false, private: false, access: { has: obj => "list" in obj, get: obj => obj.list }, metadata: _metadata }, null, _instanceExtraInitializers);
+            __esDecorate(this, null, _open_decorators, { kind: "method", name: "open", static: false, private: false, access: { has: obj => "open" in obj, get: obj => obj.open }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _search_decorators, { kind: "method", name: "search", static: false, private: false, access: { has: obj => "search" in obj, get: obj => obj.search }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _create_decorators, { kind: "method", name: "create", static: false, private: false, access: { has: obj => "create" in obj, get: obj => obj.create }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _selectModel_decorators, { kind: "method", name: "selectModel", static: false, private: false, access: { has: obj => "selectModel" in obj, get: obj => obj.selectModel }, metadata: _metadata }, null, _instanceExtraInitializers);
@@ -374,6 +378,41 @@ let SessionController = (() => {
         async list(_request, signal) {
             const items = await this.listState.list(signal);
             return { items: items.filter(item => this.ctx.remoteAccess.allows({ kind: 'session', id: item.sessionId })) };
+        }
+        /**
+         * Resume one listed Session: verify it exists and activate it in the
+         * background so it becomes the prompt-able one. The replay-ring counts
+         * (`ingested`/`skipped`) are a wire-bridge deployment fact — this Host
+         * honestly reports zeros because its follow streams history directly.
+         * @param request - Session identity to open.
+         * @returns the resumed Session identity with honest zero bridge counters.
+         */
+        async open(request) {
+            const { sessionId } = request;
+            if (!this.ctx.remoteAccess.allows({ kind: 'session', id: sessionId })) {
+                throw new RemoteError('session/not-found', `session "${sessionId}" not found`, { sessionId });
+            }
+            try {
+                const env_2 = { stack: [], error: void 0, hasError: false };
+                try {
+                    const observation = __addDisposableResource(env_2, await this.ctx.sessionQuery.observeSession(sessionId), false);
+                    this.promote(observation);
+                }
+                catch (e_2) {
+                    env_2.error = e_2;
+                    env_2.hasError = true;
+                }
+                finally {
+                    __disposeResources(env_2);
+                }
+            }
+            catch (error) {
+                if (error instanceof SessionQueryError && error.code === 'SESSION_QUERY_SESSION_NOT_FOUND') {
+                    throw new RemoteError('session/not-found', `session "${sessionId}" not found`, { sessionId });
+                }
+                throw error;
+            }
+            return { sessionId, ingested: 0, skipped: 0, skippedNote: '' };
         }
         /**
          * Search visible Session content without resuming an Agent. A non-owner

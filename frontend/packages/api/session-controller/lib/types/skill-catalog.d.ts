@@ -1,7 +1,7 @@
 /** Session-addressed, cold-readable skill catalog Remote. */
 import type { Context } from '@deepseek-ai/cordis';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
-import type { SkillListRequest, SkillListValue } from './types.ts';
+import type { SessionSkillGetRequest, SessionSkillGetValue, SkillListRequest, SkillListValue } from './types.ts';
 declare module '@deepseek-ai/cordis' {
     interface Context {
         /** Host owner of the Session-addressed `skills` Remote namespace. */
@@ -21,8 +21,21 @@ export declare class SessionSkillCatalog extends TypertRemoteService {
      * @throws RemoteError when the Session cannot be inspected or no registry can serve it.
      */
     list(request: SkillListRequest, signal: AbortSignal): Promise<SkillListValue>;
+    /**
+     * Read one user-invocable skill's full body for human viewing and explicit
+     * fill-back (web.v1 §9.2: a skill is a read-only catalog entry, never an
+     * executable RPC).
+     * @param request - Session identity selecting the composition and the skill id.
+     * @returns the skill metadata and its raw body text.
+     * @throws RemoteError when the skill is absent from the Session's composition.
+     */
+    get(request: SessionSkillGetRequest): Promise<SessionSkillGetValue>;
     /** Resolve a live or standing preset scope without creating an Agent. */
     private scopeFor;
+    /** Resolve one Session's cwd, viewing scope, and skill registry. */
+    private compositionView;
+    /** The user-invocable summaries of one composition. */
+    private visibleSkills;
 }
 export default SessionSkillCatalog;
 //# sourceMappingURL=skill-catalog.d.ts.map

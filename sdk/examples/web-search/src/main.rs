@@ -1,5 +1,6 @@
 //! web_search 外部插件（分发链 release-bin 产物；设计稿 web-search-provider
-//! 插件设计 20261118）：单工具四后端（DDG 零配置默认/SearXNG/Brave/Tavily）。
+//! 插件设计 20261118+2026-11-19 国内优先重排）：单工具六后端（Bing CN 零配置
+//! 默认国内直连/Baidu 备选/SearXNG/DDG 降位/Brave/Tavily）。
 //!
 //! 检索实现复用 crates/plugins/yunyou-web-search 的 `search` 核心函数——
 //! bundled 内置与外部分发不两套逻辑（citations 三纪律/≤8 条/10s 超时换后端

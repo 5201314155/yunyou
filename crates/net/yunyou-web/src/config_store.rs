@@ -10,6 +10,7 @@
 //! - 并发：std 锁串行（配置写=低频管理面，锁内含文件 IO 同 credentials store 律）。
 
 use yunyou_config::{load_from_str, DshConfig};
+use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -28,7 +29,7 @@ impl ConfigStore {
 
     /// 当前 revision（sections/form 投影逐段携带）。
     pub(crate) fn revision(&self) -> u64 {
-        self.inner.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone()
+        *self.inner.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     /// 配置文件路径（credentials/list 的 store 探测与 form 取值用）。
@@ -53,11 +54,11 @@ impl ConfigStore {
     /// Err(非法键路径清单)——details.keys（契约 config/validation）。
     pub(crate) fn write_section(&self, section: &str, value: &serde_json::Value) -> Result<u64, Vec<String>> {
         let original = std::fs::read_to_string(&self.path).unwrap_or_default();
-        let mut doc: toml::Value = toml::from_str(&original)
-            .map_err(|_| vec![format!("<文档级>（现有 yunyou.toml 解析失败，拒绝盲写）")])?;
+        let mut doc: toml::Table = toml::from_str(&original)
+            .map_err(|_| vec!["<文档级>（现有 yunyou.toml 解析失败，拒绝盲写）".to_string()])?;
         let section_value = toml::Value::try_from(value)
             .map_err(|_| vec![format!("{section}（段值不可序列化为 toml）")])?;
-        doc[section.to_lowercase().as_str()] = section_value;
+        doc.insert(section.to_lowercase(), section_value);
         let text = toml::to_string_pretty(&doc)
             .map_err(|_| vec![format!("{section}（文档序列化失败）")])?;
         // 深度校验：deny_unknown_fields 全集（失败=原文件不动，Err 非法键路径）
@@ -76,12 +77,18 @@ impl ConfigStore {
 fn validation_keys(err: &yunyou_config::ConfigError) -> Vec<String> {
     match err {
         yunyou_config::ConfigError::Validation(_) => {
-            // ValidationError 展示格式=多行「invalid config:」+键路径；解析取行
+            // ValidationError 展示格式：`<键> was unexpected) (at /<段>)`——
+            // 解析为 `<段>.<键>` 路径（details.keys 最小化）；其余行原样保留
             err.to_string()
                 .lines()
+                .filter(|line| line.contains("was unexpected"))
                 .filter_map(|line| {
-                    let line = line.trim();
-                    line.strip_prefix("- ").map(str::to_string)
+                    let key_start = line.find('\'')?;
+                    let key = line[key_start + 1..].split('\'').next()?;
+                    let at = line.find("(at /")?;
+                    let path = line[at + 5..].split(')').next()?.trim().to_string();
+                    let path = path.trim_start_matches('/');
+                    Some(if path.is_empty() { key.to_string() } else { format!("{path}.{key}") })
                 })
                 .collect()
         }
@@ -111,9 +118,21 @@ fn atomic_write(path: &std::path::Path, text: &str) -> Result<(), std::io::Error
 
 /// 段 schema（sections/form 投影源）：schemars 全档 derive，逐段取 properties。
 pub(crate) fn section_schema(section: &str) -> Option<serde_json::Value> {
-    let schema = serde_json::to_value(schemars::schema_for!(DshConfig)).ok()?;
-    let section_schema = schema["properties"][section.to_lowercase().as_str()].clone();
-    (section_schema.is_object()).then_some(section_schema)
+    let root = serde_json::to_value(schemars::schema_for!(DshConfig)).ok()?;
+    let section_schema = root["properties"][section.to_lowercase().as_str()].clone();
+    // schemars 顶层档：段= $ref("#/definitions/<Type>")——解引用后才是 properties
+    let resolved = match section_schema.get("$ref").and_then(Value::as_str) {
+        Some(reference) => {
+            let name = reference.rsplit('/').next()?;
+            // schemars 1.x 用 $defs（0.8 系 definitions——双键兼容防版本漂移）
+            root.get("$defs")
+                .or_else(|| root.get("definitions"))?
+                .get(name)?
+                .clone()
+        }
+        None => section_schema,
+    };
+    (resolved.is_object()).then_some(resolved)
 }
 
 /// 已知段清单（契约 §1.1：顶层九段+plugins 容器段，DshConfig 实测冻结）。

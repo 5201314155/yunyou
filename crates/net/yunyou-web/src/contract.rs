@@ -117,25 +117,25 @@ const METHODS: &[(&str, Status)] = &[
     ("schedule/create", Status::Wired),
     ("schedule/list", Status::Wired),
     ("schedule/delete", Status::Wired),
-    // plugins 域
-    ("plugins/list", Status::FrozenPending),
-    ("plugins/enable", Status::FrozenPending),
-    ("plugins/config", Status::FrozenPending),
-    ("plugins/tools", Status::FrozenPending),
+    // plugins 域（域-配置凭据与插件.md §4；W6 已接——tools 系方案 A 诚实面）
+    ("plugins/list", Status::Wired),
+    ("plugins/enable", Status::Wired),
+    ("plugins/config", Status::Wired),
+    ("plugins/tools", Status::Wired),
     // market（后续：权限未开闸）
     ("market/list", Status::Later),
     ("market/install", Status::Later),
-    // settings / credentials 域
-    ("settings/sections", Status::FrozenPending),
-    ("settings/form", Status::FrozenPending),
-    ("settings/write", Status::FrozenPending),
-    ("credentials/list", Status::FrozenPending),
-    ("credentials/set", Status::FrozenPending),
-    ("credentials/delete", Status::FrozenPending),
+    // settings / credentials 域（域-配置凭据与插件.md §1-2；W5 已接）
+    ("settings/sections", Status::Wired),
+    ("settings/form", Status::Wired),
+    ("settings/write", Status::Wired),
+    ("credentials/list", Status::Wired),
+    ("credentials/set", Status::Wired),
+    ("credentials/delete", Status::Wired),
     // devices / system 域（契约 §11）
-    ("devices/current", Status::FrozenPending),
-    ("system/info", Status::FrozenPending),
-    ("system/health", Status::FrozenPending),
+    ("devices/current", Status::Wired),
+    ("system/info", Status::Wired),
+    ("system/health", Status::Wired),
 ];
 
 /// typert 线约定解包：payload=`{args:{<参数名>:<值>}}`（单参方法参数名 'request'
@@ -212,6 +212,7 @@ mod tests {
             wire: Arc::new(WireBridge::new("test-model".into())),
             scheduler: Arc::new(yunyou_plugin_sdk::scheduler::Scheduler::new(|| 1_000_000)),
             config_store: Arc::new(crate::config_store::ConfigStore::new(std::path::PathBuf::from("/tmp/yunyou-test-yunyou.toml"))),
+            loopback: true,
         })
     }
 
@@ -239,7 +240,7 @@ mod tests {
     #[test]
     fn 注册表三档状态查询() {
         assert_eq!(status_of("session/prompt"), Some(Status::Wired));
-        assert_eq!(status_of("settings/sections"), Some(Status::FrozenPending));
+        assert_eq!(status_of("skills/list"), Some(Status::FrozenPending));
         assert_eq!(status_of("market/install"), Some(Status::Later));
         assert_eq!(status_of("nope/x"), None);
     }
@@ -247,7 +248,7 @@ mod tests {
     /// not-implemented 兜底：契约内点名状态、契约外点名契约外；两态 code 一致。
     #[test]
     fn not_implemented点名() {
-        let frozen = not_implemented("settings/sections");
+        let frozen = not_implemented("skills/list");
         assert_eq!(frozen["error"]["code"], code::NOT_IMPLEMENTED);
         assert!(
             frozen["error"]["message"].as_str().unwrap_or("").contains("冻结待接"),
@@ -285,7 +286,7 @@ mod tests {
         let later = all.iter().filter(|(_, s)| *s == Status::Later).count();
         // 锚点：openapi 已接 8 方法（session 6+commands 2）+session/open（域细则
         // 冻结形状，openapi v1.1 已补录）+team/tasks 域 9 方法（W3）；待接 20；后续 2（market）
-        assert_eq!((wired, frozen, later), (22, 16, 2), "契约方法计数漂移，先同步契约再改表：{all:?}");
+        assert_eq!((wired, frozen, later), (34, 4, 2), "契约方法计数漂移，先同步契约再改表：{all:?}");
         // 已接方法必须确有分派（rpc.rs 契约面行为测试锁定形状，此处锁无遗漏）
         for (name, status) in all {
             if *status == Status::Wired {
@@ -294,7 +295,12 @@ mod tests {
                         || name.starts_with("commands/")
                         || name.starts_with("team/")
                         || name.starts_with("tasks/")
-                        || name.starts_with("schedule/"),
+                        || name.starts_with("schedule/")
+                        || name.starts_with("settings/")
+                        || name.starts_with("credentials/")
+                        || name.starts_with("plugins/")
+                        || name.starts_with("system/")
+                        || name == "devices/current",
                     "已接面现态=session+commands+team+tasks 域：{name}"
                 );
             }
@@ -306,7 +312,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn 未接方法经unary兜底点名() {
         let state = state();
-        let body = r#"{"type":"client-request","rpcId":"r9","method":"settings/sections","payload":{}}"#;
+        let body = r#"{"type":"client-request","rpcId":"r9","method":"skills/list","payload":{}}"#;
         let resp = crate::rpc::rpc_unary(State(state.clone()), axum::body::Bytes::from(body)).await;
         assert_eq!(resp.status(), StatusCode::OK);
         let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.expect("体可读");

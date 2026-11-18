@@ -81,6 +81,7 @@ pub async fn start_instance(params: &mut WebParams) -> Result<WebInstance, WebEr
         session_dir: params.session_dir.clone(),
         wire: Arc::new(WireBridge::new(params.model.clone())),
         config_store: Arc::new(crate::config_store::ConfigStore::new(params.config_path.clone())),
+        loopback: addr.ip().is_loopback(),
         scheduler: {
             scheduler.set_trigger(Arc::new(crate::schedule_fire::TurnFireTrigger {
                 turns: Arc::new(TurnRunner::new(params.root_getter.clone(), params.model.clone())),

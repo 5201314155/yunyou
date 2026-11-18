@@ -1,9 +1,11 @@
 //! web_search 单工具搜索插件（设计稿 20261118 已批）：模型只见一个搜索工具，
 //! 后端差异全部藏在 provider 层——单工具换后端，不学 dsh 一 provider 一包。
 //!
-//! # provider 序（免费优先）
-//! duckduckgo（HTML 解析，零配置默认）→ searxng（公共实例 JSON，可配
-//! `searxng_base_url`）→ brave（免费 key）→ tavily（免费 key，LLM 摘要型）。
+//! # provider 序（国内优先，2026-11-19 业主令「国内你还要我翻墙？」重排）
+//! bing（cn.bing.com HTML，零配置默认，国内直连）→ baidu（HTML 备选零配置，
+//! 反爬注记见 provider/baidu.rs）→ searxng（可配 `searxng_base_url`，自建/海外
+//! 实例）→ duckduckgo（海外用户/翻墙场景降位）→ brave（免费 key）→ tavily
+//! （免费 key，LLM 摘要型）。国内开箱即搜；海外场景 settings 显式指定即换。
 //! settings `web_search.provider` 显式指定优先；未指定按表序取「可用者」（
 //! needs_key=false 或 key 在位）；key 过渡期走 config/env（凭据缝⑨开闸后迁移）。
 //!

@@ -29,6 +29,10 @@
 mod bridge;
 mod commands;
 mod config_store;
+mod rpc_credentials;
+mod rpc_settings;
+mod rpc_plugins;
+mod rpc_system;
 mod contract;
 mod dist;
 mod error;

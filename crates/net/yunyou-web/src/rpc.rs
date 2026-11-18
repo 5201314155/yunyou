@@ -13,7 +13,7 @@
 use crate::contract::{self, code, err_body, err_envelope};
 use crate::server::WebState;
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -21,6 +21,8 @@ use std::sync::Arc;
 /// unary RPC（POST /api/<method>）：client-request 信封 → server-response 信封。
 pub(crate) async fn rpc_unary(
     State(state): State<Arc<WebState>>,
+    axum::extract::RawQuery(raw_query): axum::extract::RawQuery,
+    headers: HeaderMap,
     body: axum::body::Bytes,
 ) -> Response {
     // json feature 未启用（依赖预批收敛清单）：Bytes+serde 手解，形态等价
@@ -120,6 +122,44 @@ pub(crate) async fn rpc_unary(
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_schedule::schedule_delete(&state, &payload)
         }
+        // settings 域（W5，契约域-配置凭据与插件.md §1）：段清单/表单投影/修订写
+        "settings/sections" => crate::rpc_settings::settings_sections(&state),
+        "settings/form" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_settings::settings_form(&state, &payload)
+        }
+        "settings/write" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_settings::settings_write(&state, &payload)
+        }
+        // credentials 域（W5，契约域-配置凭据与插件.md §2）：目录/写入/删除
+        "credentials/list" => crate::rpc_credentials::credentials_list(&state).await,
+        "credentials/set" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_credentials::credentials_set(&state, &payload).await
+        }
+        "credentials/delete" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_credentials::credentials_delete(&state, &payload).await
+        }
+        // plugins 域（W6，契约域-配置凭据与插件.md §4）
+        "plugins/list" => crate::rpc_plugins::plugins_list(&state),
+        "plugins/enable" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_plugins::plugins_enable(&state, &payload)
+        }
+        "plugins/config" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_plugins::plugins_config_read_write(&state, &payload)
+        }
+        "plugins/tools" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_plugins::plugins_tools(&state, &payload)
+        }
+        // system/devices 域（W6，契约域-配置凭据与插件.md §6）
+        "system/info" => crate::rpc_system::system_info(&state),
+        "system/health" => crate::rpc_system::system_health(&state),
+        "devices/current" => crate::rpc_system::devices_current(raw_query.as_deref(), &headers, &state),
         // commands 域（W2，契约 §9.1）：目录投影+命令缝执行桥
         "commands/list" => crate::rpc_commands::commands_list(&state),
         "commands/execute" => {
@@ -168,6 +208,7 @@ mod tests {
             wire: Arc::new(WireBridge::new("test-model".into())),
             scheduler: Arc::new(yunyou_plugin_sdk::scheduler::Scheduler::new(|| 1_000_000)),
             config_store: Arc::new(crate::config_store::ConfigStore::new(std::path::PathBuf::from("/tmp/yunyou-test-yunyou.toml"))),
+            loopback: true,
         })
     }
 

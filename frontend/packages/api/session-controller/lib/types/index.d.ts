@@ -5,7 +5,7 @@ import { nativeFileApplications, openNativeFileApplication } from '@deepseek-ai/
 import type { SessionId } from '@deepseek-ai/dsh-session';
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol';
 import { type ApiSessionAgentResult } from './agent.ts';
-import type { ModelCatalog, SessionWorkspacePathApplication, SessionAttachmentRequest, SessionAttachmentValue, SessionCancelRequest, SessionCancelValue, SessionControlFrame, SessionCreateRequest, SessionCreateValue, SessionFollowFrame, SessionFollowRequest, SessionForkRequest, SessionForkValue, SessionListRequest, SessionListValue, SessionOpenWorkspacePathRequest, SessionOpenWorkspacePathValue, SessionEventsPage, SessionPageRequest, SessionEventFrame, SessionObserveEventRequest, SessionProjectionFrame, SessionStateRequest, SessionState, SessionWaitRequest, SessionWaitValue, SessionPromptRequest, SessionPromptValue, SessionRenameRequest, SessionRenameValue, SessionSearchRequest, SessionSearchValue, SessionSelectModelRequest, SessionSelectModelValue, SessionProjectionsRequest, SessionProjectionsValue, SessionUpdateQueueRequest, SessionUpdateQueueValue } from './types.ts';
+import type { ModelCatalog, SessionWorkspacePathApplication, SessionAttachmentRequest, SessionAttachmentValue, SessionCancelRequest, SessionCancelValue, SessionControlFrame, SessionCreateRequest, SessionCreateValue, SessionFollowFrame, SessionFollowRequest, SessionForkRequest, SessionForkValue, SessionListRequest, SessionListValue, SessionOpenRequest, SessionOpenValue, SessionOpenWorkspacePathRequest, SessionOpenWorkspacePathValue, SessionEventsPage, SessionPageRequest, SessionEventFrame, SessionObserveEventRequest, SessionProjectionFrame, SessionStateRequest, SessionState, SessionWaitRequest, SessionWaitValue, SessionPromptRequest, SessionPromptValue, SessionRenameRequest, SessionRenameValue, SessionSearchRequest, SessionSearchValue, SessionSelectModelRequest, SessionSelectModelValue, SessionProjectionsRequest, SessionProjectionsValue, SessionUpdateQueueRequest, SessionUpdateQueueValue } from './types.ts';
 export type * from './types.ts';
 export { ApiSessionNotFound } from './agent.ts';
 export { SessionFileReferences } from './file-references.ts';
@@ -83,6 +83,15 @@ export declare class SessionController extends TypertRemoteService {
      * @returns visible Session summaries ordered by activity.
      */
     list(_request: SessionListRequest, signal: AbortSignal): Promise<SessionListValue>;
+    /**
+     * Resume one listed Session: verify it exists and activate it in the
+     * background so it becomes the prompt-able one. The replay-ring counts
+     * (`ingested`/`skipped`) are a wire-bridge deployment fact — this Host
+     * honestly reports zeros because its follow streams history directly.
+     * @param request - Session identity to open.
+     * @returns the resumed Session identity with honest zero bridge counters.
+     */
+    open(request: SessionOpenRequest): Promise<SessionOpenValue>;
     /**
      * Search visible Session content without resuming an Agent. A non-owner
      * receives only the hits whose Session `allows()` admits; `hasMore`

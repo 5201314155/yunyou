@@ -19,6 +19,7 @@ class UiWorkspaceService extends Service {
     sessions;
     view;
     notify;
+    resumeSession;
     /** The latest in-flight connection per Workspace; a request joins it only when both name the same preset. */
     connecting = new Map();
     lifetime = new AbortController();
@@ -32,14 +33,17 @@ class UiWorkspaceService extends Service {
      * @param sessions - pure Session Controller.
      * @param view - the browser's viewing-store write set (one instance shared with its registration).
      * @param notify - show one notice through the Workspace notice channel.
+     * @param resumeSession - the Host's Session-resume call: success carries the replay bridge's
+     * skipped-event count; a failure carries its stable failure code.
      */
-    constructor(ctx, directoryPicker, workspaces, sessions, view, notify) {
+    constructor(ctx, directoryPicker, workspaces, sessions, view, notify, resumeSession) {
         super(ctx, 'uiWorkspace');
         this.directoryPicker = directoryPicker;
         this.workspaces = workspaces;
         this.sessions = sessions;
         this.view = view;
         this.notify = notify;
+        this.resumeSession = resumeSession;
         ctx.effect(() => {
             const stop = this.watchNavigation();
             return () => {
@@ -129,7 +133,26 @@ class UiWorkspaceService extends Service {
         }
     }
     openSession(target) {
-        this.replaceMain(target, this.lifetime.signal, 'reveal');
+        return this.reveal(target, this.lifetime.signal);
+    }
+    /**
+     * Resume a cold Session when the deployment serves the resume call, then run
+     * the ordinary selection. A listed-but-unopened Session must become the
+     * Host's active one before its follow opens, or the bridge would answer the
+     * follow with the currently active Session's snapshot (web.v1 多会话步 2).
+     * A deployment without the resume call (the stable `gateway/not-implemented`)
+     * keeps the plain history-open path.
+     * @param target - the selection target.
+     * @param signal - the navigation lifetime.
+     */
+    async reveal(target, signal, panel = 'reveal') {
+        if (typeof target === 'string' && this.sessions.binding(target) === undefined) {
+            const resumed = await this.resumeSession(target);
+            if (resumed.ok && resumed.skipped > 0) {
+                this.notify({ kind: 'openResumed', count: resumed.skipped });
+            }
+        }
+        this.replaceMain(target, signal, panel);
     }
     openWorkspace(workspaceId, beforeOpen, options = {}) {
         return this.openWorkspaceSession(workspaceId, beforeOpen, options);
@@ -281,14 +304,14 @@ class UiWorkspaceService extends Service {
     async restoreSelection(workspaces, sessions) {
         const saved = this.selection.getSnapshot();
         if (saved.subagentAddress !== undefined) {
-            this.replaceMain(saved.subagentAddress, this.lifetime.signal, 'preserve');
+            await this.reveal(saved.subagentAddress, this.lifetime.signal, 'preserve');
             return;
         }
         const summary = saved.sessionId === undefined ? undefined : sessions.byId[saved.sessionId];
         const workspace = summary === undefined ? undefined
             : workspaces.items.find(item => item.sessionIds.includes(summary.id));
         if (summary !== undefined && (!summary.blank || workspace === undefined)) {
-            this.replaceMain(summary.id, this.lifetime.signal, 'preserve');
+            await this.reveal(summary.id, this.lifetime.signal, 'preserve');
             return;
         }
         const navigation = AbortSignal.any([this.ctx.layout.beginNavigation(), this.lifetime.signal]);
@@ -308,7 +331,7 @@ class UiWorkspaceService extends Service {
         if (sessionId === undefined && target !== undefined)
             sessionId = await this.connectWorkspace(target);
         if (sessionId !== undefined && !navigation.aborted) {
-            this.replaceMain(sessionId, navigation, 'preserve');
+            await this.reveal(sessionId, navigation, 'preserve');
         }
     }
     async initializeDefaultWorkspace(signal) {

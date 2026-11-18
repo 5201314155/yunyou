@@ -84,7 +84,10 @@ pub async fn run(command: crate::cli::Cli) -> Result<(), AppError> {
                     .map_err(AppError::Assemble)?
             }
             cli::PluginCmd::Install { source } => {
-                crate::plugin_cmd::install_dispatch(source, &home).map_err(AppError::Assemble)?
+                // 授权版（task-16 装载侧接线）：[permissions] 非空先过 Ask 缝再落盘
+                crate::plugin_cmd::install_authorized(source, &home)
+                    .await
+                    .map_err(AppError::Assemble)?
             }
             cli::PluginCmd::Check { path } => {
                 println!("{}", crate::plugin_cmd::check(path));

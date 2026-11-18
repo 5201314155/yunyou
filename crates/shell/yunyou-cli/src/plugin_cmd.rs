@@ -8,7 +8,7 @@
 //! manifest v2 权威校验复用 [`crate::market_manifest::parse_and_validate`]（冻结面
 //! 不另起炉灶）；本模块只做文件编排与拷贝。
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// 脚手架模板 main.rs（SDK 最小插件全文；插件作者改工具逻辑即可）。
@@ -149,6 +149,90 @@ pub fn scaffold_new(name: &str, category: &str, dir: Option<&Path>) -> Result<St
 /// 与 install.sh v3 同源——单一事实源，禁双源漂移）。
 const OFFICIAL_REMOTE: &[(&str, &str, &str)] = &[("scheduler", "scheduler-sample", "scheduler-manifest.toml")];
 
+/// 授权版入口（run.rs ⓪ 分派走此；task-16 装载侧接线）：三态源准备→五类校验→
+/// [permissions] network/credentials 非空时先过 authorize_plugin（Ask 缝；
+/// presenter 缺席=无头 fail-closed 人话拒装，UI y/n 候呈现器缝）→落盘。
+/// granted 快路径（已授权插件）同步零交互。
+pub async fn install_authorized(source: &str, home: &Path) -> Result<String, String> {
+    use yunyou_permission::{
+        authorize_plugin, granted, AuthorizationsFile, GrantRequest,
+    };
+    enum Prepared {
+        Local(PathBuf),
+        Remote(PathBuf), // 临时目录（用完即清）
+    }
+    let prepared =
+        if Path::new(source).is_dir() && Path::new(source).join("manifest.toml").is_file() {
+            Prepared::Local(PathBuf::from(source))
+        } else if source.contains("://") {
+            let tmp = std::env::temp_dir()
+                .join(format!("yunyou-plugin-clone-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&tmp);
+            let output = Command::new("git")
+                .args(["clone", "--depth", "1", source])
+                .arg(&tmp)
+                .output()
+                .map_err(|err| format!("git 启动失败：{err}"))?;
+            if !output.status.success() {
+                return Err(format!(
+                    "clone 失败（{source}）：{}",
+                    String::from_utf8_lossy(&output.stderr).trim()
+                ));
+            }
+            Prepared::Remote(tmp)
+        } else {
+            Prepared::Remote(install_official_prepare(source)?)
+        };
+    let plugin_dir = match &prepared {
+        Prepared::Local(p) | Prepared::Remote(p) => p.clone(),
+    };
+    // ② 五类校验（fail-loud 早于授权——坏 manifest 不该问用户要不要授权）
+    let manifest_v2 = crate::market_manifest::parse_and_validate(
+        &std::fs::read_to_string(plugin_dir.join("manifest.toml"))
+            .map_err(|err| format!("manifest 读取失败：{err}"))?,
+        &plugin_dir,
+    )
+    .map_err(|v| format!("manifest 五类校验违例：\n  {}", v.join("\n  ")))?;
+    // ③ 授权面（[permissions] 声明非空才走 Ask 缝；granted 快路径同步零交互）
+    let mut requests: Vec<GrantRequest> = Vec::new();
+    if manifest_v2.permissions.network {
+        requests.push(GrantRequest::Network);
+    }
+    for cred in &manifest_v2.permissions.credentials {
+        requests.push(GrantRequest::Credential(cred.clone()));
+    }
+    if !requests.is_empty() {
+        let file_path = AuthorizationsFile::default_path();
+        let mut file = match &file_path {
+            Some(path) => {
+                AuthorizationsFile::load(path).map_err(|err| format!("授权记录加载失败：{err}"))?
+            }
+            None => AuthorizationsFile::default(),
+        };
+        if granted(&file, &manifest_v2.id, &requests).is_err() {
+            let presenters = yunyou_agent_loop::ApprovalUiRegistry::default();
+            authorize_plugin(
+                &presenters,
+                &mut file,
+                file_path.as_deref(),
+                &manifest_v2.id,
+                &requests,
+                &format!("安装插件 {}（manifest [permissions] 声明）", manifest_v2.id),
+            )
+            .await?;
+            if let Some(path) = &file_path {
+                file.save(path).map_err(|err| format!("授权记录保存失败：{err}"))?;
+            }
+        }
+    }
+    // ④ 落盘（复用本地链：归类/重复拒装单源）
+    let msg = install(&plugin_dir, home)?;
+    if let Prepared::Remote(tmp) = &prepared {
+        let _ = std::fs::remove_dir_all(tmp);
+    }
+    Ok(msg)
+}
+
 /// `plugin install` 入口三态分派（task-27 一条命令装插件）：
 /// ①本地目录（存在且含 manifest.toml）→既有本地安装；
 /// ②git/https url→clone 浅拷后按本地目录安装（产物须已在仓/可执行）；
@@ -161,7 +245,11 @@ pub fn install_dispatch(source: &str, home: &Path) -> Result<String, String> {
     if source.contains("://") {
         return install_from_git(source, home);
     }
-    install_official(source, home)
+    let plugin_dir = install_official_prepare(source)?;
+    let result = install(&plugin_dir, home)
+        .map(|msg| format!("{msg}\n（来源：release-bin 官方名 {source}，架构{}）", std::env::consts::ARCH));
+    let _ = std::fs::remove_dir_all(&plugin_dir);
+    result
 }
 
 /// 远程源公共段：curl 下载（fail-loud 人话）。
@@ -206,7 +294,7 @@ fn install_from_git(url: &str, home: &Path) -> Result<String, String> {
 ///
 /// 下载校验 fail-loud（manifest 必在/二进制非零+可执行位）；与本地目录安装并存
 /// （复用同一 install 归类/五类校验/重复拒装链，零复制）。
-fn install_official(name: &str, home: &Path) -> Result<String, String> {
+fn install_official_prepare(name: &str) -> Result<PathBuf, String> {
     let (_, bin_base, manifest_asset) = OFFICIAL_REMOTE
         .iter()
         .find(|(id, _, _)| *id == name)
@@ -247,7 +335,7 @@ fn install_official(name: &str, home: &Path) -> Result<String, String> {
     }
     let plugin_dir = tmp.join("plugin");
     std::fs::create_dir_all(&plugin_dir).map_err(|err| format!("组装目录失败：{err}"))?;
-    std::fs::rename(tmp.join("plugin"), &plugin_dir.join("plugin.bin"))
+    std::fs::rename(tmp.join("plugin"), plugin_dir.join("plugin.bin"))
         .map_err(|err| format!("产物就位失败：{err}"))?;
     std::fs::rename(tmp.join("manifest.toml"), plugin_dir.join("manifest.toml"))
         .map_err(|err| format!("manifest 就位失败：{err}"))?;
@@ -264,10 +352,7 @@ fn install_official(name: &str, home: &Path) -> Result<String, String> {
     .ok_or_else(|| "runtime.entry 为空".to_string())?;
     std::fs::rename(plugin_dir.join("plugin.bin"), plugin_dir.join(&entry0))
         .map_err(|err| format!("产物改名失败：{err}"))?;
-    // ④ 走本地安装链（归类/校验/重复拒装单源复用）
-    let result = install(&plugin_dir, home).map(|msg| format!("{msg}\n（来源：release-bin 官方名 {name}，架构{}）", std::env::consts::ARCH));
-    let _ = std::fs::remove_dir_all(&tmp);
-    result
+    Ok(plugin_dir)
 }
 
 /// `plugin install <目录>`：按 manifest 的 id+category 归类落盘。
@@ -359,8 +444,18 @@ pub fn check(source_dir: &Path) -> String {
             return render(items);
         }
     }
-    let manifest = crate::market_manifest::parse_and_validate(&text, source_dir)
-        .expect("上方已验过，此处必 Ok");
+    let manifest = match crate::market_manifest::parse_and_validate(&text, source_dir) {
+        Ok(m) => m,
+        Err(violations) => {
+            // 上方已验过——防御分支（理论上不可达），fail-loud 不静默
+            return render(vec![CheckItem {
+                ok: false,
+                name: "manifest 五类权威校验（复检）",
+                detail: violations.join("；"),
+                fix: "修复 manifest.toml 后重查".into(),
+            }]);
+        }
+    };
 
     // ② 分类白名单（目录分类律；misc=兜底归档位）
     let category = manifest.category.clone().unwrap_or_else(|| "misc".into());
@@ -664,7 +759,9 @@ mod remote_tests {
         let st = Command::new("git").args(["clone", "--bare"]).arg(&src).arg(&bare).status().unwrap();
         assert!(st.success(), "裸仓应建成");
         let home = tmp.join("home");
-        let msg = install_dispatch(bare.to_str().unwrap(), &home).expect("git 形态应装成功");
+        // git 形态=URL（file:// 模拟远端）；裸目录路径无 manifest 会被判官方名=人话
+        let url = format!("file://{}", bare.display());
+        let msg = install_dispatch(&url, &home).expect("git 形态应装成功");
         assert!(msg.contains("git"), "结算句应标来源：{msg}");
         let _ = std::fs::remove_dir_all(&tmp);
     }

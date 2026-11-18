@@ -46,6 +46,10 @@ pub struct GateContext {
     /// 工作区根（S3/S4：acceptEdits 与 default 的「区内写免审」判定面；
     /// None=root 未知→策略侧按区外保守处理）。
     pub workspace_root: Option<String>,
+    /// 沙箱意愿信号（S4 L4 穿越缝：执行面愿进沙箱=Some(true)；None=未知——
+    /// 策略侧 auto_allow_sandboxed 开且意愿真时穿越 ask 规则。执行面接线候
+    /// 沙箱联动卡，v1 信号位）。
+    pub sandbox_willing: Option<bool>,
 }
 
 /// gate 决策（三态+Pass；第一个非 Pass 短路）。

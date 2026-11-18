@@ -22,7 +22,7 @@ Upgrading = re-run the same command. Uninstall = `rm ~/.local/bin/yunyou`.
 | 插件 | 落位 | 模型面 |
 | --- | --- | --- |
 | scheduler | `~/.yunyou/plugins/workflows/scheduler/` | schedule_create / schedule_list / schedule_delete（定时任务） |
-| web-search | `~/.yunyou/plugins/tools/web-search/` | web_search（联网搜索，DDG 零配置默认；SearXNG/Brave/Tavily 可配切换） |
+| web-search | `~/.yunyou/plugins/tools/web-search/` | web_search（联网搜索，Bing CN 零配置默认国内直连；Baidu/SearXNG/DDG/Brave/Tavily 可配切换） |
 
 单件下载失败自动跳过不阻塞主程序；memory 插件候入库后加行（设计已批，代码未落）。
 

@@ -99,6 +99,14 @@ impl TurnRunner {
 
     /// 停止按钮（session/cancel）：取消进行中回合——agent-loop 调用方令牌
     /// 贯穿，循环步首即断（Err loop/cancelled），闸门守卫随任务收尾释放。
+    /// 进行中回合判定（system/health turnOpen；W6 只读口，锁内纯读）。
+    pub(crate) fn turn_open(&self) -> bool {
+        self.active_cancel
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .is_some()
+    }
+
     /// 无进行中回合=false（RPC 层转人话拒绝，不静默装成功）。
     pub(crate) fn cancel_active(&self) -> bool {
         let token = self

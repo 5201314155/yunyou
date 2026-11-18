@@ -18,8 +18,9 @@ export interface UiWorkspace {
     /**
      * Select a Session and show its Conversation as one UI navigation action.
      * @param target - known Session identity or durable direct-parent subagent address to display.
+     * @returns completion of the selection, including a cold Session's resume round-trip.
      */
-    openSession(target: SessionTarget): void;
+    openSession(target: SessionTarget): Promise<void>;
     /**
      * Connect a Workspace and open its Session unless a later navigation supersedes it.
      * @param workspaceId - target Workspace.
@@ -135,6 +136,7 @@ declare class UiWorkspaceService extends Service implements UiWorkspace {
     private readonly sessions;
     private readonly view;
     private readonly notify;
+    private readonly resumeSession;
     /** The latest in-flight connection per Workspace; a request joins it only when both name the same preset. */
     private readonly connecting;
     private readonly lifetime;
@@ -148,8 +150,16 @@ declare class UiWorkspaceService extends Service implements UiWorkspace {
      * @param sessions - pure Session Controller.
      * @param view - the browser's viewing-store write set (one instance shared with its registration).
      * @param notify - show one notice through the Workspace notice channel.
+     * @param resumeSession - the Host's Session-resume call: success carries the replay bridge's
+     * skipped-event count; a failure carries its stable failure code.
      */
-    constructor(ctx: Context, directoryPicker: ClientRemote['directoryPicker'], workspaces: IWorkspaces, sessions: ISessions, view: Pick<WorkspaceViewStoreActions, 'pinSessionOrder'>, notify: (toast: RowToast) => void);
+    constructor(ctx: Context, directoryPicker: ClientRemote['directoryPicker'], workspaces: IWorkspaces, sessions: ISessions, view: Pick<WorkspaceViewStoreActions, 'pinSessionOrder'>, notify: (toast: RowToast) => void, resumeSession: (sessionId: SessionId) => Promise<{
+        readonly ok: true;
+        readonly skipped: number;
+    } | {
+        readonly ok: false;
+        readonly code: string;
+    }>);
     connectWorkspace(workspaceId: WorkspaceId, options?: Pick<StartSessionOptions, 'agentPreset'>): Promise<SessionId>;
     /**
      * @param reuse - preset for the reused or created blank.
@@ -171,7 +181,18 @@ declare class UiWorkspaceService extends Service implements UiWorkspace {
      * that still awaits a format migration reloads only those cached hints.
      */
     private restoreBlank;
-    openSession(target: SessionTarget): void;
+    openSession(target: SessionTarget): Promise<void>;
+    /**
+     * Resume a cold Session when the deployment serves the resume call, then run
+     * the ordinary selection. A listed-but-unopened Session must become the
+     * Host's active one before its follow opens, or the bridge would answer the
+     * follow with the currently active Session's snapshot (web.v1 多会话步 2).
+     * A deployment without the resume call (the stable `gateway/not-implemented`)
+     * keeps the plain history-open path.
+     * @param target - the selection target.
+     * @param signal - the navigation lifetime.
+     */
+    private reveal;
     openWorkspace(workspaceId: WorkspaceId, beforeOpen?: (sessionId: SessionId) => void, options?: Pick<StartSessionOptions, 'agentPreset'>): Promise<void>;
     private openWorkspaceSession;
     forkSession(sessionId: SessionId, onCreated?: (childId: SessionId) => void, options?: Pick<Parameters<ISessions['fork']>[0], 'allowMigration'>): Promise<SessionId>;

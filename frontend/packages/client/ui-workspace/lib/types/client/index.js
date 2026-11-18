@@ -47,7 +47,15 @@ export function apply(ctx) {
     const rowToast = createSnapshotStore(null);
     let toastSeq = 0;
     const notify = (toast) => { rowToast.set({ ...toast, seq: ++toastSeq }); };
-    const uiWorkspace = new UiWorkspaceService(ctx, ctx.remote.directoryPicker, workspaces, sessions, viewInstance.actions, notify);
+    // Cold-session resume: switch the Host's active Session before its follow
+    // opens (web.v1 多会话步 2）. A deployment without the call keeps the legacy path.
+    const resumeSession = async (sessionId) => {
+        const result = await ctx.remote.session.open({ sessionId });
+        return result.ok
+            ? { ok: true, skipped: result.value.skipped }
+            : { ok: false, code: result.error.code };
+    };
+    const uiWorkspace = new UiWorkspaceService(ctx, ctx.remote.directoryPicker, workspaces, sessions, viewInstance.actions, notify, resumeSession);
     ctx.slots.provideRoot({
         hooks: { workspaces: workspaces.list },
         keyedHooks: {

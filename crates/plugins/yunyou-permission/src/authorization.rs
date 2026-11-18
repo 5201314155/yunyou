@@ -269,7 +269,7 @@ mod tests {
         assert!(file.remove_plugin("p1"));
         assert!(!file.remove_plugin("p1"));
         file.save(&store).unwrap();
-        assert!(AuthorizationsFile::load(&store).unwrap().plugins.get("p1").is_none());
+        assert!(!AuthorizationsFile::load(&store).unwrap().plugins.contains_key("p1"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

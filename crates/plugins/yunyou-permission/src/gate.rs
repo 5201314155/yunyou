@@ -13,12 +13,20 @@ pub struct PermissionGate {
     /// 预编译规则集（settings [permissions] 三值分列；S5 前静态——运行期
     /// 重载候 [permission] 配置热更卡）。
     rules: Arc<RuleSet>,
+    /// L4 沙箱穿越开关（[permission] auto_allow_sandboxed；默认 false——
+    /// 穿越默认关，愿进沙箱也要显式配置才生效，防静默放宽）。
+    auto_allow_sandboxed: bool,
 }
 
 impl PermissionGate {
     /// 构造（规则集由装配侧加载编译后注入）。
     pub fn new(rules: RuleSet) -> Self {
-        Self { rules: Arc::new(rules) }
+        Self { rules: Arc::new(rules), auto_allow_sandboxed: false }
+    }
+
+    /// 设置 L4 穿越开关（[permission] auto_allow_sandboxed 装配透传）。
+    pub fn set_auto_allow_sandboxed(&mut self, enabled: bool) {
+        self.auto_allow_sandboxed = enabled;
     }
 }
 
@@ -38,6 +46,8 @@ impl PreToolUseGate for PermissionGate {
         let arguments = call.arguments.to_string();
         let mode = _ctx.mode.clone();
         let workspace_root = _ctx.workspace_root.clone();
+        let sandbox_willing = _ctx.sandbox_willing;
+        let auto_allow_sandboxed = self.auto_allow_sandboxed;
         Box::pin(async move {
             // L0 高危免疫层（最先判：任何规则/模式不可触达——设计稿 §一偏差 1）
             if let Some(reason) = denylist::check(&tool, &arguments) {
@@ -58,6 +68,10 @@ impl PreToolUseGate for PermissionGate {
                         == Some(crate::mode::Mode::Bypass)
                     {
                         Ok(GateDecision::Allow { sandboxed: false })
+                    } else if sandbox_willing == Some(true) && auto_allow_sandboxed {
+                        // L4 沙箱穿越（claude :1088-1104 同律）：命令愿进沙箱
+                        // ∧ 配置开 → 穿越 ask 规则自动放行（沙箱内执行标记）
+                        Ok(GateDecision::Allow { sandboxed: true })
                     } else {
                         Ok(GateDecision::Ask { suggestions: vec![format!("allow {tool}")] })
                     }
@@ -87,15 +101,10 @@ impl PreToolUseGate for PermissionGate {
     }
 }
 
-/// 区内判定（写类）：路径前缀比对（双端归一尾斜杠；root 未知=None=保守区外）。
-/// canonicalize 级防逃逸候 S4 工作区边界批（复用 resolve_workspace，此处 v1
-/// 为矩阵层最小实现——测试锁边界形态）。
+/// 区内判定（写类）：S4 防逃逸版=boundary.rs canonicalize 三步（task-43
+/// resolve_workspace 同款形态，symlink/../ 运行时闸；详见 boundary.rs 头注）。
 fn in_workspace(path: Option<&str>, root: Option<&str>) -> Option<bool> {
-    let (path, root) = (path?, root?);
-    fn norm(s: &str) -> &str {
-        s.trim_end_matches('/')
-    }
-    Some(norm(path).starts_with(norm(root)))
+    crate::boundary::in_workspace(path, root)
 }
 
 /// 参数 JSON 内容位提取（v1 启发式：常见键单点归一；deny_unknown_fields 的
@@ -146,9 +155,81 @@ mod tests {
         // allow 规则
         let d = gate.check(&call("bash", "{\"command\":\"cargo build\"}"), &GateContext::default()).await.unwrap();
         assert_eq!(d, GateDecision::Allow { sandboxed: false });
-        // 无命中=Pass（缺省归 S3 模式层）
+        // 无命中=模式矩阵（S3）：web_fetch=读类→Allow（读类任何模式放行）
         let d = gate.check(&call("web_fetch", "{\"url\":\"https://docs.rs\"}"), &GateContext::default()).await.unwrap();
-        assert_eq!(d, GateDecision::Pass);
+        assert_eq!(d, GateDecision::Allow { sandboxed: false });
+    }
+
+    /// S3 模式矩阵端到端：default 区内写 Allow/区外写 Ask；plan 写 Ask 读
+    /// Allow；bypass 豁免 ask 规则但 deny 照拒；mode 未知=Default 保守。
+    #[tokio::test]
+    async fn s3_模式矩阵端到端() {
+        let gate = gate_with(crate::rules::PermissionsSection {
+            allow: vec![],
+            ask: vec!["Bash(npm publish:*)".into()],
+            deny: vec!["Bash(rm -rf:*)".into()],
+        });
+        let ctx = |mode: Option<&str>, root: Option<&str>| GateContext {
+            mode: mode.map(String::from),
+            workspace_root: root.map(String::from),
+            sandbox_willing: None,
+        };
+        // default：区内写 Allow / 区外写 Ask
+        let d = gate.check(&call("write", "{\"path\":\"/ws/a.txt\"}"), &ctx(Some("default"), Some("/ws"))).await.unwrap();
+        assert_eq!(d, GateDecision::Allow { sandboxed: false });
+        let d = gate.check(&call("write", "{\"path\":\"/etc/x\"}"), &ctx(Some("default"), Some("/ws"))).await.unwrap();
+        assert!(matches!(d, GateDecision::Ask { .. }), "{d:?}");
+        // plan：写 Ask（区内也问）、读 Allow、执行 Ask
+        let d = gate.check(&call("write", "{\"path\":\"/ws/a.txt\"}"), &ctx(Some("plan"), Some("/ws"))).await.unwrap();
+        assert!(matches!(d, GateDecision::Ask { .. }), "plan 区内写也问：{d:?}");
+        let d = gate.check(&call("read", "{}"), &ctx(Some("plan"), Some("/ws"))).await.unwrap();
+        assert_eq!(d, GateDecision::Allow { sandboxed: false });
+        // bypass：ask 规则豁免 Allow；deny 规则照拒（不变式 3）
+        let d = gate.check(&call("bash", "{\"command\":\"npm publish\"}"), &ctx(Some("bypass"), None)).await.unwrap();
+        assert_eq!(d, GateDecision::Allow { sandboxed: false });
+        let d = gate.check(&call("bash", "{\"command\":\"rm -rf /tmp/x\"}"), &ctx(Some("bypass"), None)).await.unwrap();
+        assert!(matches!(d, GateDecision::Deny { .. }), "{d:?}");
+        // bypass 无命中执行类也 Allow
+        let d = gate.check(&call("bash", "{\"command\":\"echo hi\"}"), &ctx(Some("bypass"), None)).await.unwrap();
+        assert_eq!(d, GateDecision::Allow { sandboxed: false });
+        // acceptEdits（驼峰兼容）：区内写 Allow/执行 Ask
+        let d = gate.check(&call("write", "{\"path\":\"/ws/a.txt\"}"), &ctx(Some("acceptEdits"), Some("/ws"))).await.unwrap();
+        assert_eq!(d, GateDecision::Allow { sandboxed: false });
+        let d = gate.check(&call("bash", "{\"command\":\"make\"}"), &ctx(Some("accept_edits"), Some("/ws"))).await.unwrap();
+        assert!(matches!(d, GateDecision::Ask { .. }), "{d:?}");
+        // mode 未知=Default 保守（未知工具=执行类 Ask）
+        let d = gate.check(&call("神奇工具", "{}"), &ctx(Some("yolo"), None)).await.unwrap();
+        assert!(matches!(d, GateDecision::Ask { .. }), "{d:?}");
+    }
+
+    /// S4 L4 沙箱穿越三态：无意愿=Ask；有意愿+开关开=Allow{sandboxed:true}；
+    /// 有意愿+开关关=Ask（穿越默认关防静默放宽）。
+    #[tokio::test]
+    async fn s4_沙箱穿越三态() {
+        let gate = gate_with(crate::rules::PermissionsSection {
+            allow: vec![], ask: vec!["Bash(cargo:*)".into()], deny: vec![],
+        });
+        let ctx = |willing: Option<bool>| GateContext {
+            mode: Some("default".into()),
+            workspace_root: None,
+            sandbox_willing: willing,
+        };
+        // 无意愿信号：Ask
+        let d = gate.check(&call("bash", "{\"command\":\"cargo build\"}"), &ctx(None)).await.unwrap();
+        assert!(matches!(d, GateDecision::Ask { .. }), "{d:?}");
+        // 有意愿+开关关（默认）：仍 Ask
+        let d = gate.check(&call("bash", "{\"command\":\"cargo build\"}"), &ctx(Some(false))).await.unwrap();
+        assert!(matches!(d, GateDecision::Ask { .. }), "{d:?}");
+        // 有意愿+开关开：Allow{sandboxed:true}
+        let mut open = PermissionGate::new(crate::rules::RuleSet::compile(&crate::rules::PermissionsSection {
+            allow: vec![], ask: vec!["Bash(cargo:*)".into()], deny: vec![],
+        }).unwrap());
+        open.set_auto_allow_sandboxed(true);
+        let d = open.check(&call("bash", "{\"command\":\"cargo build\"}"), &ctx(Some(true))).await.unwrap();
+        assert_eq!(d, GateDecision::Allow { sandboxed: true });
+        // 穿越不豁免 deny 规则（L1 前于 L4）
+        let d = open.check(&call("bash", "{\"command\":\"rm -rf /tmp/x\"}"), &ctx(Some(true))).await.unwrap();
+        assert!(matches!(d, GateDecision::Deny { .. }), "{d:?}");
     }
 
     /// 内容位提取启发式：command/path/url 各键；无键=无内容（内容级规则不命中）。
@@ -161,11 +242,15 @@ mod tests {
         assert_eq!(extract_content("not-json"), None);
     }
 
-    /// 非 bash 工具不进 L0 扫描（清单语义=命令毁灭面）。
+    /// 非 bash 工具不进 L0 扫描（清单语义=命令毁灭面）：write 带毁灭文本参数
+    /// 不触发 L0（文本非命令），走 S3 矩阵——write=写类、root 未知=保守 Ask。
     #[tokio::test]
     async fn 非bash工具不进l0() {
         let gate = PermissionGate::new(crate::rules::RuleSet::default());
         let d = gate.check(&call("write", "{\"path\":\"rm -rf /\"}"), &GateContext::default()).await.unwrap();
-        assert_eq!(d, GateDecision::Pass);
+        assert!(matches!(d, GateDecision::Ask { .. }), "{d:?}");
+        // bash 带同文本=L0 命中恒 Deny（对照）
+        let d = gate.check(&call("bash", "{\"command\":\"rm -rf /\"}"), &GateContext::default()).await.unwrap();
+        assert!(matches!(d, GateDecision::Deny { .. }), "{d:?}");
     }
 }

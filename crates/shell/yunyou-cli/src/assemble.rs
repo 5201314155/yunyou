@@ -405,6 +405,42 @@ async fn load_market_plugins(
                 continue;
             }
         };
+        // 装载侧授权（task-16 接线，lead 派）：[permissions] network/credentials
+        // 非空 → authorize_plugin（Ask 缝；presenter 缺席=无头 fail-closed 拒装
+        // 人话「可用 yunyou plugin authorize 显式授权后重装」）；granted 快路径
+        // 零交互。失败=单插件拒装不拖累他插件（§4.4 语义）。
+        let mut requests: Vec<yunyou_permission::GrantRequest> = Vec::new();
+        if manifest_v2.permissions.network {
+            requests.push(yunyou_permission::GrantRequest::Network);
+        }
+        for cred in &manifest_v2.permissions.credentials {
+            requests.push(yunyou_permission::GrantRequest::Credential(cred.clone()));
+        }
+        if !requests.is_empty() {
+            let file_path = yunyou_permission::AuthorizationsFile::default_path();
+            let mut file = match &file_path {
+                Some(path) => yunyou_permission::AuthorizationsFile::load(path)
+                    .map_err(|err| format!("授权记录加载失败：{err}"))
+                    .unwrap_or_default(),
+                None => yunyou_permission::AuthorizationsFile::default(),
+            };
+            if let Err(reason) = yunyou_permission::authorize_plugin(
+                &yunyou_agent_loop::ApprovalUiRegistry::default(),
+                &mut file,
+                file_path.as_deref(),
+                &manifest_v2.id,
+                &requests,
+                "装载 market 插件（manifest [permissions] 声明）",
+            )
+            .await
+            {
+                push_market_failed(rows, &d.id, &d.file.version, reason);
+                continue;
+            }
+            if let Some(path) = &file_path {
+                let _ = file.save(path); // 授权落盘（装前持久化；失败不阻断，重装重问）
+            }
+        }
         // 沙箱衔接（§4.1）：[sandbox] enabled=false → 拒装该插件（不降级直跑）
         let enforcer: Option<Arc<dyn yunyou_tools::sandbox::SandboxEnforcer>> =
             if config.sandbox.enabled {
