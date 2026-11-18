@@ -1,0 +1,8 @@
+ Downloading crates ...
+  Downloaded windows-interface v0.59.3 (registry `rsproxy-sparse`)
+  Downloaded windows-strings v0.5.1 (registry `rsproxy-sparse`)
+  Downloaded windows-result v0.4.1 (registry `rsproxy-sparse`)
+  Downloaded windows-implement v0.60.2 (registry `rsproxy-sparse`)
+  Downloaded android_system_properties v0.1.6 (registry `rsproxy-sparse`)
+  Downloaded iana-time-zone-haiku v0.1.2 (registry `rsproxy-sparse`)
+  Downloaded windows-core v0.62.2 (registry `rsproxy-sparse`)

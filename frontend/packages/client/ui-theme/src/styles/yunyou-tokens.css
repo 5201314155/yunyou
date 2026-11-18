@@ -1,0 +1,98 @@
+/*
+ * YunYou web adapter layer (tokens.json 0.2 / Web design spec 2026-11-18 §4–§5).
+ * Outputs --yunyou-* semantic variables as the single consumption surface and keeps
+ * --dsw-* transition mappings (spec §5.3). This layer only translates semantics;
+ * it must not invent new values. Business components must not add new --dsw-* deps.
+ * Theming: light is the default (:root); dark overrides via body[data-ds-dark-theme],
+ * matching design-platform.css.
+ */
+
+:root {
+  /* Brand colors (shared across themes) */
+  --yunyou-color-brand-primary: rgb(95, 135, 175);
+  --yunyou-color-brand-secondary: rgb(135, 175, 215);
+  --yunyou-color-brand-bright: rgb(95, 175, 215);
+
+  /* Feedback colors (shared across themes) */
+  --yunyou-color-feedback-success: rgb(95, 175, 95);
+  --yunyou-color-feedback-danger: rgb(215, 95, 95);
+  --yunyou-color-feedback-warning: rgb(215, 175, 95);
+
+  /* Tool name colors (bash neutral gray must not be used for body text on light bg) */
+  --yunyou-color-tool-read: rgb(95, 135, 135);
+  --yunyou-color-tool-edit: rgb(135, 95, 135);
+  --yunyou-color-tool-bash: rgb(95, 135, 135);
+
+  /* Action / surface / text / border (tokens 0.2 new candidates) */
+  --yunyou-color-action-primary: #3F6484;
+  --yunyou-color-action-primary-foreground: #FFFFFF;
+
+  --yunyou-color-surface-base: #F7F9FB;
+  --yunyou-color-surface-raised: #FFFFFF;
+  --yunyou-color-surface-sunken: #EFF3F6;
+
+  --yunyou-color-text-primary: #17232D;
+  --yunyou-color-text-secondary: #5D6B76;
+
+  --yunyou-color-border-default: #D7E0E7;
+  --yunyou-color-border-focus: var(--yunyou-color-brand-primary);
+
+  --yunyou-color-accent-info: var(--yunyou-color-brand-secondary);
+
+  /* Spacing (4/8/12/16 primitives; 20/24/32/48 for blocks and pages only) */
+  --yunyou-space-1: 4px;
+  --yunyou-space-2: 8px;
+  --yunyou-space-3: 12px;
+  --yunyou-space-4: 16px;
+  --yunyou-space-5: 20px;
+  --yunyou-space-6: 24px;
+  --yunyou-space-8: 32px;
+  --yunyou-space-12: 48px;
+
+  /* Radii */
+  --yunyou-radius-small: 6px;
+  --yunyou-radius-control: 10px;
+  --yunyou-radius-card: 14px;
+  --yunyou-radius-panel: 18px;
+  --yunyou-radius-pill: 999px;
+
+  /* Motion */
+  --yunyou-duration-fast: 150ms;
+  --yunyou-duration-standard: 250ms;
+  --yunyou-duration-slow: 400ms;
+  --yunyou-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Typography */
+  --yunyou-typo-body-size: 14px;
+  --yunyou-typo-body-line-height: 1.6;
+  --yunyou-typo-caption-size: 12px;
+  --yunyou-typo-caption-line-height: 1.5;
+  --yunyou-typo-code-size: 13px;
+  --yunyou-typo-code-line-height: 1.55;
+  --yunyou-typo-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --yunyou-typo-font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+
+body[data-ds-dark-theme] {
+  /* Dark is an independent design: no pure black bg, no pure white text (spec §5.2) */
+  --yunyou-color-action-primary: #9CC6E3;
+  --yunyou-color-action-primary-foreground: #10161C;
+
+  --yunyou-color-surface-base: #10161C;
+  --yunyou-color-surface-raised: #182129;
+  --yunyou-color-surface-sunken: #0B1116;
+
+  --yunyou-color-text-primary: #E7EDF2;
+  --yunyou-color-text-secondary: #A5B1BA;
+
+  --yunyou-color-border-default: #34434F;
+  --yunyou-color-border-focus: var(--yunyou-color-brand-bright);
+}
+
+/*
+ * --dsw-* compatibility: existing --dsw-* aliases stay defined (and brand-aligned)
+ * in design-platform.css, which keeps every legacy consumer working. This layer must
+ * NOT redefine those aliases — their values drive the whole assembled UI and are
+ * theme-scoped in design-platform.css; migrating them to --yunyou-* values is a
+ * separate reviewed visual batch. Do not add new --dsw-* deps in business code (§5.3).
+ */

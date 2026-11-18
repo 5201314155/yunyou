@@ -302,6 +302,7 @@ impl TeamService for TeamServiceState {
             .into_iter()
             .map(|(name, meta)| RosterEntry {
                 busy: meta.busy,
+                busy_since: meta.busy_since,
                 task: meta.task,
                 online: online.get(&name).copied().unwrap_or(false),
                 description: meta.description,

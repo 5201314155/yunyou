@@ -11,6 +11,9 @@ export const zh = {
     'row.instructions': '说明',
     'row.inspect': '查看',
     'menu.userOnly': '仅用户',
+    'menu.source.builtin': '内置',
+    'menu.source.project': '项目',
+    'menu.source.plugin': '插件',
 };
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
@@ -22,6 +25,9 @@ export const en = {
     'row.instructions': 'Instructions',
     'row.inspect': 'Inspect',
     'menu.userOnly': 'user-only',
+    'menu.source.builtin': 'built-in',
+    'menu.source.project': 'project',
+    'menu.source.plugin': 'plugin',
 };
 /** Japanese copy, checked against the English keys. */
 export const ja = {
@@ -33,6 +39,9 @@ export const ja = {
     'row.instructions': '手順',
     'row.inspect': '詳細を確認',
     'menu.userOnly': 'ユーザー専用',
+    'menu.source.builtin': '組み込み',
+    'menu.source.project': 'プロジェクト',
+    'menu.source.plugin': 'プラグイン',
 };
 /** Spanish dictionary, checked against the English keys. */
 export const es = {
@@ -44,6 +53,9 @@ export const es = {
     'row.instructions': 'Instrucciones',
     'row.inspect': 'inspeccionar',
     'menu.userOnly': 'solo usuario',
+    'menu.source.builtin': 'integrada',
+    'menu.source.project': 'proyecto',
+    'menu.source.plugin': 'plugin',
 };
 /** French dictionary, checked against the English keys. */
 export const fr = {
@@ -55,6 +67,9 @@ export const fr = {
     'row.instructions': 'Instructions',
     'row.inspect': 'Inspecter',
     'menu.userOnly': 'utilisateur uniquement',
+    'menu.source.builtin': 'intégrée',
+    'menu.source.project': 'projet',
+    'menu.source.plugin': 'plugin',
 };
 /** German dictionary, checked against the English keys. */
 export const de = {
@@ -66,6 +81,9 @@ export const de = {
     'row.instructions': 'Anweisungen',
     'row.inspect': 'Inspizieren',
     'menu.userOnly': 'Nur für Benutzer',
+    'menu.source.builtin': 'integriert',
+    'menu.source.project': 'Projekt',
+    'menu.source.plugin': 'Plugin',
 };
 /** Russian dictionary, checked against the English keys. */
 export const ru = {
@@ -77,6 +95,9 @@ export const ru = {
     'row.instructions': 'Инструкции',
     'row.inspect': 'Осмотреть',
     'menu.userOnly': 'только для пользователей',
+    'menu.source.builtin': 'встроенный',
+    'menu.source.project': 'проект',
+    'menu.source.plugin': 'плагин',
 };
 /** Portuguese dictionary, checked against the English keys. */
 export const pt = {
@@ -88,5 +109,8 @@ export const pt = {
     'row.instructions': 'Instruções',
     'row.inspect': 'Inspecionar',
     'menu.userOnly': 'somente usuário',
+    'menu.source.builtin': 'integrada',
+    'menu.source.project': 'projeto',
+    'menu.source.plugin': 'plugin',
 };
 //# sourceMappingURL=locales.js.map

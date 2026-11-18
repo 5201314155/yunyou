@@ -1,0 +1,64 @@
+# yunyou.toml 全量注解示例（拷到 ~/.yunyou/yunyou.toml 或 <项目>/yunyou.toml 改用）
+# 每段均可整体省略=走默认值；未知键 fail-loud（拼错当场报错，不静默吞）。
+# 最小可用配置见 config.minimal.toml——通常只需要 [llm] 三行。
+
+# ── LLM 端点（OpenAI 兼容）──────────────────────────
+[llm]
+base_url = "https://api.example.com/v1"    # 不含 /chat/completions
+api_key = "$YUNYOU_LLM_API_KEY"            # 推荐：凭据引用（真实 key 存 ~/.yunyou/credentials.toml，0600 自动托管；明文写法为迁移期兼容，启动自动收编）
+model = "vendor/model-name"
+timeout_secs = 300                         # 连接+收头超时（0=不限时；读流段由空闲看门狗管）
+stream_idle_timeout_ms = 30000             # 流空闲看门狗：chunk 间无字节超此时长判流死（0=关）
+
+# ── 会话 ─────────────────────────────────────────────
+[session]
+# path = "~/.yunyou/sessions/default.jsonl" # 缺省即此；每次启动默认新会话（--resume/--continue 续）
+
+# ── 工作区（文件工具根）────────────────────────────
+[workspace]
+# root = "/home/me/project"                 # 缺省=git 根自动检测链（显式配置非法会警告并回退）
+
+# ── 人设 ─────────────────────────────────────────────
+# 推荐用文件不用字符串（改文件即生效，零代码零配置）：
+#   AGENTS.md 四级分源（> persona.md > toml 字符串）：
+#     /etc/yunyou/AGENTS.md                  策略级（组织下发）
+#     ~/.yunyou/AGENTS.md                    用户全局
+#     <项目>/AGENTS.md                       项目级
+#     <项目>/.yunyou/local/AGENTS.md         本地私有（不入库）
+#   persona.md 两级（向后兼容）：<项目>/.yunyou/persona.md > ~/.yunyou/persona.md
+[system_prompt]
+# persona = "你是一个严谨的运维助手"
+
+[agent_loop]
+# persona = "……"
+tool_timeout_secs = 300                    # 单工具执行超时（0=不限时）
+# max_steps = 50                           # 步数护栏（默认不设=跑到完成为止；设值=跑满软着陆可「继续」续跑）
+# token_budget = 100000                    # token 预算护栏（默认不设；端点未报 usage 时本轮不生效=诚实不估算）
+
+# ── 工具 ─────────────────────────────────────────────
+[tools]
+root_dir = "."                             # 文件类工具根（相对 cwd 或绝对）
+[tools.builtin]                            # 逐工具开关（false=不注册、LLM 看不见=真关）
+# web_fetch = false
+
+# ── 重试策略（默认即产品，无需配置）──────────────────
+[retry]
+max_retries = 2                            # 连接失败/5xx/429 自动重试（指数退避 0.5s→8s 带抖动）
+initial_delay_ms = 500
+max_delay_ms = 8000
+
+# ── 凭据托管 ─────────────────────────────────────────
+[credentials]
+# store_path = "~/.yunyou/credentials.toml" # 缺省即此（0600，原子写）
+
+# ── 沙箱（Linux：Landlock+seccomp）──────────────────
+[sandbox]
+enabled = true
+writable_tmp = true                        # /tmp 并入可写根（编译器临时文件合法面）
+network_denied = true                      # 子进程禁网（false=显式放开，重启生效）
+
+# ── 插件 ─────────────────────────────────────────────
+# 键=插件 id；enable 缺省回落各插件 manifest.auto_enable。
+[plugins.yunyou-tools]
+enable = true
+# config = { 自定义段值 }                   # 透传插件 config（新机制插件唯一配置入口）

@@ -87,6 +87,9 @@ pub struct AgentLoopRunner {
     /// 错误隔离三态，机制见 [`crate::hooks`]）。与插件服务面共享同一实例——
     /// 空注册=行为与无钩子逐字节一致（零开销短路）。
     pub hooks: Arc<crate::hooks::HooksRegistry>,
+    /// 工具执行前审批缝（task-16 S1）：gate 判定链+审批呈现器表（对象类型
+    /// 注册制）。空注册=每工具一次 is_empty 短路，行为与无缝逐字节一致。
+    pub gates: Arc<crate::gate::GateHub>,
 }
 
 impl AgentLoopRunner {

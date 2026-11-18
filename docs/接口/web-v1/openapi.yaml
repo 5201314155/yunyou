@@ -1,0 +1,224 @@
+# web.v1 unary RPC 机器可读契约（OpenAPI 3.1）
+# 状态：已冻结 v1.0（2026-11-19，lead 终审批准）。变更经云枢复审并回写版本号。
+# 口径注记：冻结细则先行、openapi 追随——新增方法先落域细则（加法演进），openapi
+# 补录可滞后；对表时以域细则状态为准，openapi 缺录不等于方法未接。
+# 说明：单一 POST /api 端点承载全部方法（method 在体内），此处按方法展开为
+# x-method 标注的 path，供代码生成与 mock；未接方法不出现在本文件（fail-visible 由
+# 服务端 gateway/not-implemented 兜底）。
+openapi: 3.1.0
+info:
+  title: 云悠 Web 接口（web.v1）
+  version: 1.0.0
+  description: |
+    信封：请求 {type:"client-request",rpcId,method,payload}；
+    响应 {type:"server-response",rpcId,result:{ok,value}|{ok,error}}。
+    业务失败一律 HTTP 200 + ok:false；错误码词表见 规格.md §2.2。
+servers:
+  - url: http://127.0.0.1:{port}
+    variables:
+      port:
+        default: "0"   # 随机端口，以启动打印 URL 为准
+security:
+  - tokenQuery: []
+  - bearerAuth: []
+  - cookieAuth: []
+paths:
+  /api/session/list:
+    post:
+      operationId: sessionList
+      x-method: session/list
+      x-status: 已接
+      summary: 会话列表（未铸会话=空数组）
+      responses: { "200": { $ref: "#/components/responses/Envelope" } }
+  /api/session/create:
+    post:
+      operationId: sessionCreate
+      x-method: session/create
+      x-status: 已接
+      summary: 铸造或复用会话
+      requestBody: { $ref: "#/components/requestBodies/Rpc" }
+      responses: { "200": { $ref: "#/components/responses/Envelope" } }
+  /api/session/open:
+    post:
+      operationId: sessionOpen
+      x-method: session/open
+      x-status: 已接
+      x-version: v1.1 增量
+      summary: 会话恢复（切换活跃会话并回放 JSONL 尾部；响应含 ingested/skipped/skippedNote）
+      requestBody: { $ref: "#/components/requestBodies/Rpc" }
+      responses: { "200": { $ref: "#/components/responses/Envelope" } }
+  /api/session/prompt:
+    post:
+      operationId: sessionPrompt
+      x-method: session/prompt
+      x-status: 已接
+      summary: 提交用户消息（受理后事件经 follow 流回流）
+      requestBody: { $ref: "#/components/requestBodies/Rpc" }
+      responses: { "200": { $ref: "#/components/responses/Envelope" } }
+  /api/session/cancel:
+    post:
+      operationId: sessionCancel
+      x-method: session/cancel
+      x-status: 已接
+      summary: 取消进行中回合（无回合= session/no-active-turn）
+      responses: { "200": { $ref: "#/components/responses/Envelope" } }
+  /api/session/page:
+    post:
+      operationId: sessionPage
+      x-method: session/page
+      x-status: 已接
+      summary: 向上翻页兜底（诚实空页）
+      responses: { "200": { $ref: "#/components/responses/Envelope" } }
+  /api/session/modelCatalog:
+    post:
+      operationId: sessionModelCatalog
+      x-method: session/modelCatalog
+      x-status: 已接
+      summary: 单提供方诚实模型目录
+      responses: { "200": { $ref: "#/components/responses/Envelope" } }
+  /api/commands/list:
+    post:
+      operationId: commandsList
+      x-method: commands/list
+      x-status: 冻结待接
+      summary: 斜杠命令目录（字典序稳定）
+      responses: { "200": { $ref: "#/components/responses/Envelope" } }
+  /api/commands/execute:
+    post:
+      operationId: commandsExecute
+      x-method: commands/execute
+      x-status: 冻结待接
+      summary: 执行斜杠命令（持回合闸门；展开类不代发；/quit 由壳层拦截）
+      requestBody: { $ref: "#/components/requestBodies/Rpc" }
+      responses: { "200": { $ref: "#/components/responses/Envelope" } }
+  /api/skills/list:
+    post:
+      operationId: skillsList
+      x-method: skills/list
+      x-status: 冻结待接
+      summary: 技能目录（builtin/project/plugin 真实分层）
+      responses: { "200": { $ref: "#/components/responses/Envelope" } }
+  /api/skills/get:
+    post:
+      operationId: skillsGet
+      x-method: skills/get
+      x-status: 冻结待接
+      summary: 技能正文（展示用，发送须用户显式动作）
+      requestBody: { $ref: "#/components/requestBodies/Rpc" }
+      responses: { "200": { $ref: "#/components/responses/Envelope" } }
+  /api/capabilities/list:
+    post:
+      operationId: capabilitiesList
+      x-method: capabilities/list
+      x-status: 冻结待接
+      summary: 能力开闸投影（available=false 必带 gate 说明）
+      responses: { "200": { $ref: "#/components/responses/Envelope" } }
+  /api/team/spawn:
+    post: { operationId: teamSpawn, x-method: team/spawn, x-status: 冻结待接, x-level: L4, summary: 拉起成员（fresh/fork），需显式授权, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/team/message:
+    post: { operationId: teamMessage, x-method: team/message, x-status: 冻结待接, x-level: L2, summary: 以 lead 身份发成员消息, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/team/roster:
+    post: { operationId: teamRoster, x-method: team/roster, x-status: 冻结待接, x-level: L1, summary: 名册投影（name/description/online/busy/task）, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/team/kick:
+    post: { operationId: teamKick, x-method: team/kick, x-status: 冻结待接, x-level: L3, summary: 踢人（dispose fiber；信箱保留）, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/tasks/create:
+    post: { operationId: tasksCreate, x-method: tasks/create, x-status: 冻结待接, x-level: L2, summary: 创建共享任务（title/description 必填，capability/blocked_by 可选）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/tasks/claim:
+    post: { operationId: tasksClaim, x-method: tasks/claim, x-status: 冻结待接, x-level: L2, summary: 认领（pending→claimed；owner 须在册）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/tasks/submit:
+    post: { operationId: tasksSubmit, x-method: tasks/submit, x-status: 冻结待接, x-level: L2, summary: 提交成果（仅 owner）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/tasks/review:
+    post: { operationId: tasksReview, x-method: tasks/review, x-status: 冻结待接, x-level: L3, summary: 审查裁决（approve/reject；板层强制拒绝自审）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/tasks/reassign:
+    post: { operationId: tasksReassign, x-method: tasks/reassign, x-status: 冻结待接, x-level: L3, summary: 改派负责人, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/tasks/list:
+    post: { operationId: tasksList, x-method: tasks/list, x-status: 冻结待接, x-level: L1, summary: 任务板投影, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/schedule/create:
+    post: { operationId: scheduleCreate, x-method: schedule/create, x-status: 冻结待接, x-level: L2, summary: 创建定时任务（at_ms/every_minutes/cron 三选一必填恰一；回显即确认）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/schedule/list:
+    post: { operationId: scheduleList, x-method: schedule/list, x-status: 冻结待接, x-level: L1, summary: 在规定时列表, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/schedule/delete:
+    post: { operationId: scheduleDelete, x-method: schedule/delete, x-status: 冻结待接, x-level: L3, summary: 按 id 删除（不存在= schedule/unknown-id + 现有清单）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/plugins/list:
+    post: { operationId: pluginsList, x-method: plugins/list, x-status: 冻结待接, x-level: L1, summary: 本地插件目录（manifest 投影+启用态）, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/plugins/enable:
+    post: { operationId: pluginsEnable, x-method: plugins/enable, x-status: 冻结待接, x-level: L3, summary: 启停插件（带 revision 乐观锁）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/plugins/config:
+    post: { operationId: pluginsConfig, x-method: plugins/config, x-status: 冻结待接, x-level: L3, summary: 读写插件段配置（带 revision）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/plugins/tools:
+    post: { operationId: pluginsTools, x-method: plugins/tools, x-status: 冻结待接, x-level: L1, summary: 插件工具清单与运行状态/错误, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/settings/sections:
+    post: { operationId: settingsSections, x-method: settings/sections, x-status: 冻结待接, x-level: L1, summary: 设置段清单（schema 投影，secret 槽位 sidecar）, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/settings/form:
+    post: { operationId: settingsForm, x-method: settings/form, x-status: 冻结待接, x-level: L1, summary: 单段表单描述（FormField 平铺+secrets 清单；secret value 恒 null）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/settings/write:
+    post: { operationId: settingsWrite, x-method: settings/write, x-status: 冻结待接, x-level: L4, summary: 段写入（revision 乐观锁；冲突=config/revision-conflict）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/credentials/list:
+    post: { operationId: credentialsList, x-method: credentials/list, x-status: 冻结待接, x-level: L1, summary: 凭据槽位目录（path/set/引用来源；零明文）, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/credentials/set:
+    post: { operationId: credentialsSet, x-method: credentials/set, x-status: 冻结待接, x-level: L4, summary: 写入/替换凭据（值只进托管存储，永不回显）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/credentials/delete:
+    post: { operationId: credentialsDelete, x-method: credentials/delete, x-status: 冻结待接, x-level: L3, summary: 删除凭据槽位（二次确认）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/devices/current:
+    post: { operationId: devicesCurrent, x-method: devices/current, x-status: 冻结待接, x-level: L1, summary: 当前连接鉴权形态（无令牌读回、无设备清单）, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/system/info:
+    post: { operationId: systemInfo, x-method: system/info, x-status: 冻结待接, x-level: L1, summary: 版本/契约/模型/工作区根/会话目录, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+  /api/system/health:
+    post: { operationId: systemHealth, x-method: system/health, x-status: 冻结待接, x-level: L1, summary: 探活（uptime/turnOpen）, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+components:
+  securitySchemes:
+    tokenQuery: { type: apiKey, in: query, name: token }
+    bearerAuth: { type: http, scheme: bearer }
+    cookieAuth: { type: apiKey, in: cookie, name: yunyou-web-token }
+  requestBodies:
+    Rpc:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ClientRequest" }
+  responses:
+    Envelope:
+      description: server-response 信封（业务成败在 result 内；形状非法=400）
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ServerResponse" }
+  schemas:
+    ClientRequest:
+      type: object
+      required: [type, rpcId, method]
+      properties:
+        type: { const: client-request }
+        rpcId: { type: string }
+        method: { type: string, description: "域/动作，如 session/prompt" }
+        payload:
+          type: object
+          properties:
+            args: { type: object, description: "单参方法惯例 {request:{…}}；兼容直接形态" }
+    ServerResponse:
+      type: object
+      required: [type, rpcId, result]
+      properties:
+        type: { const: server-response }
+        rpcId: {}
+        result:
+          oneOf:
+            - type: object
+              required: [ok, value]
+              properties: { ok: { const: true }, value: { type: object } }
+            - type: object
+              required: [ok, error]
+              properties:
+                ok: { const: false }
+                error: { $ref: "#/components/schemas/ErrorBody" }
+    ErrorBody:
+      type: object
+      required: [code, message, details]
+      properties:
+        code: { type: string, description: "词表见 规格.md §2.2" }
+        message: { type: string, description: "中文人话，可行动" }
+        details: { type: object, description: "定位所需最小结构化字段；永不放 secret/内核栈" }
+    Revisioned:
+      type: object
+      required: [revision]
+      properties:
+        revision: { type: integer, minimum: 1, description: "乐观锁；写入冲突=config/revision-conflict" }

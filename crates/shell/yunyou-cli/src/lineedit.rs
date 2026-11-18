@@ -10,7 +10,29 @@
 //! [`Editor::read_line_plain`]——补全面板整体静默，逐行读语义与既有 REPL 等价。
 
 use crate::history::LineHistory;
+use crate::editor_core;
+use crate::editor_keys;
+use crate::editor_keys::CsiKey;
+use crate::editor_render;
 use crate::panel::Panel;
+// RawMode 旧路径 re-export（input_source.rs/repl.rs 消费方零改动，家规五：
+// 改复用模块影响面=调用方不变）
+pub(crate) use editor_keys::RawMode;
+
+/// CsiKey → 状态机 Key（面板未消费时交语义层）。
+fn csi_to_key(k: CsiKey) -> editor_core::Key {
+    match k {
+        CsiKey::Up => editor_core::Key::Up,
+        CsiKey::Down => editor_core::Key::Down,
+        CsiKey::Left => editor_core::Key::Left,
+        CsiKey::Right => editor_core::Key::Right,
+        CsiKey::Home => editor_core::Key::Home,
+        CsiKey::End => editor_core::Key::End,
+        CsiKey::Delete => editor_core::Key::Delete,
+        CsiKey::Escape => editor_core::Key::Escape,
+        CsiKey::Other => editor_core::Key::Escape, // 未知序列：按 Esc 语义（收面板/吞弃）降级
+    }
+}
 use crate::render::Profile;
 use std::io::Write;
 use std::sync::Arc;
@@ -35,25 +57,6 @@ fn appended_suffix<'a>(prev: &str, buffer: &'a str) -> Option<&'a str> {
 /// CSI final 字节判定（ECMA-48：0x40..=0x7E；票④测试锚点）。
 fn csi_is_final(byte: u8) -> bool {
     (0x40..=0x7E).contains(&byte)
-}
-
-/// CSI 参数/中间字节判定（0x20..=0x3F：数字/分号/修饰符，继续读）。
-fn csi_continues(byte: u8) -> bool {
-    (0x20..=0x3F).contains(&byte)
-}
-
-/// CSI 序列解析结果（面板交互升级票①②④）：方向键双语义（面板开=选候选、
-/// 关=历史导航），其余序列吞弃。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CsiKey {
-    /// ↑（final 'A'）。
-    Up,
-    /// ↓（final 'B'）。
-    Down,
-    /// 孤立 Esc（后续 50ms 无字节——收面板语义）。
-    Escape,
-    /// 其他 CSI/ESC 序列（吞弃）。
-    Other,
 }
 
 /// 一行输入的处置。
@@ -112,6 +115,8 @@ impl Editor {
         let mut stdout = std::io::stdout();
         let mut panel = Panel::default();
         let mut buffer = initial.unwrap_or_default();
+        // 编辑行整族升级：语义层状态机（光标/删词/清行/反查/Ctrl-C 分层）
+        let mut core = editor_core::EditCore::new(&buffer, self.history.clone());
         // 提示符+初始缓冲上屏（ECHO 已关，回显自管）
         write!(stdout, "{}{buffer}", self.prompt)?;
         stdout.flush()?;
@@ -136,7 +141,18 @@ impl Editor {
         loop {
             tokio::select! {
                 biased;
-                _ = tokio::signal::ctrl_c() => return Ok(LineInput::Interrupted),
+                // Ctrl-C 分层（编辑行整族升级）：行非空=清行（非退出）；
+                // 行空+2s 连击=退出倾向（core.handle_key 统一裁决）
+                _ = tokio::signal::ctrl_c() => {
+                    match core.handle_key(editor_core::Key::Interrupted) {
+                        editor_core::Effect::Redraw => editor_render::redraw(&mut stdout, &self.prompt, core.chars(), core.cursor())?,
+                        editor_core::Effect::Quit => {
+                            writeln!(stdout)?;
+                            return Ok(LineInput::Interrupted);
+                        }
+                        _ => {}
+                    }
+                }
                 _ = self.exit.cancelled() => return Ok(LineInput::ExitRequested),
                 msg = async {
                     match scheduled.as_deref_mut() {
@@ -160,14 +176,90 @@ impl Editor {
                     let Some(b) = read? else {
                         return Ok(LineInput::Eof);
                     };
-                    match b {
-                        // 回车：收面板→落定输入行→提交；面板开着时执行**选中项**
-                        //（设计 §四「Enter 执行选中项」——交互升级票②的另一半：
-                        // 用户输入 /he 面板显示 /help 时，回车提交的是 /help 而非 /he）
-                        b'\r' | b'\n' => {
+                    // 字节→Key（编辑行整族升级：解析在 editor_keys，语义在
+                    // editor_core——IO 壳只做分发与渲染）
+                    let key = match b {
+                        0x1B => {
+                            // 孤立 Esc（50ms 无后续）=收面板/取消搜索；有后续=
+                            // CSI/SS3/Alt 族
+                            match editor_keys::read_csi(&source).await {
+                                None => continue,
+                                Some(editor_keys::CsiKey::Escape) => {
+                                    if panel.is_open() {
+                                        panel.collapse(&mut stdout, &self.prompt, &buffer)?;
+                                    }
+                                    continue;
+                                }
+                                Some(k) => csi_to_key(k),
+                            }
+                        }
+                        _ => match editor_keys::plain_key(b) {
+                            Some(key) => key,
+                            None => {
+                                // 可见字符：UTF-8 整字拼读
+                                let Some(ch) = Self::read_char(&source, b).await? else {
+                                    continue;
+                                };
+                                editor_core::Key::Char(ch)
+                            }
+                        },
+                    };
+                    // 面板优先消费的键（面板开才有意义）：Tab/↑↓/Enter/Esc——
+                    // 既有面板语义零变更；其余键交状态机
+                    let panel_consumed = match (&key, panel.is_open()) {
+                        (editor_core::Key::Tab, true) => {
+                            if let Some(completed) = panel.tab_next() {
+                                buffer = completed;
+                            }
+                            true
+                        }
+                        (editor_core::Key::Up, true) => {
+                            panel.move_up();
+                            true
+                        }
+                        (editor_core::Key::Down, true) => {
+                            panel.move_down();
+                            true
+                        }
+                        (editor_core::Key::Enter, true) => {
+                            // Enter 执行选中项（/he 提交 /help 防误发，既有语义）
                             if let Some(replacement) = panel.selected_replacement() {
                                 buffer = replacement;
                             }
+                            panel.collapse(&mut stdout, &self.prompt, &buffer)?;
+                            writeln!(stdout)?;
+                            stdout.flush()?;
+                            return Ok(LineInput::Submitted(buffer));
+                        }
+                        _ => false,
+                    };
+                    if panel_consumed {
+                        self.refresh(&mut panel, &mut stdout, &buffer, &mut prev)?;
+                        continue;
+                    }
+                    // 状态机裁决（光标/删词/清行/反查/Ctrl-C 分层）
+                    let effect = core.handle_key(key);
+                    match effect {
+                        editor_core::Effect::None => {}
+                        editor_core::Effect::Redraw => {
+                            buffer = core.text();
+                            if core.searching() {
+                                if let Some(hint) = core.search_hint() {
+                                    editor_render::search_hint(&mut stdout, &hint)?;
+                                }
+                                editor_render::redraw(&mut stdout, &self.prompt, core.chars(), core.cursor())?;
+                                prev = buffer.clone();
+                            } else if panel.is_open() {
+                                self.refresh(&mut panel, &mut stdout, &buffer, &mut prev)?;
+                            } else if editor_render::tail_extend(&mut stdout, &prev, &buffer)? && core.cursor() == core.chars().len() {
+                                prev = buffer.clone();
+                            } else {
+                                editor_render::redraw(&mut stdout, &self.prompt, core.chars(), core.cursor())?;
+                                prev = buffer.clone();
+                            }
+                        }
+                        editor_core::Effect::Submit(text) => {
+                            buffer = text;
                             if panel.is_open() {
                                 panel.collapse(&mut stdout, &self.prompt, &buffer)?;
                             }
@@ -175,94 +267,16 @@ impl Editor {
                             stdout.flush()?;
                             return Ok(LineInput::Submitted(buffer));
                         }
-                        // 退格（DEL）：删尾字符
-                        0x7F => {
-                            buffer.pop();
-                            self.refresh(&mut panel, &mut stdout, &buffer, &mut prev)?;
+                        editor_core::Effect::Eof => {
+                            writeln!(stdout)?;
+                            stdout.flush()?;
+                            return Ok(LineInput::Eof);
                         }
-                        // 迟到 CSI 残段吸收（task-34 云勘 S2 打回）：回合期
-                        // Esc 监视臂把「分批到达的方向键」的 0x1B 判孤立吃掉
-                        // 后，迟到的 0x5B('[') 0x41('A') 失去引导符会以字面
-                        // 进缓冲（实测 [A 污染+/quit 被拼接提交）——行首
-                        // （缓冲空）遇 '[' 时 50ms 内探测后继：A-D 跟上=迟到
-                        // 残段整对吞弃；否则按普通字符入缓冲不吞。
-                        b'[' if buffer.is_empty() => {
-                            match tokio::time::timeout(
-                                std::time::Duration::from_millis(50),
-                                source.read_byte(),
-                            )
-                            .await
-                            {
-                                // 迟到残段：'['+A-D 整对吞弃（无光标语义可执行
-                                // ——历史召回已在 0x1B 被吃前不可恢复，吞弃优于
-                                // 字面污染）
-                                Ok(Ok(Some(next)))
-                                    if (b'A'..=b'D').contains(&next) => {}
-                                // 非残段：'[' 按普通字符入缓冲（后继字节留
-                                // 通道走正常路径，不额外抢读）
-                                _ => {
-                                    buffer.push('[');
-                                    self.refresh(
-                                        &mut panel,
-                                        &mut stdout,
-                                        &buffer,
-                                        &mut prev,
-                                    )?;
-                                }
-                            }
-                            self.refresh(
-                                &mut panel,
-                                &mut stdout,
-                                &buffer,
-                                &mut prev,
-                            )?;
+                        editor_core::Effect::Quit => {
+                            writeln!(stdout)?;
+                            stdout.flush()?;
+                            return Ok(LineInput::Interrupted);
                         }
-                        // Tab：循环补全选中项到输入行
-                        b'\t' => {
-                            if let Some(completed) = panel.tab_next() {
-                                buffer = completed;
-                                self.refresh(&mut panel, &mut stdout, &buffer, &mut prev)?;
-                            }
-                        }
-                        // Ctrl-D：结束（管道 EOF 等价形态）
-                        0x04 => return Ok(LineInput::Eof),
-                        // Esc/方向键（交互升级票①②④）：单发 Esc=收面板；
-                        // CSI 序列按 final 字节分发——↑↓ 面板开=选候选、面板关=
-                        // 历史导航；其余序列吞弃。P2-2 根因修复：引导符 '['
-                        // (0x5B) 先单独消费，不再落入 0x40..=0x7E 终止区间被
-                        // 误判为 final（旧实现 'A' 残字入缓冲即此因）。
-                        0x1B => match Self::read_csi(source).await {
-                            Some(CsiKey::Up) => {
-                                if panel.is_open() {
-                                    panel.move_up();
-                                    self.refresh(&mut panel, &mut stdout, &buffer, &mut prev)?;
-                                } else if let Some(entry) = self.history.up(&buffer) {
-                                    buffer = entry;
-                                    self.refresh(&mut panel, &mut stdout, &buffer, &mut prev)?;
-                                }
-                            }
-                            Some(CsiKey::Down) => {
-                                if panel.is_open() {
-                                    panel.move_down();
-                                    self.refresh(&mut panel, &mut stdout, &buffer, &mut prev)?;
-                                } else if let Some(next) = self.history.down() {
-                                    buffer = next;
-                                    self.refresh(&mut panel, &mut stdout, &buffer, &mut prev)?;
-                                }
-                            }
-                            Some(CsiKey::Escape) if panel.is_open() => {
-                                panel.collapse(&mut stdout, &self.prompt, &buffer)?;
-                            }
-                            _ => {} // 其他 CSI/孤立序列：吞弃
-                        },
-                        // 可见字符：UTF-8 整字入缓冲（含中文别名输入）
-                        b if b >= 0x20 => {
-                            if let Some(ch) = Self::read_char(source, b).await? {
-                                buffer.push(ch);
-                                self.refresh(&mut panel, &mut stdout, &buffer, &mut prev)?;
-                            }
-                        }
-                        _ => {} // 其余控制字符忽略
                     }
                 }
             }
@@ -351,127 +365,4 @@ impl Editor {
         }
         Ok(std::str::from_utf8(&bytes).ok().and_then(|s| s.chars().next()))
     }
-
-    /// ESC 后序列解析（票④ CSI 字节分类修复）：
-    ///
-    /// * 首字节 50ms 内不到 → **孤立 Esc**（`Escape`——收面板语义）；
-    /// * 引导符 `[` (0x5B) → 进入参数循环：参数/中间字节（0x20..=0x3F）继续读，
-    ///   final 字节（0x40..=0x7E）按值分发（'A'=Up 'B'=Down 其余 Other）；
-    /// * 非 `[` 引导（如 SS3 的 ESC O）→ 吞该单字节按 Other；
-    /// * 序列中途 50ms 无字节 → `None`（孤立序列放弃，防 SSH 慢链路卡输入；
-    ///   数据不丢原则：放弃的序列不再回灌输入）。
-    ///
-    /// 根因对照（审三 P2-2）：旧 `drop_escape_sequence` 把 ESC 后**第一个**字节
-    /// 直接按 0x40..=0x7E 判 final——引导符 '[' (0x5B) 恰落该区间被误判终止，
-    /// 真 final（如方向键的 'A'）反被当普通键打进输入缓冲（方向键残字污染）。
-    async fn read_csi(source: &InputSource) -> Option<CsiKey> {
-        let lead = match Self::read_byte_timeout(source).await {
-            Some(byte) => byte,
-            None => return Some(CsiKey::Escape), // ESC 后无后续 = 孤立 Esc
-        };
-        if lead != b'[' {
-            return Some(CsiKey::Other); // 非 CSI 引导序列（吞单字节）
-        }
-        loop {
-            match Self::read_byte_timeout(source).await {
-                Some(b) if csi_is_final(b) => {
-                    return Some(match b {
-                        b'A' => CsiKey::Up,
-                        b'B' => CsiKey::Down,
-                        _ => CsiKey::Other,
-                    });
-                }
-                // 参数（0x30..=0x3F）与中间（0x20..=0x2F）字节：继续读
-                Some(b) if csi_continues(b) => continue,
-                _ => return None, // 超时/EOF/非法字节：放弃防卡与死循环
-            }
-        }
-    }
-
-    /// 带超时读单字节（50ms：SSH 慢链路上 CSI 字节间隔可超 30ms，复核 nit）。
-    /// **与 repl::esc_interrupt 50ms 同值同因**——孤立 Esc 消歧口径，改动需
-    /// 两侧同步（云勘契约 B；grep「50ms 同值」双向可查）。
-    async fn read_byte_timeout(source: &InputSource) -> Option<u8> {
-        tokio::time::timeout(std::time::Duration::from_millis(50), source.read_byte())
-            .await
-            .ok()
-            .and_then(|res| res.ok())
-            .flatten()
-    }
 }
-
-/// 清终端输入缓冲（业主真机缺陷①「输入泄漏」的修法）：对话期间终端处于
-/// cooked 态，用户打的字滞留 TTY 行缓冲，回答结束后进入编辑态前必须丢弃，
-/// 否则成为「删不掉的前缀」——cooked 退格按字节删，UTF-8 三字节字要按三下
-///（中文必现、英文不现即此因）。TCIFLUSH 只清「已收未读」的输入，不动输出；
-/// fd 非终端时 tcflush 失败，调用方忽略（非 TTY 场景无本缺陷，失败不是错误）。
-fn flush_stdin_fd(fd: i32) -> std::io::Result<usize> {
-    // task-39 批 A 三步：FIONREAD 前置计数（tcflush 内核级丢弃不可感——计数
-    // 必须先行）→ TCIFLUSH（原缺陷①修法保留不回退）→ 回报丢弃字节数。
-    // 计数失败=N=0=调用方不出提示行（不伪造计数）。
-    let mut pending: libc::c_int = 0;
-    let counted = unsafe { libc::ioctl(fd, libc::FIONREAD, &mut pending) } == 0;
-    let rc = unsafe { libc::tcflush(fd, libc::TCIFLUSH) };
-    if rc != 0 {
-        return Err(std::io::Error::last_os_error());
-    }
-    Ok(if counted && pending > 0 { pending as usize } else { 0 })
-}
-
-/// task-39 批 A 提示行文案（字节口径锁）：FIONREAD 计数为**字节**，UTF-8
-/// 多字节下按「字符」报数即伪造计数（报告5 P1-3 退出码 -1 同族病，不再犯）
-/// ——测试锁死「字节」用词与 N=0 静默语义。
-fn pretype_hint(n: usize) -> String {
-    format!("已忽略 {n} 字节预输入")
-}
-
-/// termios 原始态守卫：enable 关 ICANON/ECHO（ISIG 保留），Drop 恢复（panic 安全）。
-/// task-17④ 起供非交互攒行路径复用（pub(crate)）：语义同为「绕开内核行规程
-/// 的行缓冲/回显，由应用自管」——复用即同一套 RAII 恢复纪律。
-pub(crate) struct RawMode {
-    saved: libc::termios,
-    /// 是否真激活（TTY）；非 TTY inactive 守卫——回显逻辑据此守卫（管道
-    /// 场景零回显，task-34 修正）。
-    pub(crate) active: bool,
-}
-
-impl RawMode {
-    /// 对 stdin(fd 0) 启用原始态；非 TTY 场景返回 inactive 守卫（无操作）。
-    /// task-17④ 起 pub(crate)：非交互攒行路径（input_source::read_line）复用
-    pub(crate) fn enable() -> std::io::Result<Self> {
-        let mut term = std::mem::MaybeUninit::<libc::termios>::uninit();
-        let rc = unsafe { libc::tcgetattr(0, term.as_mut_ptr()) };
-        if rc != 0 {
-            // 非 TTY（ENOTTY 等）：无编辑态可言；saved 不被使用（active=false）
-            return Ok(Self { saved: unsafe { std::mem::zeroed() }, active: false });
-        }
-        let mut term = unsafe { term.assume_init() };
-        term.c_lflag &= !(libc::ICANON | libc::ECHO);
-        term.c_cc[libc::VMIN] = 1;
-        term.c_cc[libc::VTIME] = 0;
-        if unsafe { libc::tcsetattr(0, libc::TCSANOW, &term) } != 0 {
-            return Err(std::io::Error::last_os_error());
-        }
-        // 进编辑态前清掉对话期间滞留的 cooked 缓冲（缺陷票①）；失败忽略见上
-        // task-39 批 A：预输入知情取舍——丢弃数>0 时 stderr 一行提示（30-⑤
-        // 惯例：观测信息走 stderr 让位用户内容）；N=0 不出提示行。
-        if let Ok(n) = flush_stdin_fd(0) {
-            if n > 0 {
-                eprintln!("{}", pretype_hint(n));
-            }
-        }
-        Ok(Self { saved: term, active: true })
-    }
-}
-
-impl Drop for RawMode {
-    fn drop(&mut self) {
-        if self.active {
-            unsafe { libc::tcsetattr(0, libc::TCSANOW, &self.saved) };
-        }
-    }
-}
-
-#[cfg(test)]
-#[path = "lineedit_tests.rs"]
-mod tests;

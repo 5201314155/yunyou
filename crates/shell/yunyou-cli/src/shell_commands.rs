@@ -233,6 +233,8 @@ fn shell_command_definitions(shell: &Arc<ShellCore>) -> Vec<CommandDefinition> {
         crate::sessions_cmd::definition(shell),
         // task-27：/compact 手动压缩（同款增量外置）
         crate::compact_cmd::definition(shell),
+        // task-21：/team 命令族（同款增量外置；业主令「团队命令呢」）
+        crate::team_cmd::definition(shell),
     ]
 }
 

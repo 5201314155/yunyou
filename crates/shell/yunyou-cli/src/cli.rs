@@ -81,6 +81,15 @@ pub enum Command {
         #[command(subcommand)]
         cmd: PluginCmd,
     },
+    /// 自更新（task-18）：下载 release-bin 预编译新版本原子替换自身。
+    Update {
+        /// 只检查有无新版本，不升级。
+        #[arg(long)]
+        check: bool,
+        /// 回退路径：git 仓库重拉重编（主路径=下载预编译包）。
+        #[arg(long)]
+        from_source: bool,
+    },
 }
 
 /// 插件管理子命令（task-10；实现在 plugin_cmd 模块）。

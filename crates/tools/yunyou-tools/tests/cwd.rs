@@ -30,7 +30,7 @@ async fn bash_cd后文件工具仍锚定工作区根() {
     // （跟随 cd）由此测试原身锁定，本测试为其语义改版锁。
     let dir = temp_root("follow");
     let cwd = Arc::new(CwdService::new(&dir));
-    let bash = BashTool { cwd: cwd.clone(), enforcer: None };
+    let bash = BashTool { cwd: cwd.clone(), enforcer: None, tasks: None, background_after_secs: 60 };
 
     let outcome = bash.execute(serde_json::json!({"cmd": "mkdir -p sub && cd sub"}), exec()).await;
     assert!(matches!(outcome, ToolOutcome::Ok(_)), "{outcome:?}");
@@ -63,7 +63,7 @@ async fn bash_cd后文件工具仍锚定工作区根() {
 async fn bash_pwd越界被clamp回根() {
     let dir = temp_root("clamp");
     let cwd = Arc::new(CwdService::new(&dir));
-    let bash = BashTool { cwd: cwd.clone(), enforcer: None };
+    let bash = BashTool { cwd: cwd.clone(), enforcer: None, tasks: None, background_after_secs: 60 };
 
     let outcome = bash.execute(serde_json::json!({"cmd": "cd $(echo /etc)"}), exec()).await;
     assert!(matches!(outcome, ToolOutcome::Ok(_)), "变量间接属门禁盲区应放行: {outcome:?}");
@@ -84,7 +84,7 @@ async fn cwd在子目录时root约束不松动() {
     let dir = temp_root("guard");
     std::fs::create_dir_all(dir.join("sub")).unwrap();
     let cwd = Arc::new(CwdService::new(&dir));
-    let bash = BashTool { cwd: cwd.clone(), enforcer: None };
+    let bash = BashTool { cwd: cwd.clone(), enforcer: None, tasks: None, background_after_secs: 60 };
     let outcome = bash.execute(serde_json::json!({"cmd": "cd sub"}), exec()).await;
     assert!(matches!(outcome, ToolOutcome::Ok(_)), "{outcome:?}");
 

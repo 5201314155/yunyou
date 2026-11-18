@@ -136,6 +136,7 @@ fn services_with_compact(
         retry: None,
         // task-11 钩子缝：测试直构 runner 空注册表（零钩子=现状逐字节一致）
         hooks: Default::default(),
+        gates: Default::default(),
     }
 }
 
@@ -506,6 +507,7 @@ async fn 摘要连败三次熔断() {
         retry: None,
         // task-11 钩子缝：测试直构 runner 空注册表（零钩子=现状逐字节一致）
         hooks: Default::default(),
+        gates: Default::default(),
     };
     let state = runner.compaction_state.clone();
     // 预置历史（待压缩段非空前提——空历史不可能有水位，真实不变量同用例⑥）

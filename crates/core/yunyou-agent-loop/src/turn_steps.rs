@@ -315,6 +315,34 @@ impl AgentLoopRunner {
                 format!("未知工具 \"{}\"", call.name),
             );
         };
+        // 审批缝（task-16 S1）：执行前 gate 链判定（第一个非 Pass 短路；
+        // 空注册零开销）。Ask→呈现器（对象类型注册制）；无呈现器/呈现拒绝=
+        // fail-closed Deny。内核零规则知识：判定全在策略插件侧。
+        if !self.gates.gates.is_empty() {
+            let view = crate::gate::ToolCallView { name: &call.name, arguments: &call.arguments };
+            let ctx = crate::gate::GateContext::default();
+            match self.gates.gates.check(&view, &ctx).await {
+                crate::gate::GateDecision::Pass
+                | crate::gate::GateDecision::Allow { .. } => {}
+                crate::gate::GateDecision::Deny { message } => {
+                    return yunyou_tools::ToolOutcome::err("tool/denied", message);
+                }
+                crate::gate::GateDecision::Ask { .. } => {
+                    match self.gates.approval.present(crate::gate::ApprovalSubject::ToolCall(&view)).await {
+                        Some(crate::gate::ApprovalDecision::Approved) => {}
+                        Some(crate::gate::ApprovalDecision::Denied { message }) => {
+                            return yunyou_tools::ToolOutcome::err("tool/denied", message);
+                        }
+                        None => {
+                            return yunyou_tools::ToolOutcome::err(
+                                "tool/denied",
+                                "工具调用待审批，但审批呈现器未注册（无头场景 fail-closed）：已拒绝执行。",
+                            );
+                        }
+                    }
+                }
+            }
+        }
         // L-10（五席评审 20261117）：畸形 arguments 不再静默 {} 兜底执行——
         // 那样工具收空参大概率 is_error，而原样 JSON 文本已落盘、下轮原样回发
         // 端点，严格端点 400 不重试=会话自锁。此处落人话错误 ToolResult 给模型

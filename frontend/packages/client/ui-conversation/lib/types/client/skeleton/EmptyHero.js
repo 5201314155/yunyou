@@ -44,6 +44,6 @@ function HeroCloud() {
 export function HeroShell({ t, renderSlot, children }) {
     return (_jsxs("div", { className: css.root, children: [_jsxs("div", { className: css.stack, children: [_jsxs("div", { className: css.headline, children: [_jsx("span", { className: css.fishHitbox, children: renderSlot('conversation.hero.brand.mark', { size: 34, className: css.fish }, {
                                     fallback: _jsx(HeroCloud, {}),
-                                }) }), _jsxs("span", { className: css.titleGroup, children: [_jsx("span", { children: t('hero.headline') }), _jsx("span", { className: css.previewBadge, children: t('hero.preview') })] })] }), _jsx("div", { className: css.body })] }), children] }));
+                                }) }), _jsx("span", { className: css.titleGroup, children: _jsx("span", { children: t('hero.headline') }) })] }), _jsx("div", { className: css.body })] }), children] }));
 }
 //# sourceMappingURL=EmptyHero.js.map

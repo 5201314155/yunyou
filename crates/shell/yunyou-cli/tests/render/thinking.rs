@@ -58,7 +58,8 @@ fn 达标思考_midtext_正文先落时间序() {
     let back = clean.find("后半").unwrap();
     assert!(front < think && think < back, "应正文先落再冻结（时间序）：{clean:?}");
     assert!(clean.contains("· 这是一段足够长的思…"), "冻结行应含列宽预算截断预览（9 字+…，T3-a）：{clean:?}");
-    assert!(!clean.contains("超过阈值二十字"), "预览外原文不上屏：{clean:?}");
+    // 批 6（T3-b）契约演进：全文经折叠详情缝可见（见 degrade 同注）
+    assert!(clean.contains("▎ 这是一段足够长的思考内容超过阈值二十字了"), "全文经折叠详情缝可见（批 6）：{clean:?}");
 }
 
 /// 思考全文流式逃生口（任务 30-②）：YUNYOU_THINKING=full（set_thinking(Full)）
@@ -75,3 +76,29 @@ fn 思考逃生口_full_全文流式() {
     assert!(!text.contains("│ "), "思考行不得再与引用共用 │（task-46①）：{text:?}");
 }
 
+/// 批 6（T3-b）：思考全文挂 detail 展开缝——冻结行后追加折叠详情块
+/// （首行预览可见+折叠计数；「默认不倾倒」不破）。碎思考吞不产详情。
+#[test]
+fn 思考展开_全文挂详情缝_折叠() {
+    let mut r = full();
+    r.set_width(100);
+    let body: String = (0..30).map(|i| format!("思考第 {i} 行，内容足够长以撑起折叠。")).collect::<Vec<_>>().join("\n");
+    r.reasoning_delta(&body).unwrap();
+    r.text_delta("正文来了\n").unwrap();
+    let text = String::from_utf8(r.into_output()).unwrap();
+    assert!(text.contains(" 想了 "), "冻结行在位：{text:?}");
+    assert!(text.contains("思考第 0 行"), "详情块首行预览可见：{text:?}");
+    assert!(text.contains("折叠 +"), "超阈值行折叠计数在位：{text:?}");
+    assert!(text.rfind("思考第 29 行").is_none() || text.contains("折叠 +"), "尾行折叠（不倾倒）");
+}
+
+/// 批 6：碎思考不产详情块（零增量）。
+#[test]
+fn 思考展开_碎思考零增量() {
+    let mut r = full();
+    r.text_delta("前半句").unwrap();
+    r.reasoning_delta("想").unwrap();
+    r.text_delta("后半句\n").unwrap();
+    let text = String::from_utf8(r.into_output()).unwrap();
+    assert!(!text.contains("思考第"), "碎思考零详情：{text:?}");
+}

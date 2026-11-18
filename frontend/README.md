@@ -32,13 +32,26 @@
 
 ```bash
 pnpm install                # 依赖安装（npmmirror）
-pnpm run build:client       # tsdown 全子集 client 产物（lib/client.js 模块束）
-pnpm run build:web          # vite 构建 apps/web → web/apps/web/dist
-rsync -a --delete web/apps/web/dist/ ../dist/   # 产物同步 crate 根 dist/（随仓库提交）
+pnpm run build              # 一键链：build:client → build:web → build:boot
 ```
 
-业主运行时零 node：dist/ 由 build.rs 嵌入 yunyou 二进制（见 crate build.rs
-embed_dist 与 src/dist.rs）。
+三段链：
+
+1. `build:client`：tsdown 全子集 client 产物（各包 `lib/client.js` 模块束）；
+2. `build:web`：vite 构建 apps/web → `apps/web/dist`（壳产物唯一落点）；
+3. `build:boot`：`scripts/build-yunyou-boot.ts` 把 client 模块束注入
+   `apps/web/dist/index.html` 并落 `dist/modules/` 与清单（boot 组装）。
+
+产物只落 `frontend/apps/web/dist` 一处：Rust 侧 `crates/net/yunyou-web`
+的 build.rs 在编译期直接消费该目录（include_bytes! 嵌入清单），无 crate 根
+同步副本、无 rsync 复制链——dist 缺席时 cargo build 直接失败并提示先跑本链。
+业主运行时零 node（见 crate build.rs embed_dist 与 src/dist.rs）。
+
+图标再生成（云标 PNG 四张，零依赖脚本）：
+
+```bash
+pnpm exec tsx scripts/gen-yunyou-icons.ts
+```
 
 ## 许可
 

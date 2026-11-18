@@ -90,9 +90,20 @@ pub fn text_delta<W: Write>(
         if state.block == BlockKind::Reasoning && state.thinking.collapse {
             match state.thinking.close(out, profile, interactive, width)? {
                 thinking::ThinkingClose::Swallowed => {}
-                thinking::ThinkingClose::Frozen(line) => {
+                thinking::ThinkingClose::Frozen { line, full } => {
                     settle_pending(out, state, profile)?;
                     freeze_line(out, &line)?;
+                    // 批 6（T3-b）：思考全文挂 detail 展开缝——折叠渲染
+                    // （>FOLD_THRESHOLD 自动折叠，首行预览可见）；
+                    // 「默认不倾倒」不破（折叠形态可见面有界）。
+                    if !full.is_empty() {
+                        super::detail::render(
+                            out,
+                            profile,
+                            &super::event::DetailKind::Plain { lines: full },
+                            width,
+                        )?;
+                    }
                 }
             }
         } else {
@@ -166,9 +177,18 @@ pub fn close_block<W: Write>(
     if state.block == BlockKind::Reasoning && state.thinking.collapse {
         match state.thinking.close(out, profile, interactive, width)? {
             thinking::ThinkingClose::Swallowed => {}
-            thinking::ThinkingClose::Frozen(line) => {
+            thinking::ThinkingClose::Frozen { line, full } => {
                 settle_pending(out, state, profile)?;
                 freeze_line(out, &line)?;
+                // 批 6 同上：收尾路径思考全文挂详情展开缝
+                if !full.is_empty() {
+                    super::detail::render(
+                        out,
+                        profile,
+                        &super::event::DetailKind::Plain { lines: full },
+                        width,
+                    )?;
+                }
             }
         }
     }

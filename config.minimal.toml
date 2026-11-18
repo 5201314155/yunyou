@@ -1,0 +1,7 @@
+# yunyou 最小配置：通常只需要这三行（其余全部走默认值）。
+# 拷到 ~/.yunyou/yunyou.toml 即可；真实 key 存 ~/.yunyou/credentials.toml（0600）。
+
+[llm]
+base_url = "https://api.example.com/v1"
+api_key = "$YUNYOU_LLM_API_KEY"
+model = "vendor/model-name"

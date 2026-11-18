@@ -11,6 +11,9 @@ export declare const zh: {
     'row.instructions': string;
     'row.inspect': string;
     'menu.userOnly': string;
+    'menu.source.builtin': string;
+    'menu.source.project': string;
+    'menu.source.plugin': string;
 };
 /** The skill namespace key union. */
 export type SkillKey = keyof typeof zh;
@@ -24,6 +27,9 @@ export declare const en: {
     'row.instructions': string;
     'row.inspect': string;
     'menu.userOnly': string;
+    'menu.source.builtin': string;
+    'menu.source.project': string;
+    'menu.source.plugin': string;
 };
 /** Japanese copy, checked against the English keys. */
 export declare const ja: {
@@ -35,6 +41,9 @@ export declare const ja: {
     'row.instructions': string;
     'row.inspect': string;
     'menu.userOnly': string;
+    'menu.source.builtin': string;
+    'menu.source.project': string;
+    'menu.source.plugin': string;
 };
 /** Spanish dictionary, checked against the English keys. */
 export declare const es: {
@@ -46,6 +55,9 @@ export declare const es: {
     'row.instructions': string;
     'row.inspect': string;
     'menu.userOnly': string;
+    'menu.source.builtin': string;
+    'menu.source.project': string;
+    'menu.source.plugin': string;
 };
 /** French dictionary, checked against the English keys. */
 export declare const fr: {
@@ -57,6 +69,9 @@ export declare const fr: {
     'row.instructions': string;
     'row.inspect': string;
     'menu.userOnly': string;
+    'menu.source.builtin': string;
+    'menu.source.project': string;
+    'menu.source.plugin': string;
 };
 /** German dictionary, checked against the English keys. */
 export declare const de: {
@@ -68,6 +83,9 @@ export declare const de: {
     'row.instructions': string;
     'row.inspect': string;
     'menu.userOnly': string;
+    'menu.source.builtin': string;
+    'menu.source.project': string;
+    'menu.source.plugin': string;
 };
 /** Russian dictionary, checked against the English keys. */
 export declare const ru: {
@@ -79,6 +97,9 @@ export declare const ru: {
     'row.instructions': string;
     'row.inspect': string;
     'menu.userOnly': string;
+    'menu.source.builtin': string;
+    'menu.source.project': string;
+    'menu.source.plugin': string;
 };
 /** Portuguese dictionary, checked against the English keys. */
 export declare const pt: {
@@ -90,5 +111,8 @@ export declare const pt: {
     'row.instructions': string;
     'row.inspect': string;
     'menu.userOnly': string;
+    'menu.source.builtin': string;
+    'menu.source.project': string;
+    'menu.source.plugin': string;
 };
 //# sourceMappingURL=locales.d.ts.map

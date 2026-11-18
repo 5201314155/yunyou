@@ -43,7 +43,11 @@ wait_active(
     let registry = root
         .get::<dyn RegistryService>(ServiceId::of::<dyn RegistryService>())
         .expect("注册表应可见");
-    assert_eq!(registry.schemas().len(), 7, "七个内置工具应已注册（task-70 write_verify 系注册面 +1）");
+    assert_eq!(
+        registry.schemas().len(),
+        10,
+        "十内置工具应已注册（注册面演进史：7=六内置+apply_patch → 8=+write_verify（task-70）→ 10=+task_output/task_stop/task_list（池 task-20 后台任务三件，默认装配=后台注册表在位））"
+    );
 
     let cancel = tokio_util::sync::CancellationToken::new();
     let outcome = {

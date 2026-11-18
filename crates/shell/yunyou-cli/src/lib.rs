@@ -32,6 +32,7 @@
 pub mod adapter;
 pub mod assemble;
 pub mod market_manifest;
+pub mod memory;
 pub mod proxy_plugin;
 pub mod bundled;
 pub mod credentials;
@@ -39,6 +40,10 @@ pub mod cli;
 pub mod compact_cmd;
 mod command_exec;
 pub mod humanize;
+pub mod editor_core;
+pub mod editor_keys;
+pub mod editor_render;
+pub mod keybinding;
 pub mod history;
 pub mod input_source;
 pub mod lineedit;
@@ -55,10 +60,13 @@ pub mod repl;
 pub mod run;
 /// /sessions 会话列表与切换 + 会话回放（task-36④；命令缝 D1）。
 pub mod sessions_cmd;
+mod team_cmd;
 pub mod shell_commands;
 pub mod skill_read;
 pub mod skills;
 pub mod slots;
 pub mod status;
+/// `yunyou update` 自更新（task-18）：下载校验/原子替换/回滚三段。
+pub mod update;
 
 pub use run::{run, AppError};

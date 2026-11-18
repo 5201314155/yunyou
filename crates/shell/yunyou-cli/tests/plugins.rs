@@ -379,3 +379,42 @@ async fn 装载器坏声明_fail_loud聚合报() {
 fn temp_dir(tag: &str) -> PathBuf {
     std::env::temp_dir().join(format!("{tag}-{}", std::process::id()))
 }
+
+/// task-24 禁用矩阵（传递 Pending 死锁回归锁）：禁用**任一** bundled 插件→
+/// 装配秒级完成（15s 护栏）+禁用行 disabled+无 hang——传递闭包预检的穷举面。
+#[tokio::test(flavor = "multi_thread")]
+async fn 禁用矩阵_任一bundled禁用装配秒级() {
+    for id in ["yunyou-llm-openai", "yunyou-session", "yunyou-system-prompt", "yunyou-commands", "yunyou-sandbox", "yunyou-tools", "yunyou-retry", "yunyou-permission", "yunyou-agent-loop", "yunyou-tool-archive", "yunyou-credentials"] {
+        let toml = format!("[plugins.{id}]\nenable = false\n");
+        let config: DshConfig = yunyou_config::load_from_str(&toml).expect("配置应加载");
+        let home = temp_dir("yunyou-cli-disable-matrix");
+        let config_path = home.join("yunyou.toml");
+        let assembled = tokio::time::timeout(
+            std::time::Duration::from_secs(15),
+            assemble::assemble(&config, &home, &config_path),
+        )
+        .await
+        .expect_or_hang(&format!("禁用 {id} 装配超时（传递闭包预检未短路）"))
+        .expect("禁用非核心插件应安全启动");
+        let row = assembled
+            .plugin_status
+            .iter()
+            .find(|r| r.id == id)
+            .unwrap_or_else(|| panic!("禁用 {id} 的状态行应在"));
+        assert_eq!(row.state, "disabled", "禁用 {id} 应标 disabled");
+        assembled.root.dispose().await.expect("应优雅关闭");
+        std::fs::remove_dir_all(&home).ok();
+    }
+}
+
+trait ExpectNoHang<T> {
+    fn expect_or_hang(self, msg: &str) -> T;
+}
+impl<T> ExpectNoHang<T> for Result<T, tokio::time::error::Elapsed> {
+    fn expect_or_hang(self, msg: &str) -> T {
+        match self {
+            Ok(v) => v,
+            Err(_) => panic!("{msg}"),
+        }
+    }
+}

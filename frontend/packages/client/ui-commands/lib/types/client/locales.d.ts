@@ -34,6 +34,7 @@ export declare const zh: {
     'overlay.aria': string;
     'listbox.aria': string;
     'notice.attachmentsUnsupported': string;
+    'hint.expand': string;
 };
 /** The command namespace key union. */
 export type CommandKey = keyof typeof zh;
@@ -67,6 +68,7 @@ export declare const en: {
     'overlay.aria': string;
     'listbox.aria': string;
     'notice.attachmentsUnsupported': string;
+    'hint.expand': string;
 };
 /** Japanese copy, checked against the English keys. */
 export declare const ja: {
@@ -98,6 +100,7 @@ export declare const ja: {
     'overlay.aria': string;
     'listbox.aria': string;
     'notice.attachmentsUnsupported': string;
+    'hint.expand': string;
 };
 /** Spanish dictionary, checked against the English keys. */
 export declare const es: {
@@ -129,6 +132,7 @@ export declare const es: {
     'overlay.aria': string;
     'listbox.aria': string;
     'notice.attachmentsUnsupported': string;
+    'hint.expand': string;
 };
 /** French dictionary, checked against the English keys. */
 export declare const fr: {
@@ -160,6 +164,7 @@ export declare const fr: {
     'overlay.aria': string;
     'listbox.aria': string;
     'notice.attachmentsUnsupported': string;
+    'hint.expand': string;
 };
 /** German dictionary, checked against the English keys. */
 export declare const de: {
@@ -191,6 +196,7 @@ export declare const de: {
     'overlay.aria': string;
     'listbox.aria': string;
     'notice.attachmentsUnsupported': string;
+    'hint.expand': string;
 };
 /** Russian dictionary, checked against the English keys. */
 export declare const ru: {
@@ -222,6 +228,7 @@ export declare const ru: {
     'overlay.aria': string;
     'listbox.aria': string;
     'notice.attachmentsUnsupported': string;
+    'hint.expand': string;
 };
 /** Portuguese dictionary, checked against the English keys. */
 export declare const pt: {
@@ -253,5 +260,6 @@ export declare const pt: {
     'overlay.aria': string;
     'listbox.aria': string;
     'notice.attachmentsUnsupported': string;
+    'hint.expand': string;
 };
 //# sourceMappingURL=locales.d.ts.map

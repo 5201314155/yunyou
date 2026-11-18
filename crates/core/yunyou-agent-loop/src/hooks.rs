@@ -224,7 +224,7 @@ impl<F: Future> Future for CatchPanic<F> {
     }
 }
 
-fn catch_panic<F: Future>(fut: F) -> impl Future<Output = Option<F::Output>> {
+pub(crate) fn catch_panic<F: Future>(fut: F) -> impl Future<Output = Option<F::Output>> {
     CatchPanic(fut)
 }
 

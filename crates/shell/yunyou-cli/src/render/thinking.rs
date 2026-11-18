@@ -60,8 +60,12 @@ pub(super) enum ThinkingClose {
     /// 碎思考（<20 字）：整体吞——不落冻结行（mid-text 推理碎屑落行会把
     /// 正文拦腰截断，业主实测）；调用方保留正文缓冲无缝续拼。
     Swallowed,
-    /// 达标思考：落冻结单行（调用方先补落正文 pending 再冻结，保持时间序）。
-    Frozen(String),
+    /// 达标思考：落冻结单行（调用方先补落正文 pending 再冻结，保持时间序）
+    /// + 全文行（批 6 T3-b：挂 detail 展开缝——`DetailKind::Plain` 折叠渲染，
+    /// >FOLD_THRESHOLD 自动折叠，首行预览可见；「默认不倾倒」不破——折叠
+    /// 形态下可见面=FOLD_THRESHOLD 行）。全文行有界性：思考块受模型输出
+    /// token 上限约束，且渲染侧折叠截断。
+    Frozen { line: String, full: Vec<String> },
 }
 
 /// 思考块状态（归属 StreamState；Collapse 活动行计数与冻结单行用）。
@@ -72,8 +76,11 @@ pub struct ThinkingState {
     /// 思考块累计字符数（活动行计数与冻结单行共用）。
     chars: usize,
     /// 思考正文首句预览（任务30 四期 1.4；增量到达时累计至
-    /// [`THINKING_PREVIEW_COLS] 可见列即封顶——预览只需要开头，不全文缓存）。
+    /// 上界即封顶——预览只需要开头，不全文缓存）。
     head: String,
+    /// 思考全文缓存（批 6 T3-b：Collapse 收集、close 带出挂详情展开缝；
+    /// 有界性见 [`ThinkingClose::Frozen`] 注）。
+    full: String,
     /// 上次活动行重绘时刻（节流判据；None=本块尚未绘过）。
     last_paint: Option<Instant>,
     /// 节流间隔（测试注入用；生产恒 [`THINKING_REDRAW_INTERVAL]）。
@@ -90,6 +97,7 @@ impl ThinkingState {
         self.started = Some(Instant::now());
         self.chars = 0;
         self.head.clear();
+        self.full.clear();
         self.last_paint = None;
         self.paint_interval = THINKING_REDRAW_INTERVAL;
         self.collapse = true;
@@ -107,6 +115,7 @@ impl ThinkingState {
         interactive: bool,
     ) -> std::io::Result<()> {
         self.chars += text.chars().count();
+        self.full.push_str(text); // 批 6：全文缓存（详情展开缝数据面）
         // 首句预览累计：未封顶才收，换行压空格（冻结行单行形态），按收集
         // 上界封顶——落定时再按列宽预算裁（T3-a：预览「它开头在想什么」）
         if self.head_capacity() > 0 {
@@ -162,12 +171,14 @@ impl ThinkingState {
         let started = self.started.take();
         let chars = std::mem::take(&mut self.chars);
         let head = std::mem::take(&mut self.head);
+        let full = std::mem::take(&mut self.full);
         self.collapse = false;
         clear_active_line(out, interactive && painted)?;
         match started {
-            Some(started) if chars >= THINKING_FRAG_THRESHOLD => Ok(ThinkingClose::Frozen(
-                frozen_line(profile, started.elapsed(), &head, preview_budget(width)),
-            )),
+            Some(started) if chars >= THINKING_FRAG_THRESHOLD => Ok(ThinkingClose::Frozen {
+                line: frozen_line(profile, started.elapsed(), &head, preview_budget(width)),
+                full: full.lines().map(str::to_string).collect(),
+            }),
             // 碎思考（<20 字）或无起点（异常态防御）：吞
             _ => Ok(ThinkingClose::Swallowed),
         }

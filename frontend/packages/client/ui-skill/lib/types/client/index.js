@@ -4,6 +4,38 @@ import { SkillRow } from "./SkillRow.js";
 import { SkillReference } from "./SkillReference.js";
 import { skillReferenceRule } from "./user-text-rules.js";
 import { en, ja, es, fr, de, ru, pt, NS, zh } from "./locales.js";
+/**
+ * Normalize one catalog pull across the official `{skills:[…]}` face and the
+ * web.v1 `{items:[{id,name,description,source}]}` face (§9.2). Unknown shapes
+ * drop to an honest empty catalog.
+ * @param value - the Remote result value.
+ * @returns the entry list.
+ */
+function normalizeSkillCatalog(value) {
+    const items = value !== null && typeof value === 'object' && Array.isArray(value.skills)
+        ? value.skills
+        : value !== null && typeof value === 'object' && Array.isArray(value.items)
+            ? value.items
+            : [];
+    return items.flatMap((item) => {
+        if (item === null || typeof item !== 'object')
+            return [];
+        const record = item;
+        const name = typeof record.name === 'string' && record.name !== '' ? record.name
+            : typeof record.id === 'string' ? record.id : undefined;
+        if (name === undefined)
+            return [];
+        const source = record.source === 'builtin' || record.source === 'project' || record.source === 'plugin'
+            ? record.source
+            : undefined;
+        return [{
+                name,
+                description: typeof record.description === 'string' ? record.description : '',
+                modelInvocable: false,
+                ...(source !== undefined ? { source } : {}),
+            }];
+    });
+}
 /** Required services: reference source faces plus the tool-row and locale registries. */
 export const inject = ['inputTriggers', 'sessions', 'slots', 'locale', 'remote', 'remote.skills', 'sidebarRight', 'uiConversation'];
 /**
@@ -53,7 +85,7 @@ export function apply(ctx) {
                 abort.signal.throwIfAborted();
                 if (!result.ok)
                     throw new Error(`skills/list failed: ${result.error.code}: ${result.error.message}`);
-                return result.value.skills;
+                return normalizeSkillCatalog(result.value);
             });
         })();
         const entry = { promise, abort };
@@ -104,7 +136,8 @@ export function apply(ctx) {
                 name: skill.name,
                 // The user-only marker rides the description (the menu's only
                 // secondary text); `hint` is the claim-state ghost text, not a badge.
-                description: skill.modelInvocable ? skill.description : `${t('menu.userOnly')} · ${skill.description}`,
+                // The web.v1 source layer joins the same slot when served (§3).
+                description: `${skill.modelInvocable ? '' : `${t('menu.userOnly')} · `}${skill.source !== undefined ? `${t(`menu.source.${skill.source}`)} · ` : ''}${skill.description}`,
             }));
         },
         warm(session) {

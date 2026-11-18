@@ -18,6 +18,16 @@ use yunyou_plugin_proto::{
 use yunyou_util::BoxFut;
 
 
+/// 装卸超时收割（P0 落刀）：按 pid=pgid 强杀子进程组（process_group(0) 前提）。
+fn kill_stale_child(pid: &Option<u32>) {
+    if let Some(pid) = pid {
+        unsafe {
+            libc::kill(-(*pid as i32), libc::SIGKILL);
+        }
+        eprintln!("[proxy] 超时收割子进程组 pid={pid}");
+    }
+}
+
 /// spawn 形态（§4.1 沙箱衔接两路：Sandboxed=生产默认；Direct=测试缝——
 /// 集成测试二进制无哨兵分派面，OS 级沙箱链由 task-24 forked 探针独立验证）。
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -213,6 +223,8 @@ impl Plugin for ProxyPlugin {
                     format!("插件进程 spawn 失败（entry={entry:?}）：{err}"),
                 )
             })?;
+            // 装卸超时收割锚：pid=pgid（process_group(0)），超时按组强杀防残留
+            let child_pid_for_timeout = child.id();
             let mut stdin = child.stdin.take().expect("stdin piped");
             let stdout = child.stdout.take().expect("stdout piped");
             eprintln!("[p6-diag] spawn ok: id={:?} stdin/stdout taken", child.id());
@@ -223,6 +235,10 @@ impl Plugin for ProxyPlugin {
                 capabilities: vec![],
             });
             use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+            // 装卸超时（P0 协查落刀：握手/tools_list 两处 read_line 原无超时=
+            // 「子进程活着不回帧」装配永挂；包 manifest 既有 request_timeout_ms，
+            // 超时=Failed 人话+killpg 收割防残留子进程）
+            let io_timeout = std::time::Duration::from_millis(self.manifest_v2.runtime.request_timeout_ms);
             stdin
                 .write_all(encode_frame(&hello).map_err(|e| yunyou::CordisError::new(yunyou::ErrorKind::FiberFailed, format!("hello 编码：{e}")))?.as_bytes())
                 .await
@@ -231,7 +247,16 @@ impl Plugin for ProxyPlugin {
             let mut reader = BufReader::new(stdout);
             let mut line = String::new();
             eprintln!("[p6-diag] awaiting handshake line...");
-            reader.read_line(&mut line).await.map_err(|e| yunyou::CordisError::new(yunyou::ErrorKind::FiberFailed, format!("握手读取：{e}")))?;
+            tokio::time::timeout(io_timeout, reader.read_line(&mut line))
+                .await
+                .map_err(|_| {
+                    kill_stale_child(&child_pid_for_timeout);
+                    yunyou::CordisError::new(
+                        yunyou::ErrorKind::FiberFailed,
+                        format!("插件握手超时（{}ms）——子进程活着但不回帧，已收割", io_timeout.as_millis()),
+                    )
+                })?
+                .map_err(|e| yunyou::CordisError::new(yunyou::ErrorKind::FiberFailed, format!("握手读取：{e}")))?;
             eprintln!("[p6-diag] handshake line: {}", line.trim());
             match decode_frame(line.trim()).map_err(|e| yunyou::CordisError::new(yunyou::ErrorKind::FiberFailed, format!("握手帧解码：{e}")))? {
                 PluginProtoFrame::HelloOk(HelloOk { protocol_version, .. }) if protocol_version == PROTOCOL_VERSION => {}
@@ -254,7 +279,16 @@ impl Plugin for ProxyPlugin {
                 .map_err(|e| yunyou::CordisError::new(yunyou::ErrorKind::FiberFailed, format!("tools_list 写入：{e}")))?;
             stdin.write_all(b"\n").await.map_err(|e| yunyou::CordisError::new(yunyou::ErrorKind::FiberFailed, format!("tools_list 换行：{e}")))?;
             line.clear();
-            reader.read_line(&mut line).await.map_err(|e| yunyou::CordisError::new(yunyou::ErrorKind::FiberFailed, format!("tools_list 读取：{e}")))?;
+            tokio::time::timeout(io_timeout, reader.read_line(&mut line))
+                .await
+                .map_err(|_| {
+                    kill_stale_child(&child_pid_for_timeout);
+                    yunyou::CordisError::new(
+                        yunyou::ErrorKind::FiberFailed,
+                        format!("插件工具清单超时（{}ms）——子进程活着但不回帧，已收割", io_timeout.as_millis()),
+                    )
+                })?
+                .map_err(|e| yunyou::CordisError::new(yunyou::ErrorKind::FiberFailed, format!("tools_list 读取：{e}")))?;
             let tools: Vec<ToolDescriptor> = match decode_frame(line.trim()).map_err(|e| yunyou::CordisError::new(yunyou::ErrorKind::FiberFailed, format!("tools_list 解码：{e}")))? {
                 PluginProtoFrame::ToolsListOk(ToolsListOk { tools }) => tools,
                 other => {

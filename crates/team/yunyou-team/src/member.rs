@@ -332,6 +332,7 @@ impl MemberWorker {
             fiber_cancel: self.cancel.child_token(),
             retry: self.retry.clone(),
             hooks: Default::default(),
+            gates: Default::default(),
         };
         // K-16① 触达自动收尾：宽限 runner 预铸（run_turn 消费 self——宽限参数
         // 与字段克隆在消费前完成）
@@ -356,6 +357,7 @@ impl MemberWorker {
             fiber_cancel: runner.fiber_cancel.child_token(),
             retry: runner.retry.clone(),
             hooks: runner.hooks.clone(),
+            gates: runner.gates.clone(),
         };
         let outcome = runner.run_turn(input, self.cancel.clone()).await;
         let outcome = if let Ok(done) = &outcome {

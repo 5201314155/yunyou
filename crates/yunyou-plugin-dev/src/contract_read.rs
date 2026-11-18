@@ -1,6 +1,6 @@
 //! plugin_contract_read 工具（K-2-①）：manifest 契约面结构化读取+漂移比对。
 
-use crate::shared::{read_manifest, resolve_plugin_dir};
+use crate::shared::{read_manifest, resolve_plugin_dir, toml_to_json};
 use yunyou_tools::contract::{ToolDefinition, ToolExec, ToolOutcome};
 use yunyou_util::BoxFut;
 
@@ -44,15 +44,18 @@ impl ToolDefinition for ContractReadTool {
             let manifest = read_manifest(&dir).await;
             match manifest {
                 Ok(m) => {
+                    // toml::Value → serde_json::Value（单源转换器 shared::toml_to_json；
+                    // 旧文本往返桥对嵌套表静默失败=出参全空，实测锚见 shared.rs）
+                    let m: serde_json::Value = toml_to_json(&m);
                     let contract = serde_json::json!({
                         "id": m.get("id").and_then(|v| v.as_str()).unwrap_or(""),
                         "version": m.get("version").and_then(|v| v.as_str()).unwrap_or(""),
                         "level": m.get("level").and_then(|v| v.as_str()).unwrap_or(""),
-                        "contracts": m.get("contracts").cloned().unwrap_or(serde_json::Value::Null),
-                        "provides": m.get("provides").cloned().unwrap_or(serde_json::Value::Null),
-                        "inject": m.get("inject").cloned().unwrap_or(serde_json::Value::Null),
-                        "ui": m.get("ui").cloned().unwrap_or(serde_json::Value::Null),
-                        "auto_enable": m.get("auto_enable").cloned().unwrap_or(serde_json::Value::Null),
+                        "contracts": m.get("contracts").map(|v| serde_json::to_value(v).unwrap_or(serde_json::Value::Null)).unwrap_or(serde_json::Value::Null), // task-77：toml→json 桥（toml::Value 无 Null 变体）
+                        "provides": m.get("provides").map(|v| serde_json::to_value(v).unwrap_or(serde_json::Value::Null)).unwrap_or(serde_json::Value::Null), // task-77：toml→json 桥（toml::Value 无 Null 变体）
+                        "inject": m.get("inject").map(|v| serde_json::to_value(v).unwrap_or(serde_json::Value::Null)).unwrap_or(serde_json::Value::Null), // task-77：toml→json 桥（toml::Value 无 Null 变体）
+                        "ui": m.get("ui").map(|v| serde_json::to_value(v).unwrap_or(serde_json::Value::Null)).unwrap_or(serde_json::Value::Null), // task-77：toml→json 桥（toml::Value 无 Null 变体）
+                        "auto_enable": m.get("auto_enable").map(|v| serde_json::to_value(v).unwrap_or(serde_json::Value::Null)).unwrap_or(serde_json::Value::Null), // task-77：toml→json 桥（toml::Value 无 Null 变体）
                         "path": dir.display().to_string(),
                     });
                     ToolOutcome::ok(contract)

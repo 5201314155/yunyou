@@ -2,11 +2,11 @@
 export declare const onboardingZh: {
     readonly onboardingArtworkLocale: "zh";
     readonly onboardingWelcome: "欢迎使用";
-    readonly onboardingBrand: "DeepSeek Harness";
-    readonly onboardingIntroduction: "DeepSeek Harness 会以本地文件夹作为工作区，通过调用各种工具，读写本机文件，完成搜索整理资料、制作文档表格、编写代码、排查问题等各种任务。";
+    readonly onboardingBrand: "云悠";
+    readonly onboardingIntroduction: "云悠会以本地文件夹作为工作区，通过调用各种工具，读写本机文件，完成搜索整理资料、制作文档表格、编写代码、排查问题等各种任务。";
     readonly onboardingStart: "开始设置";
     readonly onboardingCredit: "准备可用额度";
-    readonly onboardingCreditDescription: "DeepSeek Harness 执行任务时，会根据模型与工具使用的 token 量扣除额度。请提前添加额度，避免任务在执行过程中被迫中断。你的余额只会在 Agent 实际执行任务时消耗。";
+    readonly onboardingCreditDescription: "云悠执行任务时，会根据模型与工具使用的 token 量扣除额度。请提前添加额度，避免任务在执行过程中被迫中断。你的余额只会在 Agent 实际执行任务时消耗。";
     readonly onboardingTopUp: "去充值";
     readonly onboardingLater: "下一步";
     readonly onboardingFundedTopUp: "去充值";
@@ -19,7 +19,7 @@ export declare const onboardingZh: {
     readonly onboardingDevelopmentDescription: "修改代码、调试问题、运行命令和管理项目文件等";
     readonly onboardingContinue: "继续";
     readonly onboardingProcess: "你希望看到多少工作过程？";
-    readonly onboardingProcessDescription: "这只会影响工作过程的展示方式，不会影响 DeepSeek Harness 的工作能力。";
+    readonly onboardingProcessDescription: "这只会影响工作过程的展示方式，不会影响云悠的工作能力。";
     readonly onboardingCompact: "聚焦结果";
     readonly onboardingCompactDescription: "只看结果，保持界面简洁明了";
     readonly onboardingStandard: "关键细节";
@@ -33,7 +33,7 @@ export declare const onboardingZh: {
     readonly onboardingSkipDescription: "你可以随时前往 设置 → 通用设置 中调整工作过程、性能与用量展示方式或开启代码工作工具。";
     readonly onboardingKeepSetting: "继续设置";
     readonly onboardingNoCreditTitle: "暂时跳过充值？";
-    readonly onboardingNoCreditDescription: "没有可用额度时，DeepSeek Harness 将无法开始新的任务。你可以稍后前往 设置 → 账号与余额 进行充值。";
+    readonly onboardingNoCreditDescription: "没有可用额度时，云悠将无法开始新的任务。你可以稍后前往 设置 → 账号与余额 进行充值。";
     readonly onboardingUnderstood: "我知道了";
     readonly onboardingGoTopUp: "前往充值";
     readonly onboardingSaveFailed: "未能保存设置，请重试。";

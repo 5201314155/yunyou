@@ -17,7 +17,7 @@ export declare const en: {
     readonly platformFailed: "Could not complete the operation. Try again.";
     readonly platformRetry: "Retry";
     readonly loading: "Loading…";
-    readonly backToHarness: "Back to DeepSeek Harness";
+    readonly backToHarness: "Back to YunYou";
     readonly settings: "Settings";
     readonly contactUs: "Feedback";
     readonly menu: "Account menu";
@@ -37,8 +37,8 @@ export declare const en: {
     readonly expired: "Sign in expired. Try again.";
     readonly failed: "Could not complete the operation. Try again.";
     readonly noResponse: "Something went wrong. Please check your network connection and try again.";
-    readonly settingsSignedOutTitle: "You are not signed in to DeepSeek Harness";
-    readonly settingsSignedOutDescription: "Sign in to DeepSeek Harness to get your dedicated API Key";
+    readonly settingsSignedOutTitle: "You are not signed in to a YunYou account";
+    readonly settingsSignedOutDescription: "Sign in to YunYou to get your dedicated API Key";
     readonly signInDescription: "Use your DeepSeek account to get started.";
     readonly profileUnavailable: "Account details are not available yet.";
     readonly balance: "Topped-up balance";
@@ -50,7 +50,7 @@ export declare const en: {
     readonly usage: "View usage";
     readonly topUp: "Top up";
     readonly quotaTitle: "No balance available";
-    readonly quotaDescription: "DeepSeek Harness cannot start a new task with this account when no balance is available. Would you like to top up? You can also top up later in Settings → Account.";
+    readonly quotaDescription: "YunYou cannot start a new task with this DeepSeek account when no balance is available. Would you like to top up? You can also top up later in Settings → Account.";
     readonly quotaTopUp: "Top up";
     readonly onboardingLater: string;
     readonly onboardingArtworkLocale: string;

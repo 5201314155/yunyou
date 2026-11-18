@@ -20,6 +20,13 @@ use yunyou_sandbox::SandboxPlugin;
 use yunyou_session::SessionPlugin;
 use yunyou_system_prompt::SystemPromptPlugin;
 use yunyou_team::TeamPlugin;
+use yunyou_tool_archive::ToolArchivePlugin;
+// 池续卡（yun-tie 2026-11-19）：web_search 搜索插件——单工具四后端，过渡期
+// bundled 内置，network 缝⑨开闸后转 market（设计稿 20261118 已批）。
+use yunyou_web_search::WebSearchPlugin;
+// task-16 S2（yun-suo）：权限审批策略卡——审批缝（gate.v1）第一个策略插件；
+// [permission] 顶层段可关（enabled=false），settings 路径缺省 ~/.yunyou/settings.json。
+use yunyou_permission::PermissionPlugin;
 use yunyou_tools::ToolsPlugin;
 
 
@@ -116,12 +123,43 @@ pub(crate) static BUNDLED_PLUGINS: &[BundledEntry] = &[
         validate: || check_manifest(RetryPlugin),
         manifest: || RetryPlugin.manifest(),
     },
+    // task-16 S2（yun-suo）：权限审批策略卡——审批缝（gate.v1）第一个策略插件。
+    // 注册序在 agent-loop 之后（inject dyn GateRegistryService 由其 provide）；
+    // [permission] 顶层段可关（enabled=false），规则源 ~/.yunyou/settings.json
+    // [permissions] 三值分列（缺文件=空规则集+denylist 内置层仍生效）。
+    BundledEntry {
+        id: "yunyou-permission",
+        segment: "permission",
+        register: |ctx, cfg| ctx.plugin(PermissionPlugin, cfg),
+        validate: || check_manifest(PermissionPlugin),
+        manifest: || PermissionPlugin.manifest(),
+    },
+    // web_search（yun-tie）：注册序在 tools 之后（inject dyn RegistryService）；
+    // [web_search] 顶层段可关（enabled=false），provider 切换只改配置一行。
+    BundledEntry {
+        id: "yunyou-web-search",
+        segment: "web_search",
+        register: |ctx, cfg| ctx.plugin(WebSearchPlugin, cfg),
+        validate: || check_manifest(WebSearchPlugin),
+        manifest: || WebSearchPlugin.manifest(),
+    },
     BundledEntry {
         id: "yunyou-agent-loop",
         segment: "agent_loop",
         register: |ctx, cfg| ctx.plugin(AgentLoopPlugin, cfg),
         validate: || check_manifest(AgentLoopPlugin),
         manifest: || AgentLoopPlugin.manifest(),
+    },
+    // task-11②（yun-ya）：工具结果剥离策略卡——组装前钩子缝第一个策略插件。
+    // 注册序在 agent-loop 之后（inject dyn HooksRegistryService 由其 provide，
+    // epoch 保序）；[tool_archive] 顶层段可关（enabled=false），store_dir 缺省
+    // 从会话存储投影（SessionStore::path）。
+        BundledEntry {
+        id: "yunyou-tool-archive",
+        segment: "tool_archive",
+        register: |ctx, cfg| ctx.plugin(ToolArchivePlugin, cfg),
+        validate: || check_manifest(ToolArchivePlugin),
+        manifest: || ToolArchivePlugin.manifest(),
     },
     // 第 6 bundled（S5/S8 收口合入，2026-11-14 第 6 席留位兑现）：凭据托管存储
     // +settings 投影双服务。宿主直接持有 store 实例做迁移与 llm 段引用解析

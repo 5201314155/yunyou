@@ -1,6 +1,7 @@
 //! 内置工具注册模块：bash / read / write / edit / glob / grep（方案 §2.5）。
 
 pub mod bash;
+pub(crate) mod bash_exec;
 pub(crate) mod capture;
 pub mod bash_guard;
 pub mod cwd;
@@ -8,6 +9,7 @@ pub mod fs_tools;
 pub mod line_diff;
 pub mod search;
 pub mod write_verify;
+pub mod tasks_tool;
 pub mod patch_match;
 pub mod patch_parser;
 pub mod patch_tool;
@@ -74,18 +76,40 @@ pub const HINT_WRITE_BLOCKED: &str =
 /// CWD 服务在本函数内构造并以同一 Arc 分发六工具——同一实例＝「统一目录
 /// 视图」的机制本身（bash 执行后捕获 pwd，文件类工具基于该值解析相对路径，
 /// 见 builtin/cwd.rs）：签名保持 (root) 单参数，装配与测试调用点零改动。
+#[allow(clippy::type_complexity)]
 pub fn builtin_tools(
     root: Arc<Path>,
     enforcer: Option<std::sync::Arc<dyn crate::sandbox::SandboxEnforcer>>,
+    background: Option<(
+        std::sync::Arc<crate::tasks::TaskRegistry>,
+        u64,
+    )>,
 ) -> Vec<Arc<dyn ToolDefinition>> {
     let cwd = Arc::new(cwd::CwdService::new(root.as_ref()));
-    vec![
-        Arc::new(bash::BashTool { cwd: cwd.clone(), enforcer }),
+    let background_registry = background.as_ref().map(|(r, _)| r.clone());
+    let (tasks, background_after_secs) = background
+        .map(|(_, s)| s)
+        .map(|s| (background_registry.clone(), s))
+        .unwrap_or((None, bash::BACKGROUND_AFTER_DEFAULT_SECS));
+    let mut tools: Vec<Arc<dyn ToolDefinition>> = vec![
+        Arc::new(bash::BashTool {
+            cwd: cwd.clone(),
+            enforcer,
+            tasks,
+            background_after_secs,
+        }),
         Arc::new(patch_tool::ApplyPatchTool { cwd: cwd.clone() }),
         Arc::new(fs_tools::ReadTool { cwd: cwd.clone() }),
         Arc::new(fs_tools::WriteTool { cwd: cwd.clone() }),
         Arc::new(fs_tools::EditTool { cwd: cwd.clone() }),
         Arc::new(search::GlobTool { cwd: cwd.clone() }),
         Arc::new(search::GrepTool { cwd }),
-    ]
+    ];
+    // 后台任务管理三工具（池 task-20）：注册表缺席=一并隐身（纯前台形态）
+    if let Some(registry) = background_registry {
+        tools.push(Arc::new(tasks_tool::TaskOutputTool { tasks: registry.clone() }));
+        tools.push(Arc::new(tasks_tool::TaskStopTool { tasks: registry.clone() }));
+        tools.push(Arc::new(tasks_tool::TaskListTool { tasks: registry }));
+    }
+    tools
 }

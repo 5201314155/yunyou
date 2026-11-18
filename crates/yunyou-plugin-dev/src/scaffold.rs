@@ -45,6 +45,7 @@ fn id_allowed(id: &str) -> bool {
 fn manifest_toml(id: &str, description: &str) -> String {
     format!(
         r#"# {id} 落盘 manifest（market v2 形态；L2 设计 §3.1 字段）
+# 描述：骨架占位：请改写本描述
 id = "{id}"
 version = "0.1.0"
 format = 2

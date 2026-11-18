@@ -19,6 +19,14 @@ pub struct ToolsConfig {
     /// schemas() 模型面（LLM 看不见=真关）；未知工具名键装载期 fail-loud。
     #[serde(default)]
     pub builtin: std::collections::BTreeMap<String, bool>,
+    /// 前台自动转后台阈值（秒；默认 60，0=关自动转；显式 run_in_background
+    /// 不受此限）。池 task-20。
+    #[serde(default = "default_background_after_secs")]
+    pub background_after_secs: u64,
+}
+
+fn default_background_after_secs() -> u64 {
+    crate::builtin::bash::BACKGROUND_AFTER_DEFAULT_SECS
 }
 
 fn default_root() -> String {
@@ -27,7 +35,7 @@ fn default_root() -> String {
 
 impl Default for ToolsConfig {
     fn default() -> Self {
-        Self { root_dir: default_root(), builtin: Default::default() }
+        Self { root_dir: default_root(), builtin: Default::default(), background_after_secs: default_background_after_secs() }
     }
 }
 
@@ -93,7 +101,9 @@ impl Plugin for ToolsPlugin {
             // 调用侧 get(name)=None 自然落「未知工具」错误路径。
             // 拼错防呆：map 键不在已知内置工具名清单 → fail-loud（配置即报错，
             // 不允许「关了个不存在的工具」静默通过）。
-            let tools = builtin::builtin_tools(root, enforcer);
+            // 后台任务注册表（池 task-20）：装配实例=会话生命周期，Drop 收割
+            let task_registry = std::sync::Arc::new(crate::tasks::TaskRegistry::new());
+            let tools = builtin::builtin_tools(root, enforcer, Some((task_registry, cfg.background_after_secs)));
             let known: std::collections::BTreeSet<&str> =
                 tools.iter().map(|t| t.name()).collect();
             for key in cfg.builtin.keys() {

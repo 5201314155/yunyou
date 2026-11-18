@@ -1,0 +1,25 @@
+[package]
+name = "yunyou-web-search"
+description = "web_search 单工具搜索插件（设计稿 20261118 已批）：SearchProvider trait 四后端（DDG HTML 零配置默认/SearXNG/Brave/Tavily）+citations 三纪律；过渡期 bundled 内置，network 缝⑨开闸后转 market"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+yunyou = { workspace = true }
+yunyou-tools = { workspace = true }
+yunyou-util = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+schemars = "1"
+tracing = "0.1"
+# HTTP 客户端（workspace 单源 rustls-tls；json 特征=Brave/Tavily/SearXNG 解析面）
+reqwest = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+tokio-util = { workspace = true }
+
+[lints]
+workspace = true

@@ -13,6 +13,7 @@
 
 pub mod events;
 pub mod jsonl;
+pub mod paths;
 pub mod plugin;
 
 /// 详情预览直出行数（跨 crate 单源，task-22 尾件，lead 裁方案甲）：折叠详情
@@ -41,6 +42,7 @@ mod lock;
 
 pub use events::SessionEvent;
 pub use jsonl::JsonlStore;
+pub use paths::sanitize_project_dir;
 pub use lock::ExclusiveLock;
 pub use plugin::SessionPlugin;
 
@@ -63,5 +65,13 @@ pub trait SessionStore: Send + Sync {
     /// 语义的实现零负担；JsonlStore 实现见 jsonl.rs）。
     fn ensure_writable(&self) -> BoxFut<'static, Result<()>> {
         Box::pin(async move { Ok(()) })
+    }
+
+    /// 会话文件路径（task-11② 投影缝）：策略插件（如 tool-archive）从会话
+    /// 文件推导 side-store 落点——默认 None（无路径语义的实现零负担；
+    /// 消费方对 None 必须诚实降级，不猜路径）。JsonlStore 实现返回自身
+    /// jsonl 路径（父目录即会话目录）。
+    fn path(&self) -> Option<&std::path::Path> {
+        None
     }
 }

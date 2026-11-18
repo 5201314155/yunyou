@@ -26,7 +26,7 @@ fn tool(tag: &str) -> (BashTool, PathBuf) {
     let dir = std::env::temp_dir().join(format!("yunyou-tools-orphan-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    (BashTool { cwd: Arc::new(CwdService::new(&dir)), enforcer: None }, dir)
+    (BashTool { cwd: Arc::new(CwdService::new(&dir)), enforcer: None , tasks: None, background_after_secs: 60 }, dir)
 }
 
 /// pidfile 里记的后台孙进程已死透（kill(pid,0)→ESRCH），3s 轮询上限。

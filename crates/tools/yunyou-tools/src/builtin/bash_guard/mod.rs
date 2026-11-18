@@ -134,8 +134,18 @@ fn scan_pipe_shell(cmd: &str, mask: &HeredocMask) -> Option<String> {
             if mask.covers(start) {
                 continue; // heredoc 体内是字面文档
             }
-            // 前一非空白字符是管道符＝该 shell 位于管道末端读 stdin（`|&` 同判）
-            let prev = cmd[..start].trim_end().chars().next_back();
+            // 前一非空白字符是管道符＝该 shell 位于管道末端读 stdin（`|&` 同判）。
+            // 引号紧贴包裹命令名（`| 'sh'`，find_word 以引号内词身命中）时，管道
+            // 判定基准前移到开引号之前——引号是 quoting 壳不是词界（与
+            // is_shell_family 剥壳先例同向）
+            let word_zone_start = if cmd[..start].ends_with('\'')
+                && cmd[end..].starts_with('\'')
+            {
+                start - '\''.len_utf8()
+            } else {
+                start
+            };
+            let prev = cmd[..word_zone_start].trim_end().chars().next_back();
             if !matches!(prev, Some('|')) {
                 continue;
             }

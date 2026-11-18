@@ -26,10 +26,10 @@ export class BootPage {
         this.root = div(css.boot);
         this.root.dataset.dshBoot = '';
         this.card = div(css.card);
-        this.wordmark = div(css.wordmark, 'HARNESS');
+        this.wordmark = div(css.wordmark, '云悠');
         this.spinner = div(css.spinner);
         this.spinner.dataset.dshBootSpinner = '';
-        this.hint = div(css.hint, 'Loading plugins…');
+        this.hint = div(css.hint, '正在加载组件…');
         this.card.append(this.wordmark, this.spinner, this.hint);
         this.root.append(this.card);
         container.append(this.root);
@@ -77,7 +77,7 @@ export class BootPage {
             return;
         }
         const report = div(css.failed);
-        report.append(div(css.failedTitle, 'Failed to load plugins'));
+        report.append(div(css.failedTitle, '组件加载失败'));
         for (const id of failed)
             report.append(div(css.failedItem, id));
         if (this.failure !== undefined)

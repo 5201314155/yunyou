@@ -54,10 +54,10 @@ export declare const zh: {
     readonly openInstalled: "在已安装中查看 {name}";
     readonly statusInstalled: "已安装";
     readonly statusUpdate: "有新版本";
-    readonly statusProvided: "随 DSH 提供";
-    readonly incompatible: "此版本与当前的 DSH {runtime} 不兼容，它要求 DSH {range}";
-    readonly noCompatibleVersion: "没有与当前 DSH {runtime} 兼容的版本";
-    readonly exempted: "此版本与当前 DSH 不兼容，但你已为它设置了兼容性豁免";
+    readonly statusProvided: "随云悠提供";
+    readonly incompatible: "此版本与当前的云悠运行时 {runtime} 不兼容，它要求 {range}";
+    readonly noCompatibleVersion: "没有与当前云悠运行时 {runtime} 兼容的版本";
+    readonly exempted: "此版本与当前云悠运行时不兼容，但你已为它设置了兼容性豁免";
     readonly backToList: "发现";
     readonly factSource: "来源";
     readonly factPackage: "软件包";

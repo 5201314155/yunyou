@@ -1,0 +1,27 @@
+[package]
+name = "yunyou-tool-archive"
+description = "工具结果剥离策略插件（task-11②）：轮边界把已消费的旧工具结果置换为存档 stub，原文落 side-store 可重读"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+yunyou = { workspace = true }
+yunyou-agent-loop = { workspace = true }
+yunyou-llm = { workspace = true }
+yunyou-session = { workspace = true }
+yunyou-util = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+schemars = "1"
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+tokio-util = { workspace = true }
+yunyou-tools = { workspace = true }
+yunyou-system-prompt = { workspace = true }
+yunyou-commands = { path = "../../shell/yunyou-commands" }
+
+[lints]
+workspace = true

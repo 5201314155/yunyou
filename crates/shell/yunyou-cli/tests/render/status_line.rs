@@ -143,3 +143,36 @@ fn 落款_窄屏省usage段保模型名() {
     assert!(text.contains("z-ai/glm-5.3-flash"), "窄屏模型名全名优先: {text:?}");
     assert!(!text.contains("上下文") && !text.contains("累计"), "窄屏省 usage 段: {text:?}");
 }
+
+/// 批 6（T4 落款品牌词）：宽屏落款 ☁ 后带「云悠 · 」品牌词（每回合品牌
+/// 曝光）；窄屏维持去装饰（48 列模型名优先，品牌词不吃列宽）。
+#[test]
+fn 落款_品牌词_宽屏有窄屏无() {
+    let mut r = full();
+    r.set_width(80);
+    r.turn_done(&TurnEvent::TurnDone {
+        elapsed: std::time::Duration::from_millis(3271),
+        prompt_tokens: Some(1204),
+        completion_tokens: Some(8931),
+        context_tokens: None,
+        context_window: None,
+        model: "z-ai/glm-5.3-flash".into(),
+    })
+    .unwrap();
+    let text = String::from_utf8(r.into_output()).unwrap();
+    assert!(text.contains("☁ 云悠 · 本回合"), "宽屏落款品牌词：{text:?}");
+    // 窄屏 48：无「云悠 ·」（去装饰既定）
+    let mut r2 = full();
+    r2.set_width(48);
+    r2.turn_done(&TurnEvent::TurnDone {
+        elapsed: std::time::Duration::from_millis(3271),
+        prompt_tokens: Some(1204),
+        completion_tokens: Some(8931),
+        context_tokens: None,
+        context_window: None,
+        model: "z-ai/glm-5.3-flash".into(),
+    })
+    .unwrap();
+    let text2 = String::from_utf8(r2.into_output()).unwrap();
+    assert!(!text2.contains("云悠 ·"), "窄屏去装饰无品牌词：{text2:?}");
+}

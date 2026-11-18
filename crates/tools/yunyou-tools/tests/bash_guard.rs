@@ -16,7 +16,7 @@ use yunyou_tools::{ToolDefinition, ToolExec, ToolOutcome};
 /// 面向「进程 cwd 为根」的工具构造（TempWorkspace 形态用；构造时机必须在
 /// enter 之后，"." 的 canonicalize 才指向临时目录）。
 fn cwd_anchored_tool() -> BashTool {
-    BashTool { cwd: Arc::new(CwdService::new(Path::new("."))), enforcer: None }
+    BashTool { cwd: Arc::new(CwdService::new(Path::new("."))), enforcer: None, tasks: None, background_after_secs: 60 }
 }
 
 fn exec() -> ToolExec {
@@ -229,7 +229,7 @@ async fn heredoc写html真实落盘() {
     let dir = std::env::temp_dir().join(format!("dsh-bash-guard-heredoc-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    let tool = BashTool { cwd: Arc::new(CwdService::new(&dir)), enforcer: None };
+    let tool = BashTool { cwd: Arc::new(CwdService::new(&dir)), enforcer: None, tasks: None, background_after_secs: 60 };
     let outcome = tool
         .execute(
             serde_json::json!({"cmd": "cat > page.html <<EOF\n<html>\n<div>hi</div>\n</html>\nEOF"}),

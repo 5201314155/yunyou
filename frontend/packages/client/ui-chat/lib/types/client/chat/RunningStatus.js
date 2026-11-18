@@ -3,7 +3,7 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { memo, useEffect, useState } from 'react';
 import { TextShimmer } from '@deepseek-ai/dsh-client-ui-primitives';
 import { formatRunDuration, LIVE_RUN_CLOCK_INTERVAL_MS } from "./message-chrome.js";
-import { RunningWhaleTail } from "./RunningWhaleTail.js";
+import { RunningIndicator } from "./RunningIndicator.js";
 import a11yCss from './accessibility.module.css';
 import css from './ChatView.module.css';
 /**
@@ -24,6 +24,6 @@ export const RunningStatus = memo(function RunningStatus({ startTime, paused, ho
     const label = startTime === undefined ? t('chat.deepDiving') : t('chat.deepDivingFor', {
         duration: formatRunDuration(Math.max(1000, now - startTime), t).map(part => part.text).join(''),
     });
-    return (_jsxs("div", { className: css.running, "data-chat-running": true, "data-holding": holding ? '' : undefined, "aria-hidden": holding || undefined, children: [holding ? null : (_jsx("span", { className: a11yCss.visuallyHidden, role: "status", "aria-live": "polite", "aria-atomic": "true", children: t('chat.deepDiving') })), _jsx("span", { className: css.runningDivider, "aria-hidden": "true" }), _jsxs("span", { className: css.runningContent, children: [_jsx(RunningWhaleTail, {}), _jsx(TextShimmer, { active: !holding, className: css.runningText, children: label })] })] }));
+    return (_jsxs("div", { className: css.running, "data-chat-running": true, "data-holding": holding ? '' : undefined, "aria-hidden": holding || undefined, children: [holding ? null : (_jsx("span", { className: a11yCss.visuallyHidden, role: "status", "aria-live": "polite", "aria-atomic": "true", children: t('chat.deepDiving') })), _jsx("span", { className: css.runningDivider, "aria-hidden": "true" }), _jsxs("span", { className: css.runningContent, children: [_jsx(RunningIndicator, {}), _jsx(TextShimmer, { active: !holding, className: css.runningText, children: label })] })] }));
 });
 //# sourceMappingURL=RunningStatus.js.map

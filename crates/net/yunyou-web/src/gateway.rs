@@ -30,7 +30,9 @@ pub(crate) async fn mux_upgrade(
 /// 单连接生命周期：上行帧分派 ∥ wire 桥下行推流（select 双路——follow 流
 /// 的 live 事件与上行 open 并发到达，不互堵）。
 async fn handle_mux(mut socket: WebSocket, state: Arc<WebState>) {
-    let mut follows: Vec<(Value, crate::bridge::StreamKind)> = Vec::new();
+    // follow 订阅：streamId + 流别 + 会话过滤器（session/follow 带
+    // address.sessionId——步 3 定向路由；None=不过滤）。
+    let mut follows: Vec<(Value, crate::bridge::StreamKind, Option<String>)> = Vec::new();
     let mut bridge = state.wire.subscribe();
     loop {
         tokio::select! {
@@ -58,8 +60,17 @@ async fn handle_mux(mut socket: WebSocket, state: Arc<WebState>) {
             }
             frame = bridge.recv() => {
                 match frame {
-                    Ok((kind, value)) => {
-                        for (stream_id, _) in follows.iter().filter(|(_, k)| *k == kind) {
+                    Ok((kind, tag, value)) => {
+                        // 定向路由（裁决①）：Session 帧只达「未过滤」或「标签匹配」
+                        // 的 follow；标签 None=活跃会话未铸（单会话现态唯一产出源，
+                        // 凡 session follow 皆收——多会话后各自定向，见模块头）。
+                        for (stream_id, _, _) in follows.iter().filter(|(_, k, filter)| {
+                            *k == kind
+                                && match (tag.as_deref(), filter.as_deref()) {
+                                    (Some(t), Some(f)) if *k == crate::bridge::StreamKind::Session => t == f,
+                                    _ => true,
+                                }
+                        }) {
                             let item = json!({"type": "item", "streamId": stream_id, "value": value.as_ref()});
                             if send(&mut socket, item).await.is_err() {
                                 break; // 写失败=连接已死，收场（select 下轮 recv 也必败）
@@ -83,7 +94,7 @@ async fn dispatch_open(
     socket: &mut WebSocket,
     state: Arc<WebState>,
     uplink: &Value,
-    follows: &mut Vec<(Value, crate::bridge::StreamKind)>,
+    follows: &mut Vec<(Value, crate::bridge::StreamKind, Option<String>)>,
 ) {
     let stream_id = uplink.get("streamId").cloned().unwrap_or(Value::Null);
     let endpoint = uplink.get("endpoint").and_then(Value::as_str).unwrap_or("");
@@ -98,7 +109,7 @@ async fn dispatch_open(
                        "value": state.wire.control_baseline()}),
             )
             .await;
-            follows.push((stream_id, crate::bridge::StreamKind::Control));
+            follows.push((stream_id, crate::bridge::StreamKind::Control, None));
         }
         // 单会话事件日志流：快照（重放环+流基线）→ 订阅 wire 桥 live 推流
         // （线约定 payload={args:{request:{address…}}}，兼容直接形态）
@@ -117,7 +128,13 @@ async fn dispatch_open(
                        "value": state.wire.snapshot(session_id)}),
             )
             .await;
-            follows.push((stream_id, crate::bridge::StreamKind::Session));
+            // 步 3 定向：记 address.sessionId 过滤器（None=未过滤）
+            let filter = request
+                .get("address")
+                .and_then(|address| address.get("sessionId"))
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            follows.push((stream_id, crate::bridge::StreamKind::Session, filter));
         }
         // 工作区流：基线=单工作区（服务进程 cwd——单会话服务的诚实投影；
         // 对端 UI 点选工作区→session/create→prompt 桥全链路的触发源）。
@@ -133,8 +150,9 @@ async fn dispatch_open(
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_else(|| cwd.clone());
             state.wire.register_workspace(&cwd, &title);
-            let now = crate::wire::now_ms();
-            let session_ids = state.wire.session_ids();
+            let now = crate::wire_frames::now_ms();
+            // 步 4：sessionIds=内存表 ∪ 磁盘扫描（workspace 基线多会话同步）
+            let session_ids = crate::sessions::all_ids(state.wire.session_ids(), &state.session_dir);
             let _ = send(
                 socket,
                 json!({"type": "item", "streamId": stream_id, "value": {
@@ -147,7 +165,7 @@ async fn dispatch_open(
                 }}),
             )
             .await;
-            follows.push((stream_id, crate::bridge::StreamKind::Workspace));
+            follows.push((stream_id, crate::bridge::StreamKind::Workspace, None));
         }
         // 客户端事件下行流：ready 帧（waterfall 桥接远期——本片只建通道）
         "$events" => {
@@ -295,5 +313,73 @@ mod tests {
         }
         assert!(saw_event, "live 事件应经 follow 流推达：广播后未收 user/message");
         let _ = ws.close(None).await;
+    }
+
+    /// 定向路由（步 3，裁决①）：铸会话 s-1 后，addressed s-1 的 follow 收
+    /// live 帧、addressed s-2 的 follow 不收（各自定向）；未铸标签=凡 follow
+    /// 皆收（单会话现态诚实规则，见 handle_mux 注记）。
+    #[tokio::test(flavor = "multi_thread")]
+    async fn live帧按sessionId定向() {
+        let state = state();
+        // 铸会话 s-1（活跃标签=s-1）
+        let _ = call_create(&state, "s-1").await;
+        let mut ws_hit = test_ws_connect(state.clone()).await;
+        let mut ws_miss = test_ws_connect(state.clone()).await;
+        for (ws, sid) in [(&mut ws_hit, "s-1"), (&mut ws_miss, "s-2")] {
+            ws.send(WsMessage::text(format!(
+                r#"{{"type":"open","streamId":"f-{sid}","endpoint":"session/follow","payload":{{"args":{{"request":{{"address":{{"kind":"session","sessionId":"{sid}"}}}}}}}}}}"#
+            )))
+            .await
+            .expect("open 可写");
+            // 吃掉快照帧
+            let _ = ws.next().await.expect("快照在").expect("快照可读");
+        }
+        // 广播用户消息 → 标签 s-1
+        state
+            .broadcast
+            .send(ServerMessage::UserMessage { text: "定向测试".into() })
+            .expect("广播收件人在场");
+        // s-1 follow 应达
+        let mut hit = false;
+        for _ in 0..4 {
+            match ws_hit.next().await {
+                Some(Ok(WsMessage::Text(data))) => {
+                    if data.contains(r#""streamId":"f-s-1""#) && data.contains("user/message") {
+                        hit = true;
+                        break;
+                    }
+                }
+                Some(Ok(_)) => {}
+                _ => break,
+            }
+        }
+        assert!(hit, "addressed s-1 的 follow 应收 live 帧");
+        // s-2 follow 不得收（超时短窗探测：500ms 内无任何 user/message 帧即通过）
+        let mut leaked = false;
+        for _ in 0..2 {
+            match tokio::time::timeout(std::time::Duration::from_millis(500), ws_miss.next()).await {
+                Ok(Some(Ok(WsMessage::Text(data)))) => {
+                    if data.contains("user/message") {
+                        leaked = true;
+                    }
+                }
+                Ok(Some(Ok(_))) => {}
+                _ => break,
+            }
+        }
+        assert!(!leaked, "addressed s-2 的 follow 不得收 s-1 的 live 帧");
+        let _ = ws_hit.close(None).await;
+        let _ = ws_miss.close(None).await;
+    }
+
+    /// session/create 经 unary 铸会话（定向测试辅助；真 HTTP 走 server 测试）。
+    async fn call_create(state: &Arc<WebState>, session_id: &str) -> Value {
+        use axum::extract::State;
+        let body = format!(
+            r#"{{"type":"client-request","rpcId":"c","method":"session/create","payload":{{"args":{{"request":{{"sessionId":"{session_id}"}}}}}}}}"#
+        );
+        let resp = crate::rpc::rpc_unary(State(state.clone()), axum::body::Bytes::from(body)).await;
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.expect("体可读");
+        serde_json::from_slice(&bytes).expect("合法 JSON")
     }
 }

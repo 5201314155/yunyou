@@ -156,12 +156,16 @@ stream_idle_timeout_ms = 30000
 # persona = "……"
 
 # ── 人设文件（推荐：改文件即生效，零代码零配置）──
-# 写 persona.md 后无需改 yunyou.toml、无需改代码，下次启动即生效：
-#   .yunyou/persona.md   项目级（放在项目根，随项目走，优先级最高）
-#   ~/.yunyou/persona.md 用户级（全局人设）
-# 优先级：项目级 persona.md > 用户级 persona.md > 上面两处 toml 字符串配置
-# （md 文件存在即 shadow toml；文件内容支持 `#` 标题分段，各段依次拼进人设槽；
-# 空文件视为不存在，继续回落）。改人设 = 改一个 md 文件。
+# AGENTS.md 四级分源（行业标准文件名，全面对齐 claude 且更好）：
+#   /etc/yunyou/AGENTS.md            策略级（组织下发，可选）
+#   ~/.yunyou/AGENTS.md              用户全局
+#   <项目>/AGENTS.md                 项目级（随仓库走）
+#   <项目>/.yunyou/local/AGENTS.md   本地私有（不入库）
+# 注入=按层序拼接（后层可见前层，冲突以后层为准）；同规则多层重复会在
+# 提示词尾人话点名（冲突检测，claude 是静默覆盖）；每层带 [agents:层名] 锚。
+# 优先级：AGENTS.md 链 > persona.md（.yunyou/persona.md 项目级 > ~/.yunyou/persona.md
+# 用户级）> 上面两处 toml 字符串配置。md 内容支持 `#` 标题分段；空文件视为不存在
+# 继续回落。改人设 = 改一个 md 文件。
 # 单工具执行超时秒数（0 = 不限时）
 tool_timeout_secs = 300
 # 工具循环步数护栏（默认不设=跑到任务完成为止；显式设值=跑满即暂停可「继续」续跑，非腰斩）

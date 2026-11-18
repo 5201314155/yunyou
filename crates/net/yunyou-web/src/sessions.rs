@@ -90,8 +90,76 @@ fn history_frame(session_id: &str, mut events: Vec<SessionEvent>) -> ServerMessa
     ServerMessage::History { session_id: session_id.to_string(), events, truncated }
 }
 
+/// 扫描行条目（步 4 session/list 多行的 JSONL 来源侧）。
+pub(crate) struct ScanRow {
+    /// 会话 id（文件词干）。
+    pub(crate) id: String,
+    /// 最后修改时刻（毫秒）。
+    pub(crate) modified_ms: u64,
+    /// 标题（首个 user-message 首行 derive_title；无用户消息=None 不虚构）。
+    pub(crate) title: Option<String>,
+    /// 无用户消息=blank（诚实：扫描行以「是否存在 user-message」判定）。
+    pub(crate) blank: bool,
+}
+
+/// 扫描 sessions/*.jsonl（valid_id 过滤；跳过已在内存表的 id 由调用方去重）。
+/// 标题/blank 判定只读文件头部（256KB 上限——长文件截断不炸，完整在文件本身）。
+pub(crate) fn scan_rows(session_dir: &std::path::Path) -> Vec<ScanRow> {
+    let mut rows = Vec::new();
+    let Ok(entries) = std::fs::read_dir(session_dir) else { return rows };
+    let mut files: Vec<std::path::PathBuf> = entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.extension().and_then(|e| e.to_str()) == Some("jsonl")
+        })
+        .collect();
+    files.sort();
+    for path in files {
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else { continue };
+        if !valid_id(stem) {
+            continue;
+        }
+        let Ok(meta) = path.metadata() else { continue };
+        let modified_ms = meta
+            .modified()
+            .ok()
+            .and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        let mut title = None;
+        let mut blank = true;
+        if let Ok(text) = std::fs::read_to_string(&path) {
+            let head: String = text.chars().take(256 * 1024).collect();
+            for line in head.lines() {
+                let Ok(value) = serde_json::from_str::<serde_json::Value>(line) else { continue };
+                if value["type"] == "user-message" {
+                    let text = value["text"].as_str().unwrap_or("");
+                    title = Some(crate::wire_frames::derive_title(text));
+                    blank = false;
+                    break;
+                }
+            }
+        }
+        rows.push(ScanRow { id: stem.to_string(), modified_ms, title, blank });
+    }
+    rows
+}
+
+/// 全部已知会话 ids（workspace 基线同步用，步 4）：内存表（wire 活跃/已开）∪
+/// 磁盘扫描（valid_id jsonl 词干），去重稳定序。
+pub(crate) fn all_ids(wire_ids: Vec<String>, session_dir: &std::path::Path) -> Vec<String> {
+    let mut ids: Vec<String> = wire_ids;
+    for row in scan_rows(session_dir) {
+        if !ids.contains(&row.id) {
+            ids.push(row.id);
+        }
+    }
+    ids
+}
+
 /// id 合法性（列表与回放共用）：字母数字与 -_，防空防穿越。
-fn valid_id(id: &str) -> bool {
+pub(crate) fn valid_id(id: &str) -> bool {
     !id.is_empty() && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 

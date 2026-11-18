@@ -63,3 +63,28 @@ pub(crate) fn read_manifest(dir: &Path) -> BoxFut<'static, Result<toml::Value, C
         })
     })
 }
+
+/// toml::Value → serde_json::Value 单源转换器（K-2 出参契约 canonical JSON）。
+///
+/// 取代「toml::to_string → serde_json::from_str」文本往返——该桥对嵌套表
+/// 静默失败（unwrap_or_default 空串→空表，contract_read_hello 实测锚：磁盘
+/// manifest 正确而出参全空）。toml 无 Null 变体：缺键一律 JSON null。
+pub(crate) fn toml_to_json(value: &toml::Value) -> serde_json::Value {
+    match value {
+        toml::Value::String(s) => serde_json::Value::String(s.clone()),
+        toml::Value::Integer(i) => serde_json::json!(i),
+        toml::Value::Float(f) => serde_json::json!(f),
+        toml::Value::Boolean(b) => serde_json::json!(b),
+        toml::Value::Datetime(dt) => serde_json::Value::String(dt.to_string()),
+        toml::Value::Array(items) => {
+            serde_json::Value::Array(items.iter().map(toml_to_json).collect())
+        }
+        toml::Value::Table(map) => {
+            let mut out = serde_json::Map::new();
+            for (k, v) in map {
+                out.insert(k.clone(), toml_to_json(v));
+            }
+            serde_json::Value::Object(out)
+        }
+    }
+}

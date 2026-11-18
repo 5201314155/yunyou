@@ -59,11 +59,13 @@ pub fn compose_turn_input(messages: &[DeliveredMessage], user_input: &str) -> St
 
 /// 测试支持（doc-hidden：非公开契约面，集成测试构造成员工具面用）。
 #[doc(hidden)]
+mod observe;
 pub mod test_support {
     pub use crate::member_tools::member_registry;
 }
 
 pub use auto::{AutoClaimConfig, ClaimCandidate};
+pub use observe::stalled_members;
 pub use board::{BoardOpError, TeamTask, TeamTaskState, TeamTaskView};
 pub use plugin::TeamPlugin;
 pub use roster::RosterEntry;

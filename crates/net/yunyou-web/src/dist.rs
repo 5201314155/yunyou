@@ -1,11 +1,12 @@
 //! v2 前端产物（dist/）服务面：build.rs 生成的嵌入清单 → HTTP 响应。
 //!
 //! # 产物来源与纪律
-//! dist/ = vite 构建 web/apps/web 的产物同步落点（随仓库提交，业主运行时
-//! 零 node）；改动只发生在「上游前端 vendor 树 → 构建 → 同步 dist/」链路上，
-//! 不手改产物。表空 = v2 前端未构建，server 侧回退 v1 vanilla assets。
+//! dist/ = `frontend/apps/web/dist`（vite+boot 一键链唯一落点）在编译期直接
+//! 嵌入，无 crate 根同步副本；改动只发生在「上游前端 vendor 树 → pnpm build
+//! → cargo build 重嵌」链路上，不手改产物。产物缺席 = build.rs 编译失败
+//! （fail-loud 指路），运行时表恒非空，不存在 v1 回退分支。
 
-// 嵌入产物表（build.rs 生成文件以条目位 include 展开；空 = dist 缺席）。
+// 嵌入产物表（build.rs 生成文件以条目位 include 展开；构建已保证非空）。
 include!(concat!(env!("OUT_DIR"), "/dist_manifest.rs"));
 
 /// dist 是否可用（server 据此决定 v2/v1 服务形态）。

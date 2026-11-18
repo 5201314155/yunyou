@@ -21,6 +21,9 @@ pub struct RosterEntry {
     pub online: bool,
     /// 正在跑回合（成员回合循环置位）。
     pub busy: bool,
+    /// 本轮开始时刻（unix 秒；task-21 停摆显示与在忙时长用；空闲=None）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub busy_since: Option<u64>,
     /// 当前认领的任务号（任务板投影）。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task: Option<u64>,
@@ -33,6 +36,8 @@ pub(crate) struct MemberMeta {
     pub description: String,
     /// 正在跑回合。
     pub busy: bool,
+    /// 本轮开始时刻（unix 秒；set_busy(true) 打点/false 清除）。
+    pub busy_since: Option<u64>,
     /// 当前认领任务号。
     pub task: Option<u64>,
 }
@@ -52,6 +57,7 @@ impl Roster {
         self.members.entry(name.to_string()).or_insert_with(|| MemberMeta {
             description,
             busy: false,
+            busy_since: None,
             task: None,
         });
     }
@@ -61,10 +67,17 @@ impl Roster {
         self.members.contains_key(name)
     }
 
-    /// 在忙态置位（成员回合循环起止时调用）。
+    /// 在忙态置位（成员回合循环起止时调用）；置位即打本轮开始时刻
+    /// （task-21 停摆显示供数），清除即还原 None。
     pub(crate) fn set_busy(&mut self, name: &str, busy: bool) {
         if let Some(meta) = self.members.get_mut(name) {
             meta.busy = busy;
+            meta.busy_since = busy.then(|| {
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0)
+            });
         }
     }
 

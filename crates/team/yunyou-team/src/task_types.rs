@@ -56,6 +56,21 @@ pub struct TeammateSpawned {
 /// 目录单源=config 而非 store 实例（SessionStore trait 无路径口是 task-36
 /// 定案，storage trait 不泄漏路径语义）。`[plugins.yunyou-team.config]`
 /// 浅合并叠加在段值之上（max_concurrency 等团队私有键不进 session 卡视图）。
+/// 执行体模式（K-11 双模式切换；缺省 Fiber=现态）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum WorkerMode {
+    /// 进程内 fiber（现态；K-8 六态机/hub 直投）。
+    #[default]
+    Fiber,
+    /// 进程外 worker（K-11 新链：launcher spawn+procmgr 登记+DeathEvent 消费）。
+    Process,
+}
+
+// [救场修复 yun-mu 2026-11-18 22:2x，留痕] 上方 WorkerMode 块原被插在
+// TeamConfig 的 derive 与 struct 之间（语法断裂=#[serde] 属性悬空编译红
+// 约 1h，挡全队 cli 链路验证）。本修复仅把 enum 块上移出 derive/struct 之
+// 间，零语义变更；请 team 域承办席复核并自接续在途件。
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
 pub struct TeamConfig {
     /// 会话文件路径（与 [session].path 同 key 同缺省；成员会话派生其父目录）。
@@ -64,6 +79,10 @@ pub struct TeamConfig {
     /// 成员回合并发上限（信号量；超出者排队——单机进程内资源闸，裁③）。
     #[serde(default = "default_max_concurrency")]
     pub max_concurrency: u32,
+    /// 执行体模式（K-11 双模式：fiber=进程内现态/process=进程外 worker 新链；
+    /// 缺省 fiber=向后兼容，切换点唯一=装配处，六态机零改）。
+    #[serde(default)]
+    pub worker_mode: WorkerMode,
     /// 自动领取策略（K-17；默认 off=防过度自动化首闸）。
     #[serde(default)]
     pub auto_claim: crate::auto::AutoClaimConfig,
@@ -106,6 +125,7 @@ impl Default for TeamConfig {
         Self {
             path: default_session_path(),
             max_concurrency: default_max_concurrency(),
+            worker_mode: WorkerMode::default(), // 缺省 Fiber=现态（K-11 向后兼容）
             auto_claim: crate::auto::AutoClaimConfig::default(),
             resume_max: default_resume_max(),
             resume_notify: default_resume_notify(),

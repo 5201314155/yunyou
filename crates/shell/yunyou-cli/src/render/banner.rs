@@ -322,7 +322,7 @@ mod tests {
             Glyph { matrix: &GLYPH_U, descender: true },
             Glyph { matrix: &GLYPH_N, descender: true },
         ]);
-        let seg = |row: &str, r: usize| -> String { row.chars().skip(8).take(6).collect() };
+        let seg = |row: &str, _r: usize| -> String { row.chars().skip(8).take(6).collect() };
         // u 区（列 8..14）：行 3=u 矩阵首行双柱（底对齐 offset=3，x-height 顶）
         assert_eq!(seg(&rows[3], 3), "█    █", "u 顶行=双柱（底对齐 x-height 顶）");
         // 出脚：末行 u 区 ▄、n 区 ▄；Y 区（列 0..6）无出脚

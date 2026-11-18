@@ -118,7 +118,8 @@ async fn append_event(root: &Context, event: SessionEvent) {
 }
 
 #[cfg(test)]
-mod tests {
+#[cfg(test)]
+pub(crate) mod tests {
     use super::*;
     use crate::server::WebState;
     use crate::turns::TurnRunner;
@@ -127,9 +128,15 @@ mod tests {
     use yunyou_commands::{CommandDefinition, CommandsPlugin};
     use yunyou_session::SessionPlugin;
 
-    /// 测试装配：真 CommandsPlugin+SessionPlugin（temp jsonl）+ 测试命令注册。
-    async fn setup() -> (Arc<WebState>, PathBuf) {
-        let dir = std::env::temp_dir().join(format!("yunyou-web-cmd-test-{}", std::process::id()));
+    /// 测试装配：真 CommandsPlugin+SessionPlugin（temp jsonl）+ 测试命令注册
+    /// （rpc_commands.rs 测试复用——同一装配语义）。
+    pub(crate) async fn setup() -> (Arc<WebState>, PathBuf) {
+        // 目录按原子序号隔离：多测试并发 setup 各持 flock，共享路径会互锁
+        //（sessions.rs 同款隔离手段）。
+        static SEQ: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let n = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let dir = std::env::temp_dir()
+            .join(format!("yunyou-web-cmd-test-{}-{n}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("temp dir");
         let session_file = dir.join("test-session.jsonl");

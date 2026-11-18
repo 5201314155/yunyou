@@ -133,6 +133,7 @@ async fn 十六步回合会话单次载入() {
         retry: None,
         // task-11 钩子缝：测试直构 runner 空注册表（零钩子=现状逐字节一致）
         hooks: Default::default(),
+        gates: Default::default(),
     };
 
     let started = Instant::now();
@@ -226,6 +227,7 @@ async fn 两步回合同样单次载入() {
         retry: None,
         // task-11 钩子缝：测试直构 runner 空注册表（零钩子=现状逐字节一致）
         hooks: Default::default(),
+        gates: Default::default(),
     };
     let outcome = runner
         .run_turn("两步即可".to_string(), CancellationToken::new())

@@ -15,7 +15,7 @@
 import { Service } from '@deepseek-ai/cordis';
 import { WeakMapWithValues } from '@deepseek-ai/dsh-util-values';
 import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives';
-import { CommandDirectory } from "./directory.js";
+import { CommandDirectory, normalizeCommandCatalog } from "./directory.js";
 import { PopupSelectController } from "./popup.js";
 import { builtinRowFace, sectionRows } from "./presentation.js";
 import { claimToken } from "./resolution.js";
@@ -61,7 +61,7 @@ export class CommandUiRuntime extends Service {
                 const result = await ctx.remote.commands.list(sessionId);
                 if (!result.ok)
                     throw new Error(`command.list failed: ${result.error.code}: ${result.error.message}`);
-                return result.value;
+                return normalizeCommandCatalog(result.value);
             });
         });
         const inputTriggers = ctx.get('inputTriggers');
@@ -346,10 +346,14 @@ export class CommandUiRuntime extends Service {
     leadingClaim(desc, session, shown) {
         const token = `/${shown} `;
         const line = `/${desc.name} `;
+        // An expand-kind command never executes on entry: the host returns the
+        // body with the fill-back note (web.v1 §2.2), so the claim hint names that
+        // behavior when the descriptor itself advertises no hint.
+        const hint = desc.input?.hint ?? (desc.kind === 'expand' ? this.t('hint.expand') : undefined);
         return {
             name: desc.name,
             token,
-            ...(desc.input !== undefined ? { hint: desc.input.hint } : {}),
+            ...(hint !== undefined ? { hint } : {}),
             ...(desc.input?.attachments === true ? { attachments: true } : {}),
             submit: (args, _actx, attachments) => this.execute(session, line + args, attachments),
         };
@@ -371,11 +375,12 @@ export class CommandUiRuntime extends Service {
             throw new Error(`command.execute failed: ${result.error.code}: ${result.error.message}`);
         if (result.value === undefined)
             return { kind: 'error', text: `unknown or malformed command: ${line}` };
-        this.notifyExecuted(session.sessionId, submittedCommandName(line), result.value.result);
+        const settled = normalizeCommandSettlement(result.value);
+        this.notifyExecuted(session.sessionId, submittedCommandName(line), settled);
         // A submission consumes its attachments only after handler success; an
         // error outcome keeps the draft and attachments in the composer.
-        if (attachments.length > 0 && result.value.result.kind === 'error') {
-            return { kind: 'error', text: result.value.result.text };
+        if (attachments.length > 0 && settled.kind === 'error') {
+            return { kind: 'error', text: settled.text };
         }
         return { kind: 'success' };
     }
@@ -449,5 +454,23 @@ export class CommandUiRuntime extends Service {
             throw new Error('ui-commands: sessions service unavailable');
         return sessions;
     }
+}
+/**
+ * Normalize one command execution settlement across the official
+ * `{result:{kind,text}}` face and the web.v1 `{ok,text}` face (§2.2). An
+ * unrecognized shape reads as a plain success with no text.
+ * @param value - the Remote result value.
+ * @returns the handler's normalized outcome.
+ */
+function normalizeCommandSettlement(value) {
+    const nested = value.result;
+    if (nested !== null && typeof nested === 'object' && typeof nested.kind === 'string') {
+        return nested;
+    }
+    if (typeof value.ok === 'boolean') {
+        const ok = value.ok;
+        return { kind: ok ? 'success' : 'error', text: typeof value.text === 'string' ? value.text : '' };
+    }
+    return { kind: 'success', text: '' };
 }
 //# sourceMappingURL=service.js.map

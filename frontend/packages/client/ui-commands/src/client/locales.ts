@@ -37,6 +37,7 @@ export const zh = {
   'overlay.aria': '/{command} 选项',
   'listbox.aria': '/{command} 匹配项',
   'notice.attachmentsUnsupported': '/{command} 不接受附件，请先移除附件',
+  'hint.expand': '展开文本：发送前请自行编辑确认',
 } satisfies Record<string, string>
 
 /** The command namespace key union. */
@@ -72,6 +73,7 @@ export const en = {
   'overlay.aria': '/{command} options',
   'listbox.aria': '/{command} matches',
   'notice.attachmentsUnsupported': '/{command} does not accept attachments; remove them first',
+  'hint.expand': 'Expands to text: edit and confirm before sending',
 } satisfies Record<CommandKey, string>
 
 /** Japanese copy, checked against the English keys. */
@@ -104,6 +106,7 @@ export const ja = {
   'overlay.aria': '/{command} のオプション',
   'listbox.aria': '/{command} の一致項目',
   'notice.attachmentsUnsupported': '/{command} は添付ファイルを受け付けません。先に削除してください',
+  'hint.expand': 'テキスト展開：送信前に自分で編集・確認してください',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */
@@ -136,6 +139,7 @@ export const es = {
   'overlay.aria': 'Opciones de /{command}',
   'listbox.aria': '/{command} coincidencias',
   'notice.attachmentsUnsupported': '/{command} no acepta archivos adjuntos; eliminarlos primero',
+  'hint.expand': 'Se expande a texto: edítalo y confírmalo antes de enviarlo',
 } satisfies Record<keyof typeof en, string>
 
 /** French dictionary, checked against the English keys. */
@@ -168,6 +172,7 @@ export const fr = {
   'overlay.aria': 'Options /{command}',
   'listbox.aria': '/{command} correspondances',
   'notice.attachmentsUnsupported': "/{command} n'accepte pas les pièces jointes ; retirez-les d'abord",
+  'hint.expand': 'Se développe en texte : modifiez et confirmez avant d’envoyer',
 } satisfies Record<keyof typeof en, string>
 
 /** German dictionary, checked against the English keys. */
@@ -200,6 +205,7 @@ export const de = {
   'overlay.aria': '/{command}-Optionen',
   'listbox.aria': '/{command} stimmt überein',
   'notice.attachmentsUnsupported': '/{command} akzeptiert keine Anhänge; Entfernen Sie sie zuerst',
+  'hint.expand': 'Erweitert sich zu Text: vor dem Senden bearbeiten und bestätigen',
 } satisfies Record<keyof typeof en, string>
 
 /** Russian dictionary, checked against the English keys. */
@@ -232,6 +238,7 @@ export const ru = {
   'overlay.aria': 'Опции /{command}',
   'listbox.aria': '/{command} совпадений',
   'notice.attachmentsUnsupported': '/{command} не принимает вложения; сначала удали их',
+  'hint.expand': 'Разворачивается в текст: отредактируйте и подтвердите перед отправкой',
 } satisfies Record<keyof typeof en, string>
 
 /** Portuguese dictionary, checked against the English keys. */
@@ -264,4 +271,5 @@ export const pt = {
   'overlay.aria': '/{command} opções',
   'listbox.aria': '/{command} correspondências',
   'notice.attachmentsUnsupported': '/{command} não aceita anexos; remova-os primeiro',
+  'hint.expand': 'Expande para texto: edite e confirme antes de enviar',
 } satisfies Record<keyof typeof en, string>

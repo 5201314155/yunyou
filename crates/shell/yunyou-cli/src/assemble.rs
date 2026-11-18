@@ -115,13 +115,41 @@ pub async fn assemble(
     // ③ 前置面：宿主插槽支持集（§2.5 比对源）与启用插件 provides 并集
     //   （epoch 全局解析、与注册顺序无关，Pending 诊断的缺失键判定源）。
     let support = host_slot_support();
-    let enabled_provides: BTreeSet<String> = BUNDLED_PLUGINS
+    let enabled_of = |entry: &crate::bundled::BundledEntry| {
+        enabled_of_with_file(entry, config, discovered_by_id.get(entry.id).map(|d| d.file.auto_enable))
+    };
+    // 传递不可满足闭包（task-24 P0，方案 a=装载预检闭包分析，内核 await_ready
+    // 语义不动）：task-12 预检只覆盖「直接 inject 键缺失」，传递链盲区=禁用
+    // llm→agent-loop Pending（诊断后继续）→依赖 agent-loop provides 的后续插件
+    // await_ready(Pending) 永挂。闭包：初始 available=启用插件 provides；迭代
+    // 剔除「inject 含不可用键的启用插件」的 provides 至不动点——余下 available
+    // 即「装配期内真正可满足的键」，预检据此短路（缺失=永久，等待=可满足）。
+    let mut available: BTreeSet<String> = BUNDLED_PLUGINS
         .iter()
-        .filter(|entry| {
-            enabled_of_with_file(entry, config, discovered_by_id.get(entry.id).map(|d| d.file.auto_enable))
-        })
+        .filter(|entry| enabled_of(entry))
         .flat_map(|entry| (entry.manifest)().provides)
         .collect();
+    loop {
+        let mut changed = false;
+        for entry in BUNDLED_PLUGINS {
+            if !enabled_of(entry) {
+                continue;
+            }
+            let manifest = (entry.manifest)();
+            let unsatisfiable = manifest.inject.iter().any(|key| !available.contains(key));
+            if unsatisfiable {
+                for key in &manifest.provides {
+                    if available.remove(key) {
+                        changed = true;
+                    }
+                }
+            }
+        }
+        if !changed {
+            break; // 不动点：余下键的提供者自身依赖全可满足
+        }
+    }
+    let enabled_provides = available;
 
     let mut rows: Vec<PluginStatus> = Vec::new();
     let mut agent_loop: Option<FiberHandle> = None;
@@ -141,9 +169,7 @@ pub async fn assemble(
     // 定时注入通道（proto v1.1 真投递）：tx 给 market 回调闭包，rx 交 REPL
     // lineedit 注入臂（回合边界排队投递同律——回合中到期=回合结束回到读行时注入）
     let (scheduled_tx, scheduled_rx) = tokio::sync::mpsc::channel::<String>(64);
-    let deliver_slot: Option<std::sync::Arc<
-        dyn Fn(Option<String>, String) -> Result<String, String> + Send + Sync,
-    >> = Some(std::sync::Arc::new(move |session_id, text| {
+    let deliver_slot: Option<DeliverCallback> = Some(std::sync::Arc::new(move |session_id, text| {
         match session_id {
             // v1 路由=当前会话（session_id=None）；显式会话路由候会话恢复面
             // try_send（非 blocking）：回调可能跑在 tokio worker（proxy 读泵 spawn
@@ -309,6 +335,10 @@ async fn register_entry(
     Ok(handle)
 }
 
+/// 会话消息投递回调（proto v1.1；装配注入点，ProxyPlugin 与 market 分支共用形态）。
+pub type DeliverCallback =
+    std::sync::Arc<dyn Fn(Option<String>, String) -> Result<String, String> + Send + Sync>;
+
 /// market 插件装载分支（task-10/K-19 刀2；§5.1 代理插件映射）：
 /// v2 声明 → market_manifest 五类权威校验 → ProxyPlugin（spawn+握手+代理注册）。
 /// 单插件失败=Failed 态入表不拖累他插件（§4.4 与 L1 整树 fail-loud 的语义差异）；
@@ -318,9 +348,7 @@ async fn load_market_plugins(
     unmatched: &[&yunyou_config::DiscoveredPlugin],
     config: &DshConfig,
     rows: &mut Vec<PluginStatus>,
-    deliver_slot: &Option<std::sync::Arc<
-        dyn Fn(Option<String>, String) -> Result<String, String> + Send + Sync,
-    >>,
+    deliver_slot: &Option<DeliverCallback>,
 ) {
     for d in unmatched {
         let is_v2_market =
@@ -423,26 +451,6 @@ fn push_market_failed(rows: &mut Vec<PluginStatus>, id: &str, version: &str, rea
         state: "failed",
         source: "market",
     });
-}
-
-/// 装载器 L1 未命中收口（原 assemble 内联段，task-22 拆出；零行为变更）：
-/// 明确诊断不静默、不拒装；L2 落地后本分支换子进程 Runner（DiscoveredPlugin
-/// 已带接缝字段）。
-fn record_unmatched(unmatched: &[&DiscoveredPlugin], rows: &mut Vec<PluginStatus>) {
-    for d in unmatched {
-        eprintln!(
-            "[装载器] 插件 {}（{}）需 L2 子进程运行时，当前版本不支持装载——声明已发现，等待 L2 子进程骨架（设计 §4）",
-            d.id,
-            d.manifest_path.display()
-        );
-        rows.push(PluginStatus {
-            id: d.id.clone(),
-            version: d.file.version.clone(),
-            enabled: false,
-            state: "unsupported",
-            source: "discovered",
-        });
-    }
 }
 
 /// manifest_ui 配对校验（任务29 C4，设计 §八；原 assemble 内联段，task-22 拆出；

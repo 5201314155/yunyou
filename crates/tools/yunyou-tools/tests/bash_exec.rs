@@ -18,7 +18,7 @@ fn tool(tag: &str) -> (BashTool, PathBuf) {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let service = Arc::new(CwdService::new(&dir));
-    (BashTool { cwd: service, enforcer: None }, dir)
+    (BashTool { cwd: service, enforcer: None, tasks: None, background_after_secs: 60 }, dir)
 }
 
 /// bash 真实执行（本机有 bash）：退出码与输出。

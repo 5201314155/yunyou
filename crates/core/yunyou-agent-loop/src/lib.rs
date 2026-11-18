@@ -23,6 +23,7 @@ mod aggregate;
 mod cancel;
 mod compaction;
 mod fold;
+mod gate;
 mod hooks;
 mod observer;
 mod plugin;
@@ -39,5 +40,10 @@ pub use compaction::CompactionState;
 pub use hooks::{
     apply_edits as apply_compose_edits, ComposeEdit, HooksRegistry, HooksRegistryService,
     PreComposeHook, PreComposeRequest,
+};
+pub use gate::{
+    ApprovalDecision, ApprovalPresenter, ApprovalSubject, ApprovalSubjectKind, ApprovalUiService,
+    GateContext, GateDecision, GateHub, GateRegistryService, GateRegistry, PreToolUseGate,
+    ToolCallView,
 };
 pub use turn::{AgentLoopRunner, TurnOutcome};

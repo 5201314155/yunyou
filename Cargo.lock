@@ -2555,6 +2555,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "web-search-sample"
+version = "0.1.0"
+dependencies = [
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
+ "yunyou-plugin-sdk",
+ "yunyou-web-search",
+]
+
+[[package]]
 name = "web-sys"
 version = "0.3.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2828,15 +2840,18 @@ dependencies = [
  "yunyou-credentials",
  "yunyou-llm",
  "yunyou-llm-openai",
+ "yunyou-permission",
  "yunyou-plugin-proto",
  "yunyou-retry",
  "yunyou-sandbox",
  "yunyou-session",
  "yunyou-system-prompt",
  "yunyou-team",
+ "yunyou-tool-archive",
  "yunyou-tools",
  "yunyou-util",
  "yunyou-web",
+ "yunyou-web-search",
 ]
 
 [[package]]
@@ -2924,12 +2939,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "yunyou-permission"
+version = "0.1.0"
+dependencies = [
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
+ "yunyou",
+ "yunyou-agent-loop",
+ "yunyou-util",
+]
+
+[[package]]
 name = "yunyou-plugin-dev"
 version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tokio-util",
  "toml 0.9.12+spec-1.1.0",
  "yunyou",
  "yunyou-tools",
@@ -3052,6 +3081,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "yunyou-tool-archive"
+version = "0.1.0"
+dependencies = [
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "yunyou",
+ "yunyou-agent-loop",
+ "yunyou-commands",
+ "yunyou-llm",
+ "yunyou-session",
+ "yunyou-system-prompt",
+ "yunyou-tools",
+ "yunyou-util",
+]
+
+[[package]]
 name = "yunyou-tools"
 version = "0.1.0"
 dependencies = [
@@ -3094,6 +3143,22 @@ dependencies = [
  "yunyou-agent-loop",
  "yunyou-commands",
  "yunyou-session",
+ "yunyou-util",
+]
+
+[[package]]
+name = "yunyou-web-search"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "yunyou",
+ "yunyou-tools",
  "yunyou-util",
 ]
 

@@ -379,6 +379,8 @@ export declare const zh: {
     'queue.steer': string;
     'queue.steer.unavailable': string;
     'error.sessionInUse': string;
+    'error.agentBusy': string;
+    'error.noActiveTurn': string;
     'queue.editFailed': string;
     'queue.removeFailed': string;
     'queue.steerFailed': string;
@@ -776,6 +778,8 @@ export declare const en: {
     'queue.steer': string;
     'queue.steer.unavailable': string;
     'error.sessionInUse': string;
+    'error.agentBusy': string;
+    'error.noActiveTurn': string;
     'queue.editFailed': string;
     'queue.removeFailed': string;
     'queue.steerFailed': string;
@@ -1171,6 +1175,8 @@ export declare const ja: {
     'queue.steer': string;
     'queue.steer.unavailable': string;
     'error.sessionInUse': string;
+    'error.agentBusy': string;
+    'error.noActiveTurn': string;
     'queue.editFailed': string;
     'queue.removeFailed': string;
     'queue.steerFailed': string;
@@ -1561,6 +1567,8 @@ export declare const es: {
     'queue.steer': string;
     'queue.steer.unavailable': string;
     'error.sessionInUse': string;
+    'error.agentBusy': string;
+    'error.noActiveTurn': string;
     'queue.editFailed': string;
     'queue.removeFailed': string;
     'queue.steerFailed': string;
@@ -1956,6 +1964,8 @@ export declare const fr: {
     'queue.steer': string;
     'queue.steer.unavailable': string;
     'error.sessionInUse': string;
+    'error.agentBusy': string;
+    'error.noActiveTurn': string;
     'queue.editFailed': string;
     'queue.removeFailed': string;
     'queue.steerFailed': string;
@@ -2351,6 +2361,8 @@ export declare const de: {
     'queue.steer': string;
     'queue.steer.unavailable': string;
     'error.sessionInUse': string;
+    'error.agentBusy': string;
+    'error.noActiveTurn': string;
     'queue.editFailed': string;
     'queue.removeFailed': string;
     'queue.steerFailed': string;
@@ -2746,6 +2758,8 @@ export declare const ru: {
     'queue.steer': string;
     'queue.steer.unavailable': string;
     'error.sessionInUse': string;
+    'error.agentBusy': string;
+    'error.noActiveTurn': string;
     'queue.editFailed': string;
     'queue.removeFailed': string;
     'queue.steerFailed': string;
@@ -3141,6 +3155,8 @@ export declare const pt: {
     'queue.steer': string;
     'queue.steer.unavailable': string;
     'error.sessionInUse': string;
+    'error.agentBusy': string;
+    'error.noActiveTurn': string;
     'queue.editFailed': string;
     'queue.removeFailed': string;
     'queue.steerFailed': string;

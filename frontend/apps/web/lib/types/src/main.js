@@ -1,5 +1,6 @@
 /** Browser entry for the Web client. */
 import '@deepseek-ai/dsh-client-ui-theme/brand-font.css';
+import './safe-area.css';
 import { AppWebEntry, applyIndexInjections } from '@deepseek-ai/dsh-client-web';
 const desktop = globalThis.dshDesktopBoot;
 const reportFailure = (reason) => {

@@ -8,7 +8,7 @@ function lastStep(context) {
 }
 /**
  * Failure shown for a turn ending: a recorded error, a sign-out cancellation,
- * or a turn that restart recovery closed because the DSH process exited mid-turn.
+ * or a turn that restart recovery closed because the YunYou process exited mid-turn.
  */
 function endFailure(reason) {
     switch (reason.kind) {
@@ -17,10 +17,10 @@ function endFailure(reason) {
         case 'aborted':
             // User and parent cancellations show only the stopped turn summary.
             return reason.reason.kind === 'hook' && reason.reason.reason === 'deepseek-account/signed-out'
-                ? { message: 'Stopped because you signed out of DeepSeek.', code: 'ACCOUNT_SIGNED_OUT' }
+                ? { message: 'Stopped because you signed out of yunyou.', code: 'ACCOUNT_SIGNED_OUT' }
                 : undefined;
         case 'interrupted':
-            return { message: 'The DSH process exited before this turn finished.', code: 'INTERRUPTED' };
+            return { message: 'The YunYou process exited before this turn finished.', code: 'INTERRUPTED' };
         default:
             // Completed, blocked, max-tokens, forked, and plugin-merged endings have no failure row.
             return undefined;

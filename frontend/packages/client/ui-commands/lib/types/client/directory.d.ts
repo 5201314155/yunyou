@@ -15,7 +15,25 @@ export type { CommandDescriptor } from '@deepseek-ai/dsh-commands/types';
  */
 export type DirectoryStatus = 'cold' | 'pending' | 'ready' | 'failed';
 /** Injected pull (the service binds command.list off the root connection). */
-export type FetchCommands = (sessionId: SessionId) => Promise<readonly CommandDescriptor[]>;
+export type FetchCommands = (sessionId: SessionId) => Promise<readonly CatalogCommand[]>;
+/**
+ * One catalog entry: the official descriptor face plus the web.v1 contract's
+ * behavior split (`kind: action|expand` is the only dispatch basis, §2.1) and
+ * `accepts_args`. Both optional so the official Host shape keeps consuming.
+ */
+export type CatalogCommand = CommandDescriptor & {
+    readonly aliases?: readonly string[];
+    readonly kind?: 'action' | 'expand';
+    readonly accepts_args?: boolean;
+};
+/**
+ * Normalize one catalog pull across the two served shapes: the official Host
+ * array and the web.v1 envelope `{items:[…]}`. Unknown shapes drop to empty —
+ * the menu shows an honest empty catalog rather than a broken one.
+ * @param value - the Remote result value.
+ * @returns the descriptor list.
+ */
+export declare function normalizeCommandCatalog(value: unknown): readonly CatalogCommand[];
 /** The session-keyed directory cache. Plain class — the owning service wires events and RPC. */
 export declare class CommandDirectory {
     private readonly fetchCommands;
@@ -33,7 +51,7 @@ export declare class CommandDirectory {
      * @param name - typed command spelling without the leading slash.
      * @returns the descriptor, or undefined when absent or the entry is not ready.
      */
-    resolve(sessionId: SessionId, name: string): CommandDescriptor | undefined;
+    resolve(sessionId: SessionId, name: string): CatalogCommand | undefined;
     /** Soft invalidation (commands-changed): background repull on every touched key; ready snapshots keep serving. */
     invalidateAll(): void;
     /**
@@ -69,7 +87,7 @@ export declare class CommandDirectory {
      * @param signal - attempt-scoped abort (the SubmitAttempt signal).
      * @returns the hot command snapshot.
      */
-    ensureReady(sessionId: SessionId, signal: AbortSignal): Promise<readonly CommandDescriptor[]>;
+    ensureReady(sessionId: SessionId, signal: AbortSignal): Promise<readonly CatalogCommand[]>;
     private entry;
 }
 //# sourceMappingURL=directory.d.ts.map

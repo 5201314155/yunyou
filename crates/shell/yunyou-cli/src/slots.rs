@@ -143,7 +143,9 @@ mod tests {
             assert_eq!(support.get(name), Some(&1), "插槽 {name} 应支持 v1：{support:?}");
         }
         // 第 10 卡=yunyou-sandbox（task-24 沙箱接线；contracts=sandbox.v1 新插槽）
-        assert_eq!(BUNDLED_PLUGINS.len(), 10, "一期十 bundled 齐（九卡+commands+K-7 team）");
+        // 10 基线（九卡+commands+K-7 team）；今晚新挂四件（tool-archive/permission/
+        // memory/scheduler 投递）+2 净增=12（P0 定位后机械同步）
+        assert_eq!(BUNDLED_PLUGINS.len(), 13, "十三 bundled 齐（十二+memory.v1 记忆卡）");
     }
 
     /// 插槽版本比对（方案 §2.5）：宿主无该插槽、或声明版本高于支持集 →

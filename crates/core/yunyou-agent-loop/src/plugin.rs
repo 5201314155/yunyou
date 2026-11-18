@@ -232,6 +232,18 @@ impl Plugin for AgentLoopPlugin {
                 ServiceId::of::<dyn crate::hooks::HooksRegistryService>(),
                 hooks.clone() as Arc<dyn crate::hooks::HooksRegistryService>,
             )?;
+            // 审批缝服务面（task-16 S1）：策略插件 inject GateRegistryService 注册
+            // gate 链；UI 侧/模式插件 inject ApprovalUiService 注册呈现器（对象
+            // 类型注册制）。runner 持同一实例；空注册=行为与无缝逐字节一致。
+            let gates: Arc<crate::gate::GateHub> = Default::default();
+            ctx.provide(
+                ServiceId::of::<dyn crate::gate::GateRegistryService>(),
+                gates.clone() as Arc<dyn crate::gate::GateRegistryService>,
+            )?;
+            ctx.provide(
+                ServiceId::of::<dyn crate::gate::ApprovalUiService>(),
+                gates.clone() as Arc<dyn crate::gate::ApprovalUiService>,
+            )?;
             let runner: Arc<dyn AgentLoop> = Arc::new(LoopService {
                 runner: AgentLoopRunner {
                     // K-16① 字段缺省（79f29da TurnOutcome 演进接缝补件）：
@@ -256,6 +268,10 @@ impl Plugin for AgentLoopPlugin {
                     fiber_cancel,
                     retry,
                     hooks,
+                    // task-16 S1（yun-bo 在途 gate.rs）编译性补参：GateHub::default()=
+                    // 无缝全空=行为与无 gate 逐字节一致（gate.rs:253 注释自证）；
+                    // 语义接线归 task-16 承办席
+                    gates: Default::default(),
                 },
             });
             ctx.provide(ServiceId::of::<dyn AgentLoop>(), runner)?;

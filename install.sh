@@ -1,5 +1,6 @@
 #!/bin/sh
-# 云悠（YunYou）一条命令全局安装（v3：scheduler 插件随装，task-14 真投递业主真机缺口）
+# 云悠（YunYou）一条命令全局安装（v4：官方插件集循环落位——业主定「官方插件
+# 随主程序同通道」规矩，2026-11-19；v3=仅 scheduler 单件）
 # 用法：curl -fsSL https://github.com/5201314155/yunyou/raw/main/install.sh | sh
 set -e
 
@@ -10,50 +11,54 @@ HOME_DIR="${YUNYOU_HOME:-$HOME/.yunyou}"
 echo "☁ 云悠安装器"
 
 # 1) 主路径：release-bin 分支直拉预编译二进制（raw，免 Release 网页操作）
-#    v3：主程序 + scheduler 插件（模型面 schedule_create/list/delete）双产物。
+#    v4：主程序 + 官方插件集（scheduler=定时三工具；web-search=联网搜索单工具
+#    四后端）逐个落位 plugins/<category>/<id>/——装完重启即被发现装载。
 #    hello-sdk 不随装（示例归示例——示例是仓库内布线，作者参考 main.rs 写法）。
+#    memory 插件候入库后加行（设计已批 20261118，代码未落）。
 ARCH=$(uname -m)
 case "$ARCH" in
   aarch64|arm64)
     BIN_NAME="yunyou-arm64.gz"
-    SCHED_NAME="scheduler-sample-arm64.gz" ;;
+    ARCH_SUFFIX="-arm64" ;;
   *)
     BIN_NAME="yunyou.gz"
-    SCHED_NAME="scheduler-sample.gz" ;;
+    ARCH_SUFFIX="" ;;
 esac
-GH_BASE="https://raw.githubusercontent.com/5201314155/yunyou/release-bin"
+GH_BASE="${YUNYOU_RELEASE_BASE:-https://raw.githubusercontent.com/5201314155/yunyou/release-bin}"
 GH_BIN="$GH_BASE/$BIN_NAME"
-GH_SCHED="$GH_BASE/$SCHED_NAME"
-GH_SCHED_MANIFEST="$GH_BASE/scheduler-manifest.toml"
 ASSET=""
 curl -fsSLI -o /dev/null "$GH_BIN" && ASSET="$GH_BIN"
-SCHED_ASSET=""
-curl -fsSLI -o /dev/null "$GH_SCHED" && SCHED_ASSET="$GH_SCHED"
 
-# 插件落位（目录分类律：plugins/<category>/<id>/=发现层扫描位；
-# manifest 的 category=workflows 与目录一致——装完重启即被发现装载）
-SCHED_DIR="$HOME_DIR/plugins/workflows/scheduler"
-
-install_scheduler() {
-    echo "→ 下载 scheduler 插件（定时任务三工具）：$SCHED_ASSET"
+# 通用插件安装（v4 循环体）：plugin_id 落位目录名 / plugin_bin release-bin 产物名
+# （不带 .gz 与架构后缀）/ plugin_category 目录分类（与 manifest.category 一致）。
+# 单件失败=跳过不阻塞主程序（安装器纪律：主程序成功优先）。
+install_plugin() {
+    plugin_id="$1"; plugin_bin="$2"; plugin_category="$3"
+    asset="$GH_BASE/$plugin_bin$ARCH_SUFFIX.gz"
+    manifest_url="$GH_BASE/$plugin_bin-manifest.toml"
+    dest="$HOME_DIR/plugins/$plugin_category/$plugin_id"
+    echo "→ 下载插件 $plugin_id：$asset"
     TMP=$(mktemp -d)
-    curl -fsSL "$GH_SCHED" -o "$TMP/scheduler-sample.gz" || {
-        echo "⚠ scheduler 插件下载失败（跳过，主程序不受影响；模型面将无定时工具）"
-        rm -rf "$TMP"
-        return 0
+    curl -fsSL "$asset" -o "$TMP/plugin.gz" || {
+        echo "⚠ $plugin_id 下载失败（跳过，主程序不受影响）"
+        rm -rf "$TMP"; return 0
     }
-    curl -fsSL "$GH_SCHED_MANIFEST" -o "$TMP/manifest.toml" || {
-        echo "⚠ scheduler manifest 下载失败（跳过）"
-        rm -rf "$TMP"
-        return 0
+    curl -fsSL "$manifest_url" -o "$TMP/manifest.toml" || {
+        echo "⚠ $plugin_id manifest 下载失败（跳过）"
+        rm -rf "$TMP"; return 0
     }
-    gunzip -f "$TMP/scheduler-sample.gz"
-    mkdir -p "$SCHED_DIR"
-    install -m 755 "$TMP/scheduler-sample" "$SCHED_DIR/scheduler-sample"
-    install -m 644 "$TMP/manifest.toml" "$SCHED_DIR/manifest.toml"
+    gunzip -f "$TMP/plugin.gz"
+    mkdir -p "$dest"
+    install -m 755 "$TMP/plugin" "$dest/$plugin_bin"
+    install -m 644 "$TMP/manifest.toml" "$dest/manifest.toml"
     rm -rf "$TMP"
-    echo "✓ scheduler 插件已装到 $SCHED_DIR（重启 yunyou 后模型面即有 schedule_create/list/delete）"
+    echo "✓ $plugin_id 已装到 $dest（重启 yunyou 后模型面即有该插件工具）"
 }
+
+# 官方插件集清单（加行即扩——产物推 release-bin 后在此登记）
+PLUGINS=""
+PLUGINS="$PLUGINS scheduler scheduler-sample workflows"
+PLUGINS="$PLUGINS web-search web-search tools"
 
 install_binary() {
     TMP=$(mktemp -d)
@@ -68,29 +73,34 @@ install_binary() {
 if [ -n "$ASSET" ]; then
     echo "→ 下载预编译二进制：$ASSET"
     install_binary
-    if [ -n "$SCHED_ASSET" ]; then
-        install_scheduler
-    else
-        echo "⚠ release-bin 分支未见 scheduler 插件产物（跳过；主程序正常）"
-    fi
+    # 官方插件集循环落位（v4；GH_BASE 可被 YUNYOU_RELEASE_BASE 覆盖=离线模拟安装）
+    set -- $PLUGINS
+    while [ $# -ge 3 ]; do
+        install_plugin "$1" "$2" "$3"
+        shift 3
+    done
 elif command -v cargo >/dev/null 2>&1; then
     echo "→ 未见预编译包，走源码安装（cargo install --git，1-2 分钟）"
     cargo install --git "$REPO" yunyou-cli
-    # 源码路径同步装 scheduler 插件（cargo install 第二个 bin + raw manifest）
-    if cargo install --git "$REPO" scheduler-sample; then
-        SCHED_BIN_DIR=$(command -v scheduler-sample >/dev/null 2>&1 && dirname "$(command -v scheduler-sample)" || echo "$HOME/.cargo/bin")
-        if [ -f "$SCHED_BIN_DIR/scheduler-sample" ]; then
-            mkdir -p "$SCHED_DIR"
-            install -m 755 "$SCHED_BIN_DIR/scheduler-sample" "$SCHED_DIR/scheduler-sample"
-            if curl -fsSL "https://raw.githubusercontent.com/5201314155/yunyou/main/sdk/examples/scheduler/manifest.toml" -o "$SCHED_DIR/manifest.toml"; then
-                echo "✓ scheduler 插件已装到 $SCHED_DIR（源码路径）"
-            else
-                echo "⚠ scheduler manifest 下载失败（跳过）"
+    # 源码路径同步装官方插件集（cargo install 第二批 bin + raw manifest）
+    set -- $PLUGINS
+    while [ $# -ge 3 ]; do
+        plugin_id="$1"; plugin_bin="$2"; plugin_category="$3"
+        dest="$HOME_DIR/plugins/$plugin_category/$plugin_id"
+        if cargo install --git "$REPO" "$plugin_bin"; then
+            SRC_BIN_DIR=$(command -v "$plugin_bin" >/dev/null 2>&1 && dirname "$(command -v "$plugin_bin")" || echo "$HOME/.cargo/bin")
+            if [ -f "$SRC_BIN_DIR/$plugin_bin" ]; then
+                mkdir -p "$dest"
+                install -m 755 "$SRC_BIN_DIR/$plugin_bin" "$dest/$plugin_bin"
+                curl -fsSL "https://raw.githubusercontent.com/5201314155/yunyou/main/sdk/examples/$plugin_id/manifest.toml" -o "$dest/manifest.toml" \
+                    && echo "✓ $plugin_id 已装到 $dest（源码路径）" \
+                    || echo "⚠ $plugin_id manifest 下载失败（跳过）"
             fi
+        else
+            echo "⚠ $plugin_id 源码安装失败（跳过，主程序不受影响）"
         fi
-    else
-        echo "⚠ scheduler 插件源码安装失败（跳过，主程序不受影响）"
-    fi
+        shift 3
+    done
 else
     echo "✗ 未找到预编译包，且本机无 cargo。"
     echo "  安装 Rust：curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"

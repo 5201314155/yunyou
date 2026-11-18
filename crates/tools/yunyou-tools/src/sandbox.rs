@@ -140,6 +140,8 @@ mod tests {
         let tool = BashTool {
             cwd: StdArc::new(CwdService::new(&dir)),
             enforcer: Some(StdArc::new(FailingEnforcer)),
+            tasks: None,
+            background_after_secs: 60,
         };
         let exec = ToolExec {
             call_id: "sbx-fail".into(),

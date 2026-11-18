@@ -66,6 +66,22 @@ impl LineHistory {
         }
     }
 
+    /// 按内部下标取条目（Ctrl-R Enter 接受命中）。
+    pub fn entry_at(&self, idx: usize) -> Option<String> {
+        self.inner.lock().expect("历史锁").entries.get(idx).cloned()
+    }
+
+    /// Ctrl-R 反查：从 `before`（内部下标，不含）向更旧找第一条含 query 的
+    /// 条目，返回 (下标, 文本)。query 空串视为匹配任意（=纯 ↑ 上溯等价）。
+    pub fn search_before(&self, query: &str, before: usize) -> Option<(usize, String)> {
+        let state = self.inner.lock().expect("历史锁");
+        let end = before.min(state.entries.len());
+        (0..end)
+            .rev()
+            .find(|&idx| query.is_empty() || state.entries[idx].contains(query))
+            .map(|idx| (idx, state.entries[idx].clone()))
+    }
+
     /// 提交一行（回车）：非空且与最后一条不同才入史（连按回车/重复命令不灌史）；
     /// 游标回草稿位、草稿清空（新提交即新草稿起点）。
     pub fn commit(&self, line: &str) {

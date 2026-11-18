@@ -17,6 +17,15 @@ Installer behavior: downloads the prebuilt binary from GitHub Releases (**no Rus
 required**) → falls back to `cargo install --git` (source build) → fixes PATH automatically.
 Upgrading = re-run the same command. Uninstall = `rm ~/.local/bin/yunyou`.
 
+**官方插件随装清单（v4，随主程序同通道）**：
+
+| 插件 | 落位 | 模型面 |
+| --- | --- | --- |
+| scheduler | `~/.yunyou/plugins/workflows/scheduler/` | schedule_create / schedule_list / schedule_delete（定时任务） |
+| web-search | `~/.yunyou/plugins/tools/web-search/` | web_search（联网搜索，DDG 零配置默认；SearXNG/Brave/Tavily 可配切换） |
+
+单件下载失败自动跳过不阻塞主程序；memory 插件候入库后加行（设计已批，代码未落）。
+
 ## Architecture (motherboard / slots / data flow)
 
 The kernel is a motherboard: it only provides slot specs (12 frozen contracts + UI registration
@@ -32,7 +41,13 @@ silent changes are forbidden.
 ## Capability overview (all plugin-shaped, visible under `/plugins`)
 
 - **Tools**: six built-ins + external SDK plugins
-- **Persona**: edit `.yunyou/persona.md` — takes effect on next start, zero code
+- **Persona**: `AGENTS.md` four-tier chain — `/etc/yunyou/AGENTS.md` (managed) →
+  `~/.yunyou/AGENTS.md` (user) → `<project>/AGENTS.md` → `<project>/.yunyou/local/AGENTS.md`
+  (local, not committed). Injected in order, later layer wins; duplicate rules across
+  layers get an explicit conflict note (better than claude's silent override); each
+  layer is anchored `[agents:<tier>]` for future hook policies. Legacy fallback:
+  `.yunyou/persona.md` > `~/.yunyou/persona.md` > toml string — all take effect on
+  next start, zero code
 - **Skills**: `.yunyou/skills/*.md` auto-registered into a model-facing catalog, read on demand (progressive disclosure)
 - **Permissions**: four modes (default / acceptEdits / plan / bypass) + workspace boundary + always-on dangerous-command interception
 - **Scheduling**: the model picks its own times via `schedule_create` (cron / interval / one-shot)
@@ -56,7 +71,7 @@ the kernel tree). See `sdk/yunyou-plugin-sdk/SDK.md` for the capability matrix
 ## Configuration (yunyou.toml)
 
 TOML, every section optional, unknown keys fail loudly (no silent typos). Full annotated
-example in [README.zh.md](README.zh.md). Highlights:
+example in [config.example.toml](config.example.toml) (minimal: [config.minimal.toml](config.minimal.toml); 中文注解版见 [README.zh.md](README.zh.md)). Highlights:
 
 ```toml
 [llm]

@@ -162,7 +162,7 @@ async fn openapi_骨架与路由覆盖一致() {
 /// 比对 utoipa 生成物）。
 #[test]
 fn yaml入库物与单源一致() {
-    let checked_in = std::fs::read_to_string("../../docs/接口/openapi-gateway.yaml")
+    let checked_in = std::fs::read_to_string("../../../docs/接口/openapi-gateway.yaml")
         .expect("openapi-gateway.yaml 应在接口区入库");
     assert_eq!(checked_in.trim(), OPENAPI_YAML.trim(), "入库 yaml 与单源漂移");
 }

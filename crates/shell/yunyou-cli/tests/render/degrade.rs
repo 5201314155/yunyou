@@ -93,7 +93,10 @@ fn 非交互终态不丢字_尾段落定() {
     r.reasoning_delta("一段足够长的思考内容在非交互模式下也要冻结计数").unwrap();
     r.finish().unwrap();
     let text = String::from_utf8(r.into_output()).unwrap();
-    assert!(!text.contains("非交互模式下也要冻结计数"), "预览外原文不上屏：{text:?}");
+    // 批 6（T3-b，lead 批设计稿）契约演进：思考全文经 detail 展开缝折叠
+    // 可见（冻结行预览仍截断；「默认不倾倒」的落地面从「不上屏」演进为
+    // 「折叠可见」——详情块 FOLD_THRESHOLD 阈值自动折叠）
+    assert!(text.contains("▎") && text.contains("非交互模式下也要冻结计数"), "全文经折叠详情缝可见（批 6）：{text:?}");
     assert!(text.contains('▏') && text.contains(" 想了 ") && text.contains("· 一段足够长的思考内…"), "非交互冻结单行照出（T3-a 列宽预算预览截断 9 字+…；ANSI 中缀允许）：{text:?}");
     assert!(text.ends_with('\n'), "收尾应落定换行：{text:?}");
 

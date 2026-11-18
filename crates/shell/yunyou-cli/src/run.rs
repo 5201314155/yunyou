@@ -69,6 +69,13 @@ pub async fn run(command: crate::cli::Cli) -> Result<(), AppError> {
     let home = cli::resolve_home(command.home.clone());
     std::fs::create_dir_all(&home).map_err(AppError::Io)?;
 
+    // ⓪' 自更新子命令（task-18）：纯网络+文件编排不进装配——早分派直返
+    if let Some(cli::Command::Update { check, from_source }) = &command.command {
+        let msg = crate::update::run_update(*check, *from_source).map_err(AppError::Assemble)?;
+        println!("{msg}");
+        return Ok(());
+    }
+
     // ⓪ 插件管理子命令（task-10）：纯文件编排不进装配——早分派直返
     if let Some(cli::Command::Plugin { cmd }) = &command.command {
         let msg = match cmd {
@@ -301,6 +308,14 @@ pub async fn run(command: crate::cli::Cli) -> Result<(), AppError> {
     if command.verbose && (catalog || skill_read) {
         eprintln!("[技能] 渐进披露：目录段={} skill_read={}", catalog, skill_read);
     }
+    // memory.v1 记忆缝（池 task-14）：四操作工具 + MEMORY.md 活索引常驻注入
+    //（复用 harness:skills 目录段机制；空索引不注入=零噪音）
+    let memory_store = std::sync::Arc::new(crate::memory::MemoryStore::new(&home, &cwd));
+    let memory_tools = crate::memory::register_memory_tools(&assembled.root, std::sync::Arc::clone(&memory_store));
+    let memory_section = crate::memory::register_memory_section(&assembled.root, &memory_store);
+    if command.verbose && (memory_tools > 0 || memory_section) {
+        eprintln!("[记忆] memory.v1：工具 {} 个 索引段={}", memory_tools, memory_section);
+    }
     let outcome = match command.task.as_deref() {
         Some(task) => {
             // task-25①：store 显式注入（task-74 修法 a 同族——上下文查找类
@@ -328,6 +343,7 @@ pub async fn run(command: crate::cli::Cli) -> Result<(), AppError> {
                 yunyou_web::serve(params).await.map_err(|err| AppError::Assemble(err.to_string()))
             }
             Some(cli::Command::Plugin { .. }) => unreachable!("plugin 子命令已于 ⓪ 早分派直返"),
+            Some(cli::Command::Update { .. }) => unreachable!("update 子命令已于 ⓪' 早分派直返"),
             None => {
                 // 定时注入接收端（proto v1.1 真投递）：market 插件到期→lineedit 注入臂
                 let scheduled_rx = assembled.scheduled_rx.take();

@@ -3,8 +3,10 @@
   "private": true,
   "packageManager": "pnpm@11.9.0",
   "scripts": {
+    "build": "pnpm run build:client && pnpm run build:web && pnpm run build:boot",
     "build:client": "tsdown --config-loader native --env.DSH_BUILD_FACE client",
-    "build:web": "pnpm --filter @deepseek-ai/dsh-web-frontend run build"
+    "build:web": "pnpm --filter @deepseek-ai/dsh-web-frontend run build",
+    "build:boot": "tsx scripts/build-yunyou-boot.ts"
   },
   "devDependencies": {
     "@jridgewell/gen-mapping": "^0.3.13",

@@ -23,9 +23,9 @@
 //!   的成本（一次临时文件写读）远低于漏判带来的路径迷航代价；
 //! - 不做完整路径沙箱——由宿主的运行环境约束，修复模式等敏感场景禁用本工具。
 
-use crate::builtin::capture::CaptureFile;
 use crate::builtin::cwd::CwdService;
 use crate::contract::{ToolDefinition, ToolExec, ToolOutcome};
+use crate::tasks::TaskRegistry;
 use std::path::PathBuf;
 use std::sync::Arc;
 use yunyou_util::BoxFut;
@@ -33,36 +33,8 @@ use yunyou_util::BoxFut;
 // 对外保持 `bash::detect_escaping_write` 路径可用（门禁实现已迁至 bash_guard）。
 pub use super::bash_guard::detect_escaping_write;
 use super::bash_guard::reject_with_hint;
-
-/// 单次输出截断上限。
-const MAX_OUTPUT_BYTES: usize = 64 * 1024;
-
-/// 全组收割（unix）：`process_group(0)` 后子进程自为组长（PGID=子 PID），
-/// `killpg` 对整组发 SIGKILL——组内孙进程（前台深链/后台遗留）一并死透，
-/// 不复用孤儿；组空（全员已退）= ESRCH 静默。幂等：重复调用无害。
-#[cfg(unix)]
-fn kill_process_group(pgid: u32) {
-    // SIGKILL 直达：TERM 需进程配合退出，收割场景（取消/超时/已放弃）
-    // 不假设组内进程体面配合——先 KILL 后 reap，无常宽限（任务书信号序裁决）。
-    unsafe {
-        libc::killpg(pgid as libc::pid_t, libc::SIGKILL);
-    }
-}
-
-/// 组收割 RAII：spawn 成功即持有，任意出口（正常返回/提前 return/panic
-/// unwind/上层 abort future）drop 时全组 SIGKILL——补 [`std::process::
-/// Child`] 系 kill_on_drop 只杀直子的孙进程盲区，drop 路径零孤儿。
-#[cfg(unix)]
-struct GroupReaper(libc::pid_t);
-
-#[cfg(unix)]
-impl Drop for GroupReaper {
-    fn drop(&mut self) {
-        unsafe {
-            libc::killpg(self.0, libc::SIGKILL);
-        }
-    }
-}
+pub(crate) use super::bash_exec::BACKGROUND_AFTER_DEFAULT_SECS;
+use super::bash_exec::run_bash;
 
 /// bash 命令执行工具。
 pub struct BashTool {
@@ -71,6 +43,12 @@ pub struct BashTool {
     /// 沙箱强制器（可选消费，task-19）：Some=helper 链沙箱执行；None=降级
     /// 直跑+结果 meta 标注 `sandboxed:false`（设计 §2 裁决 1）。
     pub enforcer: Option<Arc<dyn crate::sandbox::SandboxEnforcer>>,
+    /// 后台任务注册表（池 task-20）：Some=超时/显式参数可转后台；None=纯前台
+    /// （三臂 select 退化为双臂，行为与 task-20 前完全一致）。转后台与前台
+    /// 同权限判定链（guard/沙箱 prepare 全在 spawn 前），不因转后台豁免。
+    pub tasks: Option<Arc<TaskRegistry>>,
+    /// 前台自动转后台阈值（秒，0=关自动转；显式 run_in_background 不受此限）。
+    pub background_after_secs: u64,
 }
 
 impl ToolDefinition for BashTool {
@@ -79,7 +57,7 @@ impl ToolDefinition for BashTool {
     }
 
     fn description(&self) -> &str {
-        "在工作目录执行一条 bash 命令并返回合并输出与退出码；命令内的 cd 会更新后续文件工具的相对路径基准。长命令会阻塞本轮；避免交互式命令。命令结束或被取消时其全部后代进程随进程组收割，不支持借本工具启动长驻服务。"
+        "在工作目录执行一条 bash 命令并返回合并输出与退出码；命令内的 cd 会更新后续文件工具的相对路径基准。长命令（默认超 60 秒，可配）自动转后台并立即返回 task_id，用 task_output 查询进度、task_stop 终止、task_list 列表；也可用 run_in_background 显式后台执行。命令结束或被取消时其前台后代进程随进程组收割；已转后台的任务不随对话取消终止（只由 task_stop 或会话退场收割）。避免交互式命令。"
     }
 
     fn parameters(&self) -> serde_json::Value {
@@ -87,7 +65,8 @@ impl ToolDefinition for BashTool {
             "type": "object",
             "properties": {
                 "cmd": {"type": "string", "description": "要执行的 bash 命令"},
-                "cwd": {"type": "string", "description": "可选：本次执行的工作目录（相对工作区根，目录必须已存在）"}
+                "cwd": {"type": "string", "description": "可选：本次执行的工作目录（相对工作区根，目录必须已存在）"},
+                "run_in_background": {"type": "boolean", "description": "可选：true=立即转后台执行，返回 task_id 后用 task_output 轮询输出、task_stop 终止（长编译/长测试推荐，不阻塞对话）"}
             },
             "required": ["cmd"]
         })
@@ -96,7 +75,13 @@ impl ToolDefinition for BashTool {
     fn execute(&self, args: serde_json::Value, exec: ToolExec) -> BoxFut<'static, ToolOutcome> {
         let cwd_service = self.cwd.clone();
         let enforcer = self.enforcer.clone();
+        let tasks = self.tasks.clone();
+        let background_after_secs = self.background_after_secs;
         Box::pin(async move {
+            let run_in_background = args
+                .get("run_in_background")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
             let Some(cmd) = args.get("cmd").and_then(|v| v.as_str()) else {
                 return ToolOutcome::err("tool/args", "缺少 cmd 参数");
             };
@@ -158,192 +143,15 @@ impl ToolDefinition for BashTool {
                 }
                 None => None,
             };
-            run_bash(cmd, start_dir, exec, cwd_service, prepared).await
+            run_bash(cmd, start_dir, exec, cwd_service, prepared, tasks, background_after_secs, run_in_background).await
         })
     }
 }
 
-/// 子进程执行主体（独立函数便于取消语义集中）。
-async fn run_bash(
-    cmd: String,
-    start_dir: PathBuf,
-    exec: ToolExec,
-    cwd: Arc<CwdService>,
-    prepared: Option<crate::sandbox::PreparedSandbox>,
-) -> ToolOutcome {
-    // cwd 捕获临时文件：RAII 兜底删除（取消/spawn 失败/wait 失败任何路径不留
-    // 垃圾）；宿主预创建 0600 锁权（见 CaptureFile::new）；路径不在模型面——
-    // 防伪不靠路径隐蔽（同机进程可枚举 /tmp/yunyou-cwd-* 通配），靠捕获值
-    // clamp 的收益论证（见 builtin/cwd.rs；云镜 P2-A2 措辞降调）
-    let capture = CaptureFile::new();
-    // wrapper＝命令尾部追加三行宿主指令（门禁扫描之后拼接，模型不可见）：
-    // 不用花括号包裹——花括号会打断 heredoc（终止标记后同行不能接 `; }`），
-    // 追加行与任何命令形态（多行/heredoc/管道）正交；`exit $__yunyou_exit`
-    // 保持原退出码语义。捕获文件缺席（预创建失败降级）＝不追加捕获行，命令
-    // 原样执行。已知代价：cmd 以反斜杠续行结尾或 set -e 提前退出时捕获缺失
-    // ＝cwd 维持不变（降级安全，note_uncaptured 留痕）。
-    let wrapped = match capture.as_inner() {
-        Some(path) => format!(
-            "{cmd}\n__yunyou_exit=$?\npwd > '{}'\nexit $__yunyou_exit",
-            path.display()
-        ),
-        None => cmd,
-    };
-    // 沙箱 helper 链（task-19 阶段 4）：prepared 在位→arg0 自唤起 helper
-    //（fresh exec 应用 Landlock+seccomp 后 execvp bash，设计 §3.4 C 案）；
-    // None（降级）→直跑+结果 meta 标注 sandboxed:false（设计 §3.6 降级显式告警）。
-    // task-24 接线修正（死代码从未运行暴露的两处潜伏雷）：
-    // ①命令向量必须带 shell 本体——helper execvp 的 command[0] 是用户命令，
-    //   旧码传 ["-c", wrapped] 会 execvp("-c") 必 ENOENT；
-    // ②arg0 哨兵分派——Command::new(program) 的 argv[0] 是程序路径而非哨兵名，
-    //   必须 CommandExt::arg0 显式设哨兵，否则 try_helper 不命中、策略 JSON 被
-    //   当普通 CLI 参数（finder 隐患形态：接 enforcer 不调 try_helper=喂 clap）。
-    let (program, helper_args, sandboxed) = match &prepared {
-        Some(p) => {
-            let (program, argv) = p.helper_argv(&["bash".into(), "-c".into(), wrapped.clone()]);
-            (program, argv, true)
-        }
-        None => (PathBuf::from("bash"), vec!["-c".into(), wrapped.clone()], false),
-    };
-    let mut command = if sandboxed {
-        use std::os::unix::process::CommandExt;
-        let mut c = tokio::process::Command::new(&program);
-        // arg0=哨兵名（try_helper 入口协议），argv[1..]=--policy-json… 用户命令
-        c.as_std_mut().arg0(&helper_args[0]);
-        c.args(&helper_args[1..]);
-        c
-    } else {
-        let mut c = tokio::process::Command::new(&program);
-        c.arg("-c").arg(&helper_args[1]);
-        c
-    };
-    #[cfg(unix)]
-    command.process_group(0);
-    command.kill_on_drop(true);
-    command.current_dir(&start_dir);
-    let mut child = match command
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-    {
-        Ok(child) => child,
-        Err(err) => {
-            return ToolOutcome::err_h(
-                "tool/spawn",
-                format!("bash 启动失败: {err}"),
-                "bash 启动失败，请重试或简化命令",
-            );
-        }
-    };
-    // 全组收割接线（task-14）：process_group(0) 使子进程自为组长（PGID=子
-    // PID），spawn 即记组号——wait 完成后 `Child::id()` 变 None，组号必须
-    // 先存；RAII reaper 覆盖 panic/上层 abort future 的 drop 路径，取消与
-    // 正常完成路径显式收割（kill_on_drop 仅杀直子，为孙进程盲区，仅作
-    // 非 unix 降级兜底保留）。
-    let pgid = child.id().expect("spawn 成功后 pid 必在位");
-    #[cfg(unix)]
-    let _group_reaper = GroupReaper(pgid as libc::pid_t);
-    // 输出读取交给独立任务（句柄已从 child take，不阻塞取消路径）
-    let mut stdout = child.stdout.take().expect("已设 piped");
-    let mut stderr = child.stderr.take().expect("已设 piped");
-    let out_task = tokio::spawn(async move {
-        let mut buf = Vec::new();
-        let _ = tokio::io::AsyncReadExt::read_to_end(&mut stdout, &mut buf).await;
-        buf
-    });
-    let err_task = tokio::spawn(async move {
-        let mut buf = Vec::new();
-        let _ = tokio::io::AsyncReadExt::read_to_end(&mut stderr, &mut buf).await;
-        buf
-    });
-    let status = tokio::select! {
-        result = child.wait() => result,
-        _ = exec.cancel.cancelled() => {
-            // 全组收割（孙进程一并死透，不复用孤儿）：先 KILL 后 reap；
-            // RAII reaper 随 return 的再次 killpg 组空=ESRCH，幂等无害。
-            #[cfg(unix)]
-            kill_process_group(pgid);
-            #[cfg(not(unix))]
-            let _ = child.start_kill();
-            let _ = child.wait().await;
-            return ToolOutcome::err("tool/cancelled", "bash 执行被取消，进程已收割");
-        }
-    };
-    // 正常完成也收割组内遗留（P2-9 + 零孤儿语义）：bash 已退，后台遗留
-    // 孙进程可能仍持 stdout/stderr 写端——不杀则 read_to_end 永不 EOF、
-    // 本函数永挂。组长已死，killpg 只命中遗留组员；组空=ESRCH。落款
-    // （退出码/输出/cwd 捕获）在收割后照常取，正常完成路径零影响。
-    #[cfg(unix)]
-    kill_process_group(pgid);
-    let out = out_task.await.unwrap_or_default();
-    let err_out = err_task.await.unwrap_or_default();
-    let status = match status {
-        Ok(status) => status,
-        Err(err) => {
-            cwd.note_uncaptured();
-            return ToolOutcome::err("tool/wait", format!("等待子进程失败: {err}"));
-        }
-    };
-    // 沙箱 helper 失败归一（task-24 裁 5，设计 §3.6）：helper 预执行失败
-    // （参数集不完整 64/策略不识别 65/沙箱应用失败 126）以 stderr 前缀 marker
-    // 「yunyou-sandbox：」+专用退出码出现——归一 tool/sandbox-failed 拒执行，
-    // 不回退裸跑。消歧：用户命令自身退出 64/65/126 无 marker=真实结果原样
-    // 透传（设计区分：内核拒绝 EACCES/EPERM 是真实结果，非沙箱故障）。
-    let err_text = String::from_utf8_lossy(&err_out);
-    if sandboxed
-        && matches!(status.code(), Some(64) | Some(65) | Some(126))
-        && err_text.contains("yunyou-sandbox：")
-    {
-        cwd.note_uncaptured();
-        return ToolOutcome::err(
-            "tool/sandbox-failed",
-            format!("沙箱应用失败，命令未执行（fail-closed 不回退裸跑）：{}", err_text.trim()),
-        );
-    }
-    // 统一目录视图：命令结束后取子进程最终 pwd 写回共享服务（越界由服务
-    // clamp 回 root 并留痕；捕获缺失＝命令提前退出或临时文件缺席降级，cwd
-    // 维持不变）。空内容也按未捕获处理：预创建的空档被 `exit` 提前退出等
-    // 场景留下（捕获行未执行），不是合法 pwd——不得走 clamp 回根。
-    let captured = match capture.as_inner() {
-        Some(path) => std::fs::read_to_string(path).ok().filter(|raw| !raw.trim().is_empty()),
-        None => None,
-    };
-    match captured {
-        Some(raw) => {
-            cwd.set_captured(&raw);
-        }
-        None => cwd.note_uncaptured(),
-    }
-    let mut output = String::from_utf8_lossy(&out).into_owned();
-    let err_text = String::from_utf8_lossy(&err_out);
-    if !err_text.trim().is_empty() {
-        output.push_str(&format!("\n[stderr]\n{err_text}"));
-    }
-    truncate(&mut output, MAX_OUTPUT_BYTES);
-    ToolOutcome::ok(serde_json::json!({
-        "exit_code": status.code(),
-        "output": output,
-        "sandboxed": sandboxed,
-    }))
-}
-
-
-/// 截断输出到上限（字符边界安全）。
-fn truncate(text: &mut String, max_bytes: usize) {
-    if text.len() <= max_bytes {
-        return;
-    }
-    let mut cut = max_bytes;
-    while cut > 0 && !text.is_char_boundary(cut) {
-        cut -= 1;
-    }
-    text.truncate(cut);
-    text.push_str("\n[输出已截断]");
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::builtin::capture::CaptureFile;
+    use super::super::bash_exec::truncate;
 
     /// 截断的字符边界安全（多字节不裂开）。
     #[test]

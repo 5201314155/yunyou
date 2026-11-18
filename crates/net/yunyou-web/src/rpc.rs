@@ -10,7 +10,7 @@
 //! 受理→后台回合，echo 对账经 wire 桥回流）。其余方法显式 not-implemented
 //! （fail-visible，不伪造值——解析错比假值可诊断）。
 
-use crate::protocol::ServerMessage;
+use crate::contract::{self, code, err_body, err_envelope};
 use crate::server::WebState;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -28,14 +28,14 @@ pub(crate) async fn rpc_unary(
     let Ok(body) = parsed else {
         return rpc_response(
             Value::Null,
-            json!({"ok": false, "error": err_body("gateway/bad-request", "请求体不是合法 JSON")}),
+            json!({"ok": false, "error": err_body(code::BAD_REQUEST, "请求体不是合法 JSON")}),
             StatusCode::BAD_REQUEST,
         );
     };
     if body.get("type").and_then(Value::as_str) != Some("client-request") {
         return rpc_response(
             Value::Null,
-            json!({"ok": false, "error": err_body("gateway/bad-request", "非 client-request 信封")}),
+            json!({"ok": false, "error": err_body(code::BAD_REQUEST, "非 client-request 信封")}),
             StatusCode::BAD_REQUEST,
         );
     }
@@ -44,16 +44,15 @@ pub(crate) async fn rpc_unary(
     let result = match method {
         // 侧栏会话列表（批⑬投影面）：单会话真名行（title 投影键——
         // manager.ts:755 消费路径）；未铸会话=空表
-        "session/list" => {
-            json!({"ok": true, "value": {"items": state.wire.session_summaries()}})
-        }
+        // 多会话步 4：内存行 ∪ JSONL 扫描行（合成在 rpc_session）
+        "session/list" => crate::rpc_session::session_list(&state),
         // 停止按钮（SessionCancelRequest={sessionId}，types.ts:366）：取消
         // 进行中回合；空闲=人话拒绝（fail-visible，不静默装成功）
         "session/cancel" => {
             if state.turns.cancel_active() {
                 json!({"ok": true, "value": {"accepted": true}})
             } else {
-                err_envelope("session/no-active-turn", "当前没有正在执行的回合，无需停止")
+                err_envelope(code::NO_ACTIVE_TURN, "当前没有正在执行的回合，无需停止")
             }
         }
         // 模型触达面（ModelCatalog，types.ts:135）：单模型单供应商的诚实
@@ -73,98 +72,25 @@ pub(crate) async fn rpc_unary(
         }
         // loadOlder 向上翻页兜底：空页（本进程会话流不超快照重放环）
         "session/page" => json!({"ok": true, "value": {"records": [], "hasMore": false}}),
-        "session/prompt" => rpc_prompt(&state, &body),
-        _ => json!({"ok": false, "error": err_body(
-            "gateway/not-implemented",
-            &format!("RPC 方法 {method} 未实现（适配层后续片）")
-        )}),
+        "session/prompt" => crate::rpc_session::rpc_prompt(&state, &body).await,
+        // 会话恢复（多会话步 2，域细则 §1.1-3）：切活跃+JSONL 尾部灌入重放环
+        "session/open" => return crate::rpc_session::rpc_open(&state, &body).await,
+        // commands 域（W2，契约 §9.1）：目录投影+命令缝执行桥
+        "commands/list" => crate::rpc_commands::commands_list(&state),
+        "commands/execute" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_commands::commands_execute(&state, &payload).await
+        }
+        // 未接方法：契约注册表点名状态（fail-visible，不伪造值——contract.rs）
+        _ => contract::not_implemented(method),
     };
     rpc_response(rpc_id, result, StatusCode::OK)
 }
 
-/// 提交桥（session/prompt，施工图 §3.3）：取 content 首个 text → 回合闸门
-/// 即刻受理（占住=agent-busy 人话拒绝）→ 后台跑回合，事件经 wire 桥回流。
-/// requestId 先登记（user/message source echo 对账——客户端乐观 echo 退场凭据）。
-fn rpc_prompt(state: &Arc<WebState>, body: &Value) -> Value {
-    let payload = body.get("payload").cloned().unwrap_or(json!({}));
-    let request = request_of(&payload);
-    let request_id = request.get("requestId").and_then(Value::as_str).unwrap_or("");
-    let mode = request.get("mode").and_then(Value::as_str).unwrap_or("");
-    let text = request.get("content").and_then(Value::as_array).and_then(|parts| {
-        parts.iter().find_map(|part| {
-            if part.get("type").and_then(Value::as_str) == Some("text") {
-                part.get("text").and_then(Value::as_str).map(str::to_string)
-            } else {
-                None
-            }
-        })
-    });
-    if request_id.is_empty() {
-        return err_envelope("gateway/bad-request", "prompt 缺 requestId（对端 echo 对账必需）");
-    }
-    if !matches!(mode, "queue" | "steer") {
-        return err_envelope("gateway/bad-request", "prompt mode 需 queue|steer");
-    }
-    let Some(text) = text else {
-        return err_envelope(
-            "gateway/bad-request",
-            "prompt content 需至少一个 text 部分（空数组续跑语义未桥接）",
-        );
-    };
-    if text.trim().is_empty() {
-        return err_envelope("gateway/bad-request", "prompt 正文为空白");
-    }
-    // 回合闸门：即刻探测——占住=对端 agent-busy（人话文案与 ws 层同源）
-    let Some(guard) = state.turns.try_lock_gate() else {
-        return err_envelope(
-            "session/agent-busy",
-            "当前会话正在对话中，等本回合落定再发新消息",
-        );
-    };
-    state.wire.set_request_id(Some(request_id.to_string()));
-    let runner = state.turns.clone();
-    let sender = state.broadcast.clone();
-    tokio::spawn(async move {
-        // 受理后失败（agentLoop 缺失/回合失败）：人话进事件流——wire 桥转
-        // system/message；回合已开则一并闭合（turn/end error）。
-        // 用户停止（cancel 令牌贯穿，agent-loop Err loop/cancelled）：转
-        // 人话落款，不露内核错误码。
-        if let Err(err) = runner.run_locked(&text, sender.clone()).await {
-            let text = if err.contains("loop/cancelled") {
-                "已停止本回合（用户取消）".to_string()
-            } else {
-                err
-            };
-            let _ = sender.send(ServerMessage::Error { text });
-        }
-        drop(guard); // 守卫持至回合落定（含 Err），闸门语义与 ws 层等价
-    });
-    json!({"ok": true, "value": {"accepted": true}})
-}
+/// typert 线约定解包：契约统一实现移至 contract::request_of（rpc_commands 同用）。
+use contract::request_of;
 
-/// typert 线约定解包：payload=`{args:{<参数名>:<值>}}`（FaceModel 参数名
-/// 'request' 为单参方法惯例；无参方法 args={}）。兼容直接 payload 形态
-/// （批⑤ 探针/直调测试用）。
-fn request_of(payload: &Value) -> &Value {
-    payload
-        .get("args")
-        .and_then(|args| args.get("request"))
-        .unwrap_or(payload)
-}
-
-/// 错误 result 信封（信封内 ok:false——fail-visible 不伪造值）。
-fn err_envelope(code: &str, message: &str) -> Value {
-    json!({"ok": false, "error": err_body(code, message)})
-}
-
-/// 错误体（gateway 统一三字段）。
-fn err_body(code: &str, message: &str) -> Value {
-    json!({"code": code, "message": message, "details": {}})
-}
-
-/// server-response 信封统一形态（application/json；json feature 未启用，
-/// 字符串体+头手工成形）。
-fn rpc_response(rpc_id: Value, result: Value, status: StatusCode) -> Response {
+pub(crate) fn rpc_response(rpc_id: Value, result: Value, status: StatusCode) -> Response {
     let envelope = json!({"type": "server-response", "rpcId": rpc_id, "result": result});
     (
         status,
@@ -177,6 +103,7 @@ fn rpc_response(rpc_id: Value, result: Value, status: StatusCode) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protocol::ServerMessage;
     use crate::server::WebState;
     use crate::turns::TurnRunner;
     use crate::bridge::WireBridge;
@@ -260,7 +187,8 @@ mod tests {
         ] {
             let reject = call(&state, "session/prompt", payload).await;
             assert_eq!(reject["result"]["ok"], false, "{why} 应拒绝：{reject}");
-            assert_eq!(reject["result"]["error"]["code"], "gateway/bad-request");
+            // 契约 §2.2：prompt 缺陷专用码 session/prompt-invalid（W1 对表）
+            assert_eq!(reject["result"]["error"]["code"], "session/prompt-invalid");
         }
         // 闸门占住：对端 agent-busy（人话文案与 ws 层同源）
         let busy = call(
@@ -305,5 +233,58 @@ mod tests {
             items[0]["projections"]["values"]["sessionListMetadata"]["blank"], true,
             "投影块在列"
         );
+    }
+
+    /// 会话恢复桥端到端（步 2）：真实 JSONL → open → 灌入计数回显 →
+    /// follow 快照带历史记录 → list 行 agentAvailable=true（活跃）。
+    /// 不存在/非法 id=bad-request 人话。
+    #[tokio::test(flavor = "multi_thread")]
+    async fn 会话恢复桥_灌入与拒绝() {
+        use yunyou_session::{JsonlStore, SessionEvent, SessionStore};
+        // 造真实会话文件（temp 目录，原子序号隔离）
+        static SEQ: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let n = SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let dir = std::env::temp_dir()
+            .join(format!("yunyou-web-open-test-{}-{n}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let path = dir.join("hist1.jsonl");
+        let store = JsonlStore::new(path.clone());
+        store.append(&SessionEvent::UserMessage { text: "历史一问".into() }).await.unwrap();
+        store.append(&SessionEvent::AssistantMessage { text: "历史一答".into(), reasoning: None }).await.unwrap();
+        store.append(&SessionEvent::CommandRun {
+            command_id: "c".into(), name: "help".into(), raw_input: "/help".into(),
+        }).await.unwrap();
+        let mut state = state();
+        Arc::get_mut(&mut state).expect("单引用可变").session_dir = dir.clone(); // 会话目录指向本测试文件
+        // open 成功：灌入 2、跳过 1
+        let value = call(&state, "session/open", r#"{"sessionId":"hist1"}"#).await["result"]["value"].clone();
+        assert_eq!(value["sessionId"], "hist1", "{value}");
+        assert_eq!(value["ingested"], 2);
+        assert_eq!(value["skipped"], 1);
+        assert!(value["skippedNote"].as_str().unwrap_or("").contains("跳过 1 条"), "{value}");
+        // open 后 list 单行（诚实中间态——步 4 前不伪装多行）
+        let list = call(&state, "session/list", "{}").await["result"]["value"].clone();
+        let items = list["items"].as_array().expect("items 在");
+        assert_eq!(items.len(), 1, "open 后单活跃行：{list}");
+        assert_eq!(items[0]["sessionId"], "hist1");
+        assert_eq!(items[0]["agentAvailable"], true, "活跃行可 prompt");
+        assert_eq!(items[0]["blank"], false, "有历史=非 blank");
+        // follow 快照带灌入历史（对端重放环生效）
+        let snapshot = state.wire.snapshot(None);
+        assert_eq!(snapshot["header"]["id"], "hist1");
+        assert_eq!(snapshot["skippedEvents"], 1, "跳过计数进快照");
+        let records = snapshot["records"].as_array().expect("records 在");
+        assert_eq!(records.len(), 2, "灌入 2 帧入环：{records:?}");
+        // 拒绝面：缺 sessionId / 非法名 / 不存在
+        for (payload, why) in [
+            ("{}", "缺 sessionId"),
+            (r#"{"sessionId":"../etc"}"#, "非法名"),
+            (r#"{"sessionId":"nope"}"#, "不存在"),
+        ] {
+            let resp = call(&state, "session/open", payload).await;
+            assert_eq!(resp["result"]["error"]["code"], "gateway/bad-request", "{why}: {resp}");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

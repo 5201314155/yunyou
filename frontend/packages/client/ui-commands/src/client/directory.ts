@@ -19,12 +19,39 @@ export type { CommandDescriptor } from '@deepseek-ai/dsh-commands/types'
 export type DirectoryStatus = 'cold' | 'pending' | 'ready' | 'failed'
 
 /** Injected pull (the service binds command.list off the root connection). */
-export type FetchCommands = (sessionId: SessionId) => Promise<readonly CommandDescriptor[]>
+export type FetchCommands = (sessionId: SessionId) => Promise<readonly CatalogCommand[]>
+
+/**
+ * One catalog entry: the official descriptor face plus the web.v1 contract's
+ * behavior split (`kind: action|expand` is the only dispatch basis, §2.1) and
+ * `accepts_args`. Both optional so the official Host shape keeps consuming.
+ */
+export type CatalogCommand = CommandDescriptor & {
+  readonly aliases?: readonly string[]
+  readonly kind?: 'action' | 'expand'
+  readonly accepts_args?: boolean
+}
+
+/**
+ * Normalize one catalog pull across the two served shapes: the official Host
+ * array and the web.v1 envelope `{items:[…]}`. Unknown shapes drop to empty —
+ * the menu shows an honest empty catalog rather than a broken one.
+ * @param value - the Remote result value.
+ * @returns the descriptor list.
+ */
+export function normalizeCommandCatalog(value: unknown): readonly CatalogCommand[] {
+  const items = Array.isArray(value) ? value
+    : value !== null && typeof value === 'object' && Array.isArray((value as { items?: unknown }).items)
+      ? (value as { items: unknown[] }).items
+      : []
+  return items.filter((item): item is CatalogCommand =>
+    item !== null && typeof item === 'object' && typeof (item as { name?: unknown }).name === 'string')
+}
 
 /** One session key's cache cell. */
 class Entry {
   state: DirectoryStatus = 'cold'
-  commands: readonly CommandDescriptor[] = []
+  commands: readonly CatalogCommand[] = []
   /** Bumped at each pull start; only the latest pull may publish its outcome. */
   epoch = 0
   lastError: unknown
@@ -52,7 +79,7 @@ export class CommandDirectory {
    * @param name - typed command spelling without the leading slash.
    * @returns the descriptor, or undefined when absent or the entry is not ready.
    */
-  resolve(sessionId: SessionId, name: string): CommandDescriptor | undefined {
+  resolve(sessionId: SessionId, name: string): CatalogCommand | undefined {
     const entry = this.entries.get(sessionId)
     if (entry === undefined || entry.state !== 'ready') return undefined
     return resolveCommand(name, entry.commands)
@@ -133,7 +160,7 @@ export class CommandDirectory {
    * @param signal - attempt-scoped abort (the SubmitAttempt signal).
    * @returns the hot command snapshot.
    */
-  async ensureReady(sessionId: SessionId, signal: AbortSignal): Promise<readonly CommandDescriptor[]> {
+  async ensureReady(sessionId: SessionId, signal: AbortSignal): Promise<readonly CatalogCommand[]> {
     const entry = this.entry(sessionId)
     while (true) {
       if (entry.state === 'ready') return entry.commands

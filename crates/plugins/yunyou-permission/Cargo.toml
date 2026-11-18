@@ -1,0 +1,20 @@
+[package]
+name = "yunyou-permission"
+description = "权限审批策略插件（task-16②，池卡）：规则引擎（Tool(content) 三值分列）+L0 高危免疫清单——审批缝（yunyou-agent-loop::gate）的第一个策略卡"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+yunyou = { workspace = true }
+yunyou-agent-loop = { workspace = true }
+yunyou-util = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+schemars = "1"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+
+[lints]
+workspace = true

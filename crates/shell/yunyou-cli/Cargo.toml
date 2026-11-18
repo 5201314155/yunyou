@@ -30,6 +30,9 @@ yunyou-session = { workspace = true }
 yunyou-tools = { workspace = true }
 yunyou-system-prompt = { workspace = true }
 yunyou-agent-loop = { path = "../../core/yunyou-agent-loop" }
+yunyou-tool-archive = { workspace = true }
+yunyou-permission = { workspace = true }
+yunyou-web-search = { workspace = true }
 yunyou-retry = { path = "../../llm/yunyou-retry" }
 yunyou-sandbox = { path = "../../tools/yunyou-sandbox" }
 # 取消令牌（REPL Ctrl-C → run_turn 中断）

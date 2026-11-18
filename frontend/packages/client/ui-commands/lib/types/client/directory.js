@@ -1,4 +1,18 @@
 import { resolveCommand } from '@deepseek-ai/dsh-commands/builtin';
+/**
+ * Normalize one catalog pull across the two served shapes: the official Host
+ * array and the web.v1 envelope `{items:[…]}`. Unknown shapes drop to empty —
+ * the menu shows an honest empty catalog rather than a broken one.
+ * @param value - the Remote result value.
+ * @returns the descriptor list.
+ */
+export function normalizeCommandCatalog(value) {
+    const items = Array.isArray(value) ? value
+        : value !== null && typeof value === 'object' && Array.isArray(value.items)
+            ? value.items
+            : [];
+    return items.filter((item) => item !== null && typeof item === 'object' && typeof item.name === 'string');
+}
 /** One session key's cache cell. */
 class Entry {
     state = 'cold';

@@ -6,10 +6,11 @@
 //! tokens.json，代码零改动；本端适配层只做「翻译」（如 mono → 系统等宽栈），
 //! 不新增语义、不私设色值。
 //!
-//! v2 追加（任务40 rev10 路径）：dist/ 嵌入清单——vite 产物（frontend/apps/web/dist
-//! 同步至 crate 根 dist/，随仓库提交）在编译期生成 `dist_manifest.rs`
-//! （相对路径 → include_bytes! 静态表），业主运行时零 node。dist/ 缺席或为空
-//! 时生成空表（v1 vanilla assets 继续服务）——构建不因前端产物缺席而断。
+//! v2 追加（任务40 rev10 路径）：dist/ 嵌入清单——编译期直接消费
+//! `frontend/apps/web/dist`（vite+boot 一键链产物，相对本 crate 三级上级），生成
+//! `dist_manifest.rs`（相对路径 → include_bytes! 静态表），业主运行时零 node。
+//! 产物缺席即编译失败并给出人话指路（先跑前端构建，不再有 crate 根 dist 同步
+//! 复制链——单一落点消除「忘同步」这类静默回退缺陷）。
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -127,36 +128,38 @@ fn font_family(name: &str) -> &'static str {
     }
 }
 
-/// dist/ 嵌入清单生成：遍历 crate 根 dist/（vite 产物同步落点），产出
-/// `dist_manifest.rs`——`pub static DIST_FILES: &[(&str, &[u8])]`，路径为
-/// dist 内相对路径（`/` 前缀），字节为 include_bytes! 静态引用（生成绝对
-/// 路径：include 相对路径相对所在文件=OUT_DIR 解析，不可用）。目录缺席/
-/// 为空 = 空表（v1 vanilla 回退面继续服务，不报错）。
+/// dist/ 嵌入清单生成：直接遍历 `frontend/apps/web/dist`（vite+boot 构建唯一
+/// 落点，无 crate 根同步副本），产出 `dist_manifest.rs`——
+/// `pub static DIST_FILES: &[(&str, &[u8])]`，路径为 dist 内相对路径（`/`
+/// 前缀），字节为 include_bytes! 静态引用（生成绝对路径：include 相对路径
+/// 相对所在文件=OUT_DIR 解析，不可用）。目录缺席/为空 = 编译失败并人话指路：
+/// 静默空表会让 server 退化到 v1 vanilla 面，等于带着旧壳出门，宁断勿哑。
 fn embed_dist() {
-    let dist = PathBuf::from("dist");
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR 未设置");
+    // 本 crate 位于 <仓库根>/crates/net/yunyou-web → 三级上级=仓库根。
+    let dist = Path::new(&manifest_dir).join("../../../frontend/apps/web/dist");
+    let dist = dist
+        .canonicalize()
+        .unwrap_or_else(|err| panic!("前端产物缺失（{}）：{err}\n先在 frontend/ 下执行构建：\n  pnpm install\n  pnpm run build   # = build:client → build:web → build:boot 一键链\n完成后重新 cargo build 即可。", dist.display()));
     println!("cargo:rerun-if-changed={}", dist.display());
     let mut files: Vec<(String, PathBuf)> = Vec::new();
-    if dist.is_dir() {
-        walk_dist(&dist, Path::new(""), &mut files);
-    }
+    walk_dist(&dist, Path::new(""), &mut files);
     files.sort();
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR 未设置");
-    let mut code = String::from(
-        "// 由 yunyou-web build.rs 从 dist/ 生成——勿手改；前端产物变更后重新构建。\n",
-    );
     if files.is_empty() {
-        code.push_str("// 空=dist/ 缺席或为空：v2 前端未构建，v1 vanilla assets 回退服务。\n");
-        code.push_str("pub static DIST_FILES: &[(&str, &[u8])] = &[];\n");
-    } else {
+        panic!(
+            "前端产物目录为空（{}）：\n先在 frontend/ 下执行构建：\n  pnpm install\n  pnpm run build   # = build:client → build:web → build:boot 一键链\n完成后重新 cargo build 即可。",
+            dist.display()
+        );
+    }
+    let mut code = String::from(
+        "// 由 yunyou-web build.rs 从 frontend/apps/web/dist 生成——勿手改；前端产物变更后重新构建。\n",
+    );
+    {
         code.push_str("// v2 官方移植前端产物（相对路径 → 字节；完整产物随仓库 dist/ 提交）。\n");
         code.push_str("pub static DIST_FILES: &[(&str, &[u8])] = &[\n");
         for (rel, abs) in &files {
-            let _ = writeln!(
-                code,
-                "    (\"/{rel}\", include_bytes!(r\"{}/{}\")),",
-                manifest_dir,
-                abs.display()
-            );
+            // canonicalize 后 abs 已是绝对路径，直接交给 include_bytes!
+            let _ = writeln!(code, "    (\"/{rel}\", include_bytes!(r\"{}\")),", abs.display());
         }
         code.push_str("];\n");
     }

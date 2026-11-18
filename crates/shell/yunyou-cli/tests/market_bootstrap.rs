@@ -223,3 +223,47 @@ def main():
 if __name__ == "__main__":
     main()
 "#;
+
+/// P0 落刀锁：插件 spawn 后活着不回帧→装配限时返回 Failed（非 hang）。
+/// 沉默插件=python3 sleep（进程活、stdout 无帧）；request_timeout_ms=2000。
+#[tokio::test(flavor = "multi_thread")]
+async fn p0_沉默插件装配限时Failed非hang() {
+    let dir = tmp_dir("p0-silent");
+    let plugin_dir = write_hello_plugin(&dir, &["python3", "-c", "import time; time.sleep(60)"]);
+    let manifest_path = plugin_dir.join("manifest.toml");
+    std::fs::write(
+        &manifest_path,
+        "id = \"silent\"\nversion = \"0.1.0\"\nformat = 2\nlevel = \"market\"\ncontracts = [\"tools.v1\"]\nauto_enable = true\n\n[runtime]\ntype = \"subprocess\"\nentry = [\"python3\", \"-c\", \"import time; time.sleep(60)\"]\nrequest_timeout_ms = 2000\n",
+    )
+    .unwrap();
+    let toml_text = std::fs::read_to_string(&manifest_path).unwrap();
+    let manifest_v2 = yunyou_cli::market_manifest::parse_and_validate(&toml_text, &plugin_dir)
+        .expect("manifest 应过五类校验");
+    let proxy = yunyou_cli::proxy_plugin::ProxyPlugin {
+        manifest_v2,
+        plugin_dir: plugin_dir.clone(),
+        enforcer: None,
+        spawn_form: yunyou_cli::proxy_plugin::SpawnForm::Direct,
+        deliver: None,
+    };
+    let root = Context::new();
+    let registry: Arc<dyn RegistryService> = yunyou_tools::ToolsRegistry::new();
+    root.provide(ServiceId::of::<dyn RegistryService>(), registry.clone()).unwrap();
+    let handle = root.plugin(proxy, serde_json::json!({}));
+    // 限时护栏：修前=await_ready 永挂（15s 护栏必超）；修后=2s 超时内 Failed
+    let result = tokio::time::timeout(std::time::Duration::from_secs(15), handle.await_ready()).await;
+    match result {
+        Ok(Err(err)) => {
+            let text = err.to_string();
+            assert!(
+                text.contains("超时") && (text.contains("握手") || text.contains("工具清单")),
+                "错误应点名超时与阶段，实际：{text}"
+            );
+        }
+        Ok(Ok(())) => panic!("沉默插件不应装载成功（P0 挂死回归）"),
+        Err(_) => panic!("await_ready 超时护栏触发=装配 hang（P0 回归）"),
+    }
+    assert_eq!(handle.state(), FiberState::Failed, "应落 Failed 态");
+    let _ = root.dispose().await;
+    let _ = std::fs::remove_dir_all(&dir);
+}

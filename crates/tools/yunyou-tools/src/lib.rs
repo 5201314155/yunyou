@@ -21,6 +21,10 @@ pub mod sandbox;
 pub mod executor;
 pub mod plugin;
 pub mod registry;
+// task-20 后台任务批（他席在途，yun-ya 机械补声明）：builtin/bash.rs 已消费
+// crate::tasks::{kill_process_group,OutputSink,TaskRegistry,TaskState}，模块
+// 文件在位但漏挂 lib——补声明接通编译，语义归承办席
+pub mod tasks;
 
 pub use contract::{ToolDefinition, ToolError, ToolExec, ToolOutcome};
 pub use plugin::{ToolsConfig, ToolsPlugin};

@@ -76,6 +76,10 @@ pub(crate) fn file_error(path: &Path, what: &str, err: std::io::Error) -> Cordis
 }
 
 impl SessionStore for JsonlStore {
+    fn path(&self) -> Option<&std::path::Path> {
+        Some(self.inner.path.as_path())
+    }
+
     fn append(&self, event: &SessionEvent) -> BoxFut<'static, Result<()>> {
         let inner = self.inner.clone();
         // 序列化前移（task-36①a，挑刺 P3-1a）：序列化在同步段完成（&event 引用

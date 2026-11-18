@@ -4,9 +4,9 @@ export declare const en: {
     readonly pin: "Pin {name} to sidebar";
     readonly install: "Browse other plugins";
     readonly create: "Create your plugin";
-    readonly 'createPrompt.sidebar': "Create a DSH plugin with a left sidebar entry.";
-    readonly 'createPrompt.conversation': "Create a DSH conversation view plugin.";
-    readonly 'createPrompt.rightbar': "Create a DSH plugin with a right sidebar entry.";
+    readonly 'createPrompt.sidebar': "Create a YunYou plugin with a left sidebar entry.";
+    readonly 'createPrompt.conversation': "Create a YunYou conversation view plugin.";
+    readonly 'createPrompt.rightbar': "Create a YunYou plugin with a right sidebar entry.";
 };
 /** Chinese counterpart of the entry-customization dictionary. */
 export declare const zh: Record<keyof typeof en, string>;

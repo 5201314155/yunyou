@@ -86,12 +86,14 @@ impl ToolDefinition for BareProbe {
 #[test]
 fn schemas白名单只投三元组且元数据零出现() {
     let registry = ToolsRegistry::new();
-    for tool in builtin_tools(Arc::from(Path::new(".")), None) {
+    // task-20：默认装配形态=后台注册表在位（三管理工具注册进模型面）
+    let background = Some((Arc::new(yunyou_tools::tasks::TaskRegistry::new()), 60u64));
+    for tool in builtin_tools(Arc::from(Path::new(".")), None, background) {
         registry.register(tool).expect("内置工具注册");
     }
     registry.register(Arc::new(FullProbe)).expect("探针注册");
     let schemas = registry.schemas();
-    assert_eq!(schemas.len(), 8, "六内置＋探针＋新注册面（演进随批对齐实测）");
+    assert_eq!(schemas.len(), 11, "十内置（bash/read/write/edit/glob/grep/apply_patch/task_output/task_stop/task_list）＋探针（task-20 后台三工具演进随批对齐实测）");
     for schema in &schemas {
         let json = serde_json::to_value(schema).expect("schema 可序列化");
         let mut keys: Vec<&str> = json.as_object().expect("schema 为对象").keys().map(String::as_str).collect();
@@ -166,7 +168,7 @@ fn output_schema收敛纪律() {
     assert!(source.contains("新工具必须覆盖本方法"), "「S4 后新工具必填」声明缺失");
     // 我辖区五内置工具已填 output_schema 作示范（bash 归云铠辖区，不代不断言）
     let mine = ["read", "write", "edit", "glob", "grep"];
-    let tools = builtin_tools(Arc::from(Path::new(".")), None);
+    let tools = builtin_tools(Arc::from(Path::new(".")), None, None);
     let mut filled = 0;
     for tool in &tools {
         if !mine.contains(&tool.name()) {

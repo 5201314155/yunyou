@@ -28,6 +28,7 @@
 
 mod bridge;
 mod commands;
+mod contract;
 mod dist;
 mod error;
 mod gateway;
@@ -35,11 +36,15 @@ mod instance;
 mod observer;
 mod protocol;
 mod rpc;
+mod rpc_session;
+mod rpc_commands;
 mod server;
 mod sessions;
 mod token;
 mod turns;
 mod wire;
+mod wire_frames;
+mod wire_session;
 mod ws;
 
 pub use error::WebError;

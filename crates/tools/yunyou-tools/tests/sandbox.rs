@@ -16,7 +16,7 @@ fn exec() -> ToolExec {
 async fn 降级路径_meta标注sandboxed_false() {
     let dir = std::env::temp_dir().join(format!("sbx-none-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    let tool = BashTool { cwd: Arc::new(CwdService::new(&dir)), enforcer: None };
+    let tool = BashTool { cwd: Arc::new(CwdService::new(&dir)), enforcer: None, tasks: None, background_after_secs: 60 };
     let outcome = tool
         .execute(serde_json::json!({"cmd": "echo plain"}), exec())
         .await;

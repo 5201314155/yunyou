@@ -29,7 +29,8 @@ pub(crate) fn lock_state(state: &Mutex<WireState>) -> std::sync::MutexGuard<'_, 
 /// wire 桥单例：广播端（mux 连接订阅）+ 状态机（临界区无 await，std 锁）。
 pub(crate) struct WireBridge {
     state: Mutex<WireState>,
-    frames: broadcast::Sender<(StreamKind, Arc<Value>)>,
+    /// 下行帧流：流别 + 会话标签（Session 帧带活跃会话 id 供定向；其余 None）。
+    frames: broadcast::Sender<(StreamKind, Option<String>, Arc<Value>)>,
 }
 
 impl WireBridge {
@@ -40,7 +41,7 @@ impl WireBridge {
     }
 
     /// mux 订阅端（每条 mux 连接一个；无订阅者时事件安全丢弃）。
-    pub(crate) fn subscribe(&self) -> broadcast::Receiver<(StreamKind, Arc<Value>)> {
+    pub(crate) fn subscribe(&self) -> broadcast::Receiver<(StreamKind, Option<String>, Arc<Value>)> {
         self.frames.subscribe()
     }
 
@@ -49,17 +50,20 @@ impl WireBridge {
     pub(crate) fn push(&self, msg: &ServerMessage) -> usize {
         let (frames, control) = {
             let mut state = lock_state(&self.state);
-            let frames = state.apply(msg);
-            let control = std::mem::take(&mut state.control_out);
-            (frames, control)
+            state.apply(msg)
         };
         let count = frames.len();
+        // 会话标签：活跃会话 id（apply 恒打活跃会话——单会话现态唯一产出源）
+        let tag = {
+            let state = lock_state(&self.state);
+            state.active_session_id()
+        };
         for frame in frames {
             // 无订阅者=无人看 follow 流，安全丢弃
-            let _ = self.frames.send((StreamKind::Session, Arc::new(frame)));
+            let _ = self.frames.send((StreamKind::Session, tag.clone(), Arc::new(frame)));
         }
         for frame in control {
-            let _ = self.frames.send((StreamKind::Control, Arc::new(frame)));
+            let _ = self.frames.send((StreamKind::Control, None, Arc::new(frame)));
         }
         count
     }
@@ -82,17 +86,15 @@ impl WireBridge {
     pub(crate) fn create_session(&self, requested: Option<&str>) -> String {
         let upsert = {
             let mut state = lock_state(&self.state);
-            if let Some(existing) = &state.session_id {
-                return existing.clone();
+            // 已铸=复用（现有会话 id 原样返回，不重铸）
+            let existing = state.session_ids().into_iter().next();
+            if let Some(existing) = existing {
+                return existing;
             }
-            let id = match requested {
-                Some(id) if !id.is_empty() => id.to_string(),
-                _ => uuid::Uuid::new_v4().to_string(),
-            };
-            state.session_id = Some(id.clone());
+            let id = state.create_session(requested);
             // 首铸 upsert（元数据在位才发；无元数据=无 workspace 流开过，缺省无害）
             state.workspace_meta.as_ref().map(|(workspace_id, path, title)| {
-                let now = crate::wire::now_ms();
+                let now = crate::wire_frames::now_ms();
                 json!({
                     "type": "upsert",
                     "workspace": {
@@ -104,9 +106,19 @@ impl WireBridge {
             })
         };
         if let Some(frame) = upsert {
-            let _ = self.frames.send((StreamKind::Workspace, Arc::new(frame)));
+            let _ = self.frames.send((StreamKind::Workspace, None, Arc::new(frame)));
         }
-        lock_state(&self.state).session_id.clone().unwrap_or_default()
+        lock_state(&self.state).session_ids().into_iter().next().unwrap_or_default()
+    }
+
+    /// 会话打开（session/open，多会话步 2）：切活跃+灌历史（load 在锁外
+    /// 完成，锁内只做纯状态操作）。返回 (灌入, 跳过)。
+    pub(crate) fn open_session(
+        &self,
+        id: &str,
+        events: &[yunyou_session::SessionEvent],
+    ) -> (usize, usize) {
+        lock_state(&self.state).open_session(id, events)
     }
 
     /// 工作区稳定 id（同进程恒一；sessionIds 变更靠 upsert/重开流重取基线）。
@@ -119,18 +131,18 @@ impl WireBridge {
 
     /// 当前会话 ids（workspace 基线 sessionIds 用；单会话=0 或 1 个）。
     pub(crate) fn session_ids(&self) -> Vec<String> {
-        lock_state(&self.state).session_id.iter().cloned().collect()
+        lock_state(&self.state).session_ids()
     }
 
     /// 登记 prompt requestId（echo 对账；下一条 user/message 消费后即清）。
     pub(crate) fn set_request_id(&self, request_id: Option<String>) {
-        lock_state(&self.state).request_id = request_id;
+        lock_state(&self.state).set_request_id(request_id);
     }
 
     /// 最近登记的 requestId（测试观测用；生产面经 user/message echo 消费）。
     #[cfg(test)]
     pub(crate) fn request_id(&self) -> Option<String> {
-        lock_state(&self.state).request_id.clone()
+        lock_state(&self.state).active_ref().and_then(|w| w.request_id.clone())
     }
 
     /// follow 快照（mux open session/follow 的 opening item 值）：

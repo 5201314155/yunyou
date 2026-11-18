@@ -70,10 +70,46 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 /** One session's catalog fetch: the shared promise plus its own abort handle. */
 interface CatalogFetch {
-  readonly promise: Promise<readonly SkillEntry[]>
+  readonly promise: Promise<readonly SkillCatalogEntry[]>
   readonly abort: AbortController
   /** Settled catalog for synchronous lexicon reads (unset while in flight or on failure). */
-  settled?: readonly SkillEntry[]
+  settled?: readonly SkillCatalogEntry[]
+}
+
+/** A catalog entry with the web.v1 §3 source layer when the catalog serves it. */
+type SkillCatalogEntry = SkillEntry & {
+  readonly source?: 'builtin' | 'project' | 'plugin'
+}
+
+/**
+ * Normalize one catalog pull across the official `{skills:[…]}` face and the
+ * web.v1 `{items:[{id,name,description,source}]}` face (§9.2). Unknown shapes
+ * drop to an honest empty catalog.
+ * @param value - the Remote result value.
+ * @returns the entry list.
+ */
+function normalizeSkillCatalog(value: unknown): readonly SkillCatalogEntry[] {
+  const items = value !== null && typeof value === 'object' && Array.isArray((value as { skills?: unknown }).skills)
+    ? (value as { skills: unknown[] }).skills
+    : value !== null && typeof value === 'object' && Array.isArray((value as { items?: unknown }).items)
+      ? (value as { items: unknown[] }).items
+      : []
+  return items.flatMap((item): SkillCatalogEntry[] => {
+    if (item === null || typeof item !== 'object') return []
+    const record = item as Record<string, unknown>
+    const name = typeof record.name === 'string' && record.name !== '' ? record.name
+      : typeof record.id === 'string' ? record.id : undefined
+    if (name === undefined) return []
+    const source = record.source === 'builtin' || record.source === 'project' || record.source === 'plugin'
+      ? record.source
+      : undefined
+    return [{
+      name,
+      description: typeof record.description === 'string' ? record.description : '',
+      modelInvocable: false,
+      ...(source !== undefined ? { source } : {}),
+    }]
+  })
 }
 
 /** Required services: reference source faces plus the tool-row and locale registries. */
@@ -129,7 +165,7 @@ export function apply(ctx: ClientContext): void {
         const result = await skills.list({ sessionId }, abort.signal)
         abort.signal.throwIfAborted()
         if (!result.ok) throw new Error(`skills/list failed: ${result.error.code}: ${result.error.message}`)
-        return result.value.skills
+        return normalizeSkillCatalog(result.value)
       })
     })()
     const entry: CatalogFetch = { promise, abort }
@@ -180,7 +216,10 @@ export function apply(ctx: ClientContext): void {
           name: skill.name,
           // The user-only marker rides the description (the menu's only
           // secondary text); `hint` is the claim-state ghost text, not a badge.
-          description: skill.modelInvocable ? skill.description : `${t('menu.userOnly')} · ${skill.description}`,
+          // The web.v1 source layer joins the same slot when served (§3).
+          description: `${skill.modelInvocable ? '' : `${t('menu.userOnly')} · `}${
+            skill.source !== undefined ? `${t(`menu.source.${skill.source}` as SkillKey)} · ` : ''
+          }${skill.description}`,
         }))
     },
     warm(session) {

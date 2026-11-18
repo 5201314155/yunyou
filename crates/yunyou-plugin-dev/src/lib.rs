@@ -26,7 +26,7 @@ pub mod validate;
 
 use yunyou::{PluginLevel, PluginManifest, projection_of};
 use yunyou_tools::contract::ToolDefinition;
-use yunyou_tools::plugin::ToolsRegistry;
+use yunyou_tools::registry::ToolsRegistry; // task-77：registry 直路径（plugin.rs 私有 use 非 re-export）
 use yunyou_tools::registry::RegistryService;
 use yunyou_util::BoxFut;
 

@@ -103,6 +103,19 @@ export const InputBar = memo(function InputBar({ useSession, useInput, inputActi
             showToast(t('error.sessionInUse'));
             return;
         }
+        // The turn gate is a normal state, not a malfunction: the human-readable
+        // copy stands alone (no diagnostic suffix) and the draft stays for resubmit.
+        // The codes widen to string: the web.v1 contract adds codes beyond the
+        // official Remote failure union.
+        const code = error.code;
+        if (code === 'session/agent-busy') {
+            showToast(t('error.agentBusy'));
+            return;
+        }
+        if (code === 'session/no-active-turn') {
+            showToast(t('error.noActiveTurn'));
+            return;
+        }
         showToast(error.code === 'session/attachment-invalid' || error.code === 'subagent/attachment-invalid'
             ? attachmentErrorText(t, error.details.reason, imageLimits)
             : `${error.message} (${error.code})`);
