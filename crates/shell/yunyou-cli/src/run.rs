@@ -185,7 +185,7 @@ pub async fn run(command: crate::cli::Cli) -> Result<(), AppError> {
     }
 
     // ③ §2.5 装配序列（失败路径内部已整树卸干净；home 供会话缺省路径补值）
-    let assembled = assemble::assemble(&config, &home, &config_path).await?;
+    let mut assembled = assemble::assemble(&config, &home, &config_path).await?;
 
     // ③-b 插件状态表（方案 §2.4 第 5 步观测面；任务 30-⑤ 启动净化：--verbose 才出）
     if command.verbose {
@@ -328,7 +328,11 @@ pub async fn run(command: crate::cli::Cli) -> Result<(), AppError> {
                 yunyou_web::serve(params).await.map_err(|err| AppError::Assemble(err.to_string()))
             }
             Some(cli::Command::Plugin { .. }) => unreachable!("plugin 子命令已于 ⓪ 早分派直返"),
-            None => repl::run_repl(slot, shell, render_config.clone()).await,
+            None => {
+                // 定时注入接收端（proto v1.1 真投递）：market 插件到期→lineedit 注入臂
+                let scheduled_rx = assembled.scheduled_rx.take();
+                repl::run_repl(slot, shell, render_config.clone(), scheduled_rx).await
+            }
         },
     };
 

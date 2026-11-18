@@ -35,6 +35,8 @@ members = [
     "sdk/yunyou-plugin-sdk",
     # task-10（云_gen）：hello-sdk 自举示例（SDK 写→独立编译→install→spawn→真调用）
     "sdk/examples/hello-sdk",
+    # task-14（云_gen）：scheduler 三工具样板（真投递随 proto v1.1）
+    "sdk/examples/scheduler",
     # K-2/①② 共享（云愈骨架+云刺 scaffold）：插件开发工具族（contract_read/validate/scaffold）
     "crates/yunyou-plugin-dev",
     "crates/team/yunyou-team-launcher",

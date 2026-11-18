@@ -12,6 +12,9 @@
 /// 删行+增行；path 由调用方按文件归属另记，本模块单文件语义）。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LineHunk {
+    /// 变更区在旧文的起始行号（1-based；批 5 gutter 行号列数据面——
+    /// Fallback 单 hunk=1，整段语义仍成立）。
+    pub old_start: usize,
     /// 上下文行数（渲染为 ⋮ 上下文 N 行；与上一变更区共享的未变行）。
     pub context: usize,
     /// 删行（旧文独有，按原序）。
@@ -59,6 +62,7 @@ pub fn diff_hunks(old: &str, new: &str) -> Vec<LineHunk> {
             // context=与上一变更区的共享行数（cap 2）；首个 hunk 无上邻=0
             let context = if hunks.is_empty() { 0 } else { gap_shared.len().min(2) };
             hunks.push(LineHunk {
+                old_start: prev_a + 1, // 1-based（prev_a=本变更区前已消费的 a 行数）
                 context,
                 removed: del.iter().map(|s| (*s).to_string()).collect(),
                 added: add.iter().map(|s| (*s).to_string()).collect(),
@@ -74,6 +78,7 @@ pub fn diff_hunks(old: &str, new: &str) -> Vec<LineHunk> {
         // 有变更但 hunk 空=护栏退化路径（pairs 全空时上面循环会产出一个
         // 整段 hunk，不会到这）；防御兜底：整段删/加。
         hunks.push(LineHunk {
+            old_start: 1,
             context: 0,
             removed: a.iter().map(|s| (*s).to_string()).collect(),
             added: b.iter().map(|s| (*s).to_string()).collect(),
@@ -121,6 +126,7 @@ mod tests {
         let hunks = diff_hunks("let x = 1;\n", "let x = 2;\n");
         assert_eq!(hunks.len(), 1);
         assert_eq!(hunks[0].context, 0);
+        assert_eq!(hunks[0].old_start, 1, "首行变更 old_start=1");
         assert_eq!(hunks[0].removed, vec!["let x = 1;"]);
         assert_eq!(hunks[0].added, vec!["let x = 2;"]);
     }
@@ -144,6 +150,7 @@ mod tests {
         assert_eq!(hunks.len(), 2, "间隔 >2 行应各自成 hunk：{hunks:?}");
         assert_eq!(hunks[0].removed, vec!["X"]);
         assert_eq!(hunks[1].removed, vec!["Y"]);
+        assert_eq!(hunks[1].old_start, 9, "第二变更区=旧文第 9 行（批 5 gutter）");
         assert_eq!(hunks[1].context, 2, "hunk 间 6 行共享按 cap 2 计：{hunks:?}");
     }
 

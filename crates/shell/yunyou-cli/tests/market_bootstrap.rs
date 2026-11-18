@@ -108,6 +108,7 @@ async fn p6_6_python插件端到端() {
         // 沙箱链由 task-24 forked 探针独立验证；协议链全通为本场验收面）
         enforcer: None,
         spawn_form: yunyou_cli::proxy_plugin::SpawnForm::Direct,
+            deliver: None,
     };
     let root = Context::new();
     let registry: Arc<dyn RegistryService> = yunyou_tools::ToolsRegistry::new();

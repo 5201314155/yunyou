@@ -363,6 +363,7 @@ pub async fn run_repl(
     slot: Arc<SessionSlot>,
     shell: Arc<ShellCore>,
     render: RenderConfig,
+    mut scheduled_rx: Option<tokio::sync::mpsc::Receiver<String>>,
 ) -> Result<(), AppError> {
     let mut pending_expand: Option<String> = None;
     // task-73 A1：会话级 cbreak（ICANON off+ISIG 保留——信号安全留内核，裁决
@@ -395,7 +396,9 @@ pub async fn run_repl(
             width: crate::panel_text::TERMINAL_WIDTH,
         };
         let input = if render.interactive {
-            editor.read_line(pending_expand.take()).await
+            editor
+                .read_line(pending_expand.take(), scheduled_rx.as_mut())
+                .await
         } else {
             // 非交互保持既有行为：逐行前打提示符（剥色档无 ANSI，符号保留）
             print!("{}", prompt_string(render.profile));

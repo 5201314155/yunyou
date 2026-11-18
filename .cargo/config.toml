@@ -1,3 +1,9 @@
+# 共享构建缓存（多会话并行：增量互相复用五份变一份。清理=rm -rf 该目录）
+[build]
+target-dir = "/home/wu/agent/.cargo-target"
+
+# aarch64 交叉编译（ARM 版发布：0eb19f3f 引入，d10132c50 误覆盖本段已并回——
+# 并行改本文件必须先 git pull 对齐，违者按写审分离事故论处）
 [target.aarch64-unknown-linux-gnu]
 linker = "aarch64-linux-gnu-gcc"
 env = { "CC_aarch64_unknown_linux_gnu" = "aarch64-linux-gnu-gcc", "AR_aarch64_unknown_linux_gnu" = "aarch64-linux-gnu-ar" }

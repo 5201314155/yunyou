@@ -263,7 +263,27 @@ impl ToolDefinition for EditTool {
                 1 => {
                     let updated = text.replacen(old, new, 1);
                     match crate::builtin::write_verify::write_verified(&full, updated.as_bytes()).await {
-                        Ok(_on_disk) => ToolOutcome::ok(serde_json::json!({
+                        Ok(_on_disk) => {
+                            // 批 5（gutter 数据面）：hunk 行号=文件内 1-based——
+                            // 定位 old 唯一匹配前的行数（文件偏移）+ 行内 diff 行号
+                            let structured_patch: Vec<serde_json::Value> = {
+                                let offset = text
+                                    .find(old)
+                                    .map(|pos| text[..pos].lines().count())
+                                    .unwrap_or(0);
+                                crate::builtin::line_diff::diff_hunks(old, new)
+                                    .iter()
+                                    .map(|h| {
+                                        serde_json::json!({
+                                            "old_start": offset + h.old_start,
+                                            "context": h.context,
+                                            "removed": h.removed,
+                                            "added": h.added,
+                                        })
+                                    })
+                                    .collect()
+                            };
+                            ToolOutcome::ok(serde_json::json!({
                             "replaced": 1,
                             "path": full.display().to_string(),
                             // task-55 阶段 B：diff 数据面上抛——旧文/新文随 outcome
@@ -276,15 +296,9 @@ impl ToolDefinition for EditTool {
                             // 上抛——行级 LCS diff（line_diff 纯函数），替代 cli
                             // 侧「旧整段删/新整段加」伪 diff。加法演进：旧消费者
                             // 缺键零影响；超限退 Fallback 由 line_diff 护栏承担。
-                            "structuredPatch": crate::builtin::line_diff::diff_hunks(old, new)
-                                .iter()
-                                .map(|h| serde_json::json!({
-                                    "context": h.context,
-                                    "removed": h.removed,
-                                    "added": h.added,
-                                }))
-                                .collect::<Vec<_>>(),
-                        })),
+                            "structuredPatch": structured_patch,
+                            }))
+                        }
                         Err(err) => ToolOutcome::err(
                             "tool/io",
                             format!("写回失败：{}（{err}）", full.display()),

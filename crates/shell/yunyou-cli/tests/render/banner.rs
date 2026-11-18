@@ -12,16 +12,17 @@ fn 横幅_大字版_宽终端() {
     r.banner("z-ai/glm-5.3-flash", "/tmp/sessions/default.jsonl", None, true).unwrap();
     let text = String::from_utf8(r.into_output()).unwrap();
     let lines: Vec<&str> = text.lines().collect();
-    assert_eq!(lines.len(), 11, "大字版 B 案 11 行=LOGO3+空+品牌1+信息2+空+Tips3：{text:?}");
-    assert!(lines[0].contains('█') && lines[0].contains("\x1b[38;5;67m"), "LOGO 上段块字+主色 67：{}", lines[0]);
-    assert!(lines[1].contains("\x1b[38;5;110m"), "LOGO 中段 110：{}", lines[1]);
-    assert!(lines[2].contains("\x1b[38;5;74m"), "LOGO 下段亮青 74：{}", lines[2]);
-    assert!(lines[4].contains("云悠 yunyou"), "品牌行（B 案精简无☁）：{}", lines[4]);
-    assert!(lines[5].contains("模型 z-ai/glm-5.3-flash"), "模型行独立（拆行防窄屏折行）：{}", lines[5]);
-    assert!(lines[6].contains("会话 /tmp/sessions/default.jsonl"), "会话行独立：{}", lines[6]);
-    assert!(lines[8].contains("直接说需求"), "Tips 一：{}", lines[8]);
-    assert!(lines[9].contains("会话自动落盘"), "Tips 二：{}", lines[9]);
-    assert!(lines[10].contains("/quit") && lines[10].contains("Ctrl-C"), "Tips 三（退出可承诺）：{}", lines[10]);
+    // task-69 终版：大版 15 行=矩阵字模 7+空+品牌 1+信息 2+空+Tips 3
+    assert_eq!(lines.len(), 15, "大版 15 行（矩阵字模 7 行）：{text:?}");
+    assert!(lines[0].contains('█') && lines[0].contains("\x1b[38;5;67m"), "字模上段主色 67：{}", lines[0]);
+    assert!(lines[3].contains("\x1b[38;5;110m"), "字模中段 110：{}", lines[3]);
+    assert!(lines[6].contains("\x1b[38;5;74m"), "字模下段亮青 74：{}", lines[6]);
+    assert!(lines[8].contains("☁") && lines[8].contains("云悠 yunyou"), "中文主品牌行（☁+粗体+定位语=业主定稿）：{}", lines[8]);
+    assert!(lines[9].contains("模型 z-ai/glm-5.3-flash"), "模型行独立：{}", lines[9]);
+    assert!(lines[10].contains("会话 /tmp/sessions/default.jsonl"), "会话行独立：{}", lines[10]);
+    assert!(lines[12].contains("直接说需求"), "Tips 一：{}", lines[12]);
+    assert!(lines[13].contains("会话自动落盘"), "Tips 二：{}", lines[13]);
+    assert!(lines[14].contains("/quit") && lines[14].contains("Ctrl-C"), "Tips 三：{}", lines[14]);
     assert!(!text.contains("/help"), "未上线命令不得宣称：{text:?}");
     assert!(!text.contains('\r') && !text.contains("\x1b[K"), "横幅逐行落定零重绘（§5 不闪不动）：{text:?}");
     assert_no_forbidden_ansi(text.as_bytes());
@@ -32,10 +33,16 @@ fn 横幅_大字版_宽终端() {
 /// 意义）；唯一底稿=docs/设计/演示/task-69-样稿/B-Full-100.txt 真字节。
 #[test]
 fn 横幅_logo字模快照_三行独立字面() {
-    const SNAPSHOT: [&str; 3] = [
-        "█▀█ █  █ █ ▀ █ █▀█ ▄▄▄ █  █",
-        "█ █ █  █ ██ █ █▀▄ █   █ ██",
-        "▀ ▀ ▀▀▀ █  █  ▀█▀  ▀▀▀ ▀██",
+    // task-69 终版：yun 矩阵拼装七行**独立字面**锁死（与 banner.rs 常量物理
+    // 分离防同漂；Y=lead 示范件 6×7，u/n x-height 4 行+▄出脚；容器 22 列）
+    const SNAPSHOT: [&str; 7] = [
+        "█   █",
+        "█   █",
+        "█████",
+        " ███    █    █  ██████",
+        "  █     █    █  █    █",
+        "  █     █    █  █    █",
+        " ███    ▄▄▄▄▄▄  ▄    ▄",
     ];
     let mut r = full();
     r.set_width(80);
@@ -44,22 +51,12 @@ fn 横幅_logo字模快照_三行独立字面() {
     let clean = strip_ansi(&text);
     let lines: Vec<&str> = clean.lines().collect();
     for (idx, row) in SNAPSHOT.iter().enumerate() {
-        assert_eq!(
-            lines[idx].trim_end(),
-            format!("  {row}").trim_end(),
-            "LOGO 第 {} 行快照漂移（task-69 B 案防改线）：{}",
+        let rendered = lines[idx].trim_end();
+        assert!(
+            rendered.ends_with(row),
+            "字模第 {} 行快照漂移（矩阵拼装防改线；前导=居中 pad）：{:?} 应以 {:?} 结尾",
             idx + 1,
-            lines[idx]
-        );
-    }
-    // B 案三行宽实测锁死（27/26/27 列）——底稿真字节等宽
-    let expect_widths = [27usize, 26, 26];
-    for (idx, row) in SNAPSHOT.iter().enumerate() {
-        assert_eq!(
-            yunyou_cli::render::tool::visible_width(row),
-            expect_widths[idx],
-            "LOGO 第 {} 行宽漂移：{:?}",
-            idx + 1,
+            rendered,
             row
         );
     }
@@ -115,9 +112,9 @@ fn banner_凭据提示行条件渲染() {
     r.banner("z-ai/glm-5.3-flash", "/tmp/sessions/default.jsonl", Some(NOTICE), true).unwrap();
     let text = String::from_utf8(r.into_output()).unwrap();
     let lines: Vec<&str> = text.lines().collect();
-    assert_eq!(lines.len(), 12, "大字版 11 行+提示 1 行：{text:?}");
-    assert!(lines[11].contains(NOTICE), "提示行应含文案：{}", lines[11]);
-    assert!(lines[10].contains("/quit"), "提示行应在 Tips 三之后：{}", lines[10]);
+    assert_eq!(lines.len(), 16, "大版 15 行+提示 1 行：{text:?}");
+    assert!(lines[15].contains(NOTICE), "提示行应含文案：{}", lines[15]);
+    assert!(lines[14].contains("/quit"), "提示行应在 Tips 三之后：{}", lines[14]);
     assert!(!text.contains('\r') && !text.contains("\x1b[K"), "提示行零重绘（§5 不闪不动）：{text:?}");
     // 单行版（<40 列）：3 行 + 提示 1 行 = 4 行；窄幅截断护栏生效（宁截断不折行，头部保留）
     let mut r = plain();
@@ -131,11 +128,11 @@ fn banner_凭据提示行条件渲染() {
         yunyou_cli::render::tool::visible_width(lines[3]) <= 39,
         "窄幅截断到列宽内：{}", lines[3]
     );
-    // None：两版均零增量（大字版 B 案 11 行、单行版 3 行）
+    // None：两版均零增量（大版矩阵字模 15 行、单行版 3 行）
     let mut r = full();
     r.set_width(80);
     r.banner("z-ai/glm-5.3-flash", "/tmp/sessions/default.jsonl", None, true).unwrap();
-    assert_eq!(String::from_utf8(r.into_output()).unwrap().lines().count(), 11);
+    assert_eq!(String::from_utf8(r.into_output()).unwrap().lines().count(), 15);
     // 截断护栏：超长提示（含长路径）宁截断不折行——可见宽 ≤ 列宽
     let long_notice = format!("API key 未配置：在 {}.yunyou/yunyou.toml 写 api_key（详见 --help）", "x".repeat(120));
     let mut r = full();

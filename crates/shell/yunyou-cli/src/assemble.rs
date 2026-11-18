@@ -56,6 +56,9 @@ pub struct Assembled {
     /// 插件状态行（id/version/enabled/state，方案 §2.4 第 5 步数据面；
     /// 宿主经 `--verbose` 门控渲染输出，REPL `/plugins` 二期同源消费）。
     pub plugin_status: Vec<PluginStatus>,
+    /// 定时注入接收端（proto v1.1 真投递，task-14 续）：market 插件 DeliverMessage
+    /// → 回调 tx → REPL lineedit 注入臂（回合边界排队投递同律）。无 market 插件=None。
+    pub scheduled_rx: Option<tokio::sync::mpsc::Receiver<String>>,
 }
 
 /// 表驱动装配（方案 §2.4 五步）：任一启用插件装载失败/校验违例 → 整树逆序卸载
@@ -135,18 +138,37 @@ pub async fn assemble(
         rows.push(status);
     }
 
+    // 定时注入通道（proto v1.1 真投递）：tx 给 market 回调闭包，rx 交 REPL
+    // lineedit 注入臂（回合边界排队投递同律——回合中到期=回合结束回到读行时注入）
+    let (scheduled_tx, scheduled_rx) = tokio::sync::mpsc::channel::<String>(64);
+    let deliver_slot: Option<std::sync::Arc<
+        dyn Fn(Option<String>, String) -> Result<String, String> + Send + Sync,
+    >> = Some(std::sync::Arc::new(move |session_id, text| {
+        match session_id {
+            // v1 路由=当前会话（session_id=None）；显式会话路由候会话恢复面
+            // try_send（非 blocking）：回调可能跑在 tokio worker（proxy 读泵 spawn
+            // 上下文），blocking_send 会 panic；容量 64 满=人话失败（miss 顺延语义）
+            None => scheduled_tx
+                .try_send(format!("[定时触发] {text}"))
+                .map(|_| "已入当前会话注入队列（回合边界投递）".to_string())
+                .map_err(|err| format!("注入队列满或已关闭（按 miss 策略顺延）：{err}")),
+            Some(sid) => Err(format!(
+                "会话级路由（{sid}）v1 未开放——durable 会话投递=S4 批次"
+            )),
+        }
+    }));
     // 装载器 L1 未命中收口（设计 §3/§4 + task-10/K-19 刀2 market 分支）：
     // v2 market 声明（format=2+level=market）→ ProxyPlugin 子进程装载（spawn+握手
     // +tools_list+代理注册）；失败=单插件 Failed 不拖累其他插件（§4.4 语义差异）；
     // 其余未命中（v1 声明）保留 unsupported 诊断。
-    load_market_plugins(&root, &unmatched, config, &mut rows).await;
+    load_market_plugins(&root, &unmatched, config, &mut rows, &deliver_slot).await;
 
     // ⑤ 插件状态数据随装配产物交宿主（方案 §2.4 第 5 步；任务 30-⑤ 启动净化：
     // 打印由 run.rs 按 --verbose 门控，装配层只产数据不产输出）
 
     // manifest_ui 配对校验（任务29 C4）：循环外统一查（时序稳定，见函数文档）。
     verify_manifest_ui_commands(&root);
-    Ok(Assembled { root, agent_loop, plugin_status: rows })
+    Ok(Assembled { root, agent_loop, plugin_status: rows, scheduled_rx: Some(scheduled_rx) })
 }
 
 /// 单插件装载编排（原 assemble 循环体，行数清偿批 task-22 拆出；零行为变更）：
@@ -296,6 +318,9 @@ async fn load_market_plugins(
     unmatched: &[&yunyou_config::DiscoveredPlugin],
     config: &DshConfig,
     rows: &mut Vec<PluginStatus>,
+    deliver_slot: &Option<std::sync::Arc<
+        dyn Fn(Option<String>, String) -> Result<String, String> + Send + Sync,
+    >>,
 ) {
     for d in unmatched {
         let is_v2_market =
@@ -370,6 +395,7 @@ async fn load_market_plugins(
             plugin_dir,
             enforcer,
             spawn_form: crate::proxy_plugin::SpawnForm::Sandboxed,
+            deliver: deliver_slot.clone(),
         };
         let name = d.id.clone();
         let version = d.file.version.clone();

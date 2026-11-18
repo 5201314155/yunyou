@@ -255,7 +255,8 @@ impl ToolDefinition for TaskListTool {
         "team_task_list"
     }
     fn description(&self) -> &str {
-        "列出共享任务板全部任务（号/标题/状态/负责人）。"
+        "列出共享任务板全部任务（号/标题/状态/负责人）。\
+         流转自动通知：submit 后自动送审 lead；approve 后自动解锁通知被阻塞任务的 owner——均由系统发出（system 类消息），无需人工代发。"
     }
     fn parameters(&self) -> Value {
         json!({"type": "object", "properties": {}})

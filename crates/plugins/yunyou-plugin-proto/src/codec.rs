@@ -23,6 +23,39 @@ mod tests {
     use super::*;
     use crate::messages::*;
 
+    /// v1.1 投递对往返无损（加法演进；旧端未知标签=拒——本端双向兼容）。
+    #[test]
+    fn 投递对往返无损() {
+        let frames = vec![
+            PluginProtoFrame::DeliverMessage(DeliverMessage {
+                deliver_id: "dlv-1".into(),
+                session_id: None,
+                text: "[定时触发 sched-x] 提醒".into(),
+            }),
+            PluginProtoFrame::DeliverMessage(DeliverMessage {
+                deliver_id: "dlv-2".into(),
+                session_id: Some("sess-1".into()),
+                text: "会话级".into(),
+            }),
+            PluginProtoFrame::DeliverAck(DeliverAck {
+                deliver_id: "dlv-1".into(),
+                ok: true,
+                detail: "已入当前会话注入队列".into(),
+            }),
+            PluginProtoFrame::DeliverAck(DeliverAck {
+                deliver_id: "dlv-3".into(),
+                ok: false,
+                detail: "注入队列投递失败".into(),
+            }),
+        ];
+        for frame in frames {
+            let line = encode_frame(&frame).unwrap();
+            assert!(!line.contains('\n'));
+            let decoded = decode_frame(&line).unwrap();
+            assert_eq!(decoded, frame, "往返无损: {line}");
+        }
+    }
+
     /// 八变体全量往返无损（MVP 词汇全覆盖；单行形态）。
     #[test]
     fn 八变体全量往返无损() {

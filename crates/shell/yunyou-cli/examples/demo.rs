@@ -173,6 +173,7 @@ fn main() -> std::io::Result<()> {
             removed: 1,
             hunks: vec![DiffHunk {
                 path: None,
+                old_start: None,
                 removed: vec!["# YunYou Agent".into()],
                 added: vec!["# 云悠 YunYou".into()],
                 context_lines: 2,

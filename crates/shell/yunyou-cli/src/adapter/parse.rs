@@ -130,7 +130,13 @@ fn hunk_from(value: &serde_json::Value, path: Option<String>) -> Option<crate::r
         .iter()
         .filter_map(|v| v.as_str().map(str::to_string))
         .collect();
-    Some(crate::render::event::DiffHunk { path, context_lines: ctx, removed, added })
+    Some(crate::render::event::DiffHunk {
+        path,
+        old_start: value["old_start"].as_u64().map(|v| v as usize),
+        context_lines: ctx,
+        removed,
+        added,
+    })
 }
 
 /// structuredPatch 平铺数组（edit 单文件形态）→ Diff 详情（None=形状不符
@@ -177,6 +183,7 @@ fn diff_detail(old: &str, new: &str) -> DetailKind {
         removed: removed.len(),
         hunks: vec![crate::render::event::DiffHunk {
                 path: None,
+                old_start: None,
             context_lines: 0,
             removed,
             added,

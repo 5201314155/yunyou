@@ -18,7 +18,8 @@ use yunyou_session::{FOLD_THRESHOLD, PREVIEW_LINES};
 const BASH_TAIL_LINES: usize = 5;
 
 /// 按 DetailKind 渲染详情块（紧跟完成卡之后的若干新行）。
-pub fn render<W: Write>(out: &mut W, profile: Profile, kind: &DetailKind) -> std::io::Result<()> {
+/// `width`：当前列宽（批 5——diff gutter 窄终端防御单源）。
+pub fn render<W: Write>(out: &mut W, profile: Profile, kind: &DetailKind, width: usize) -> std::io::Result<()> {
     // task-65 P0-1：入口单点净化——详情块全系模型可见文本（文件内容/命令
     // 输出/diff），先净化再分发（\n 保留结构语义；\r 剥除保「落定永不回改」
     // =P1-1 同源收口；外来 CSI/OSC 剥除）。
@@ -38,6 +39,7 @@ pub fn render<W: Write>(out: &mut W, profile: Profile, kind: &DetailKind) -> std
                 .iter()
                 .map(|h| crate::render::event::DiffHunk {
                     path: h.path.clone(),
+                    old_start: h.old_start,
                     context_lines: h.context_lines,
                     removed: h.removed.iter().map(|l| super::sanitize::sanitize_text(l)).collect(),
                     added: h.added.iter().map(|l| super::sanitize::sanitize_text(l)).collect(),
@@ -53,7 +55,7 @@ pub fn render<W: Write>(out: &mut W, profile: Profile, kind: &DetailKind) -> std
     match kind {
         DetailKind::Bash { exit_code, output } => render_bash(out, profile, *exit_code, output),
         DetailKind::Read { lines, from, .. } => render_read(out, profile, lines, *from),
-        DetailKind::Diff { added, removed, hunks } => render_diff(out, profile, *added, *removed, hunks),
+        DetailKind::Diff { added, removed, hunks } => render_diff(out, profile, *added, *removed, hunks, width),
         DetailKind::Plain { lines } => render_plain(out, profile, lines),
     }
 }
@@ -127,6 +129,7 @@ fn render_diff<W: Write>(
     added: usize,
     removed: usize,
     hunks: &[super::event::DiffHunk],
+    width: usize,
 ) -> std::io::Result<()> {
     if hunks.is_empty() {
         let note = format!("+{added} −{removed}（无逐行上下文）");
@@ -167,13 +170,28 @@ fn render_diff<W: Write>(
             );
             freeze_line(out, &note)?;
         }
-        for line in &hunk.removed {
-            let rendered = diff_line(profile, super::terminal::SYM_DIFF_MINUS, line, super::terminal::SGR_FEEDBACK_DANGER_256);
-            freeze_line(out, &rendered)?;
+        // 批 5（三层渲染·行内高亮+gutter）：
+        // - 行内：removed[i]/added[i] 按索引配对剥公共前后缀，变更中段加粗
+        //   （语义色族内加亮，规范「色彩是路标」不扩色号）；
+        // - gutter：列宽 ≥80 且 canonical 带行号（old_start）才出行号列——
+        //   窄终端/旧回放退位（claude code StructuredDiff 同防御，〈挖掘〉§6.2）。
+        //   added 行号自 old_start+removed.len() 起算（hunk 粒度近似——context
+        //   行不含于 hunk 体，偏移 ≤context 行数，行号列作导航锚够用，注释声明）。
+        let gutter = width >= 80 && hunk.old_start.is_some();
+        let old_start = hunk.old_start.unwrap_or(1);
+        let added_base = old_start + hunk.removed.len();
+        let pairs = hunk.removed.len().min(hunk.added.len());
+        for (i, line) in hunk.removed.iter().enumerate() {
+            let opposite = hunk.added.get(i).map(|s| s.as_str());
+            let body = inline_highlight(profile, super::terminal::SYM_DIFF_MINUS, line, opposite, super::terminal::SGR_FEEDBACK_DANGER_256);
+            let num = if gutter { format!("{:>4} ", old_start + i) } else { String::new() };
+            freeze_line(out, &format!("{num}{}", rail_line(profile, &body)))?;
         }
-        for line in &hunk.added {
-            let rendered = diff_line(profile, "+", line, super::terminal::SGR_FEEDBACK_SUCCESS_256);
-            freeze_line(out, &rendered)?;
+        for (i, line) in hunk.added.iter().enumerate() {
+            let opposite = hunk.removed.get(i).map(|s| s.as_str());
+            let body = inline_highlight(profile, "+", line, opposite, super::terminal::SGR_FEEDBACK_SUCCESS_256);
+            let num = if gutter { format!("{:>4} ", added_base + i) } else { String::new() };
+            freeze_line(out, &format!("{num}{}", rail_line(profile, &body)))?;
         }
     }
     Ok(())
@@ -194,6 +212,7 @@ fn render_plain<W: Write>(out: &mut W, profile: Profile, lines: &[String]) -> st
     }
     Ok(())
 }
+
 
 /// 折叠/上下文提示行（左缘束线 + 秋香黄 … + 烟灰说明，缩进 4 空格；task-46③）。
 fn fold_note(profile: Profile, note: &str) -> String {
@@ -260,4 +279,117 @@ fn diff_line(profile: Profile, sign: &str, content: &str, sgr_const: &'static st
             profile.reset()
         ),
     )
+}
+
+/// 行内高亮（批 5）：sign+整行底色内，与对面行（同索引配对）剥出公共
+/// 前后缀后，**变更中段加粗**——一眼锁定「这行改了哪几个字」。对面缺位
+/// （纯增/纯删行）整行不加粗（无对照=无变更段语义）。裸 body 契约：本
+/// 函数恒返回**不含 rail** 的 ± 行体（rail 由调用方统一包一层——首版无
+/// 对面分支走 diff_line 带 rail，外层再包=双束线，探针单测已锁）。
+fn inline_highlight(
+    profile: Profile,
+    sign: &str,
+    content: &str,
+    opposite: Option<&str>,
+    sgr_const: &'static str,
+) -> String {
+    let Some(opposite) = opposite else {
+        return format!(
+            "{}{sign}{} {content}",
+            profile.color(sgr_const),
+            profile.reset()
+        );
+    };
+    let (prefix, changed, suffix) = changed_span(content, opposite);
+    if changed.is_empty() {
+        return format!(
+            "{}{sign}{} {content}",
+            profile.color(sgr_const),
+            profile.reset()
+        ); // 行无独立变更（与对面全同）不加粗
+    }
+    let (prefix, changed, suffix) = (prefix.as_str(), changed.as_str(), suffix.as_str());
+    let (color, reset, bold) = (profile.color(sgr_const), profile.reset(), profile.bold());
+    format!(
+        "{color}{sign}{reset} {color}{prefix}{reset}{bold}{color}{changed}{reset}{color}{suffix}{reset}"
+    )
+}
+
+/// 变更段剥离：按字符最长公共前缀/后缀，返回（前缀, 变更中段, 后缀）。
+/// 空串/完全相同→中段空（调用方退整行不加粗）。
+fn changed_span(line: &str, opposite: &str) -> (String, String, String) {
+    let a: Vec<char> = line.chars().collect();
+    let b: Vec<char> = opposite.chars().collect();
+    let mut pre = 0;
+    while pre < a.len() && pre < b.len() && a[pre] == b[pre] {
+        pre += 1;
+    }
+    let mut suf = 0;
+    while suf < a.len() - pre && suf < b.len() - pre && a[a.len() - 1 - suf] == b[b.len() - 1 - suf] {
+        suf += 1;
+    }
+    let mid_end = a.len() - suf;
+    if pre >= mid_end {
+        return (line.to_string(), String::new(), String::new());
+    }
+    (
+        a[..pre].iter().collect(),
+        a[pre..mid_end].iter().collect(),
+        a[mid_end..].iter().collect(),
+    )
+}
+
+#[cfg(test)]
+mod diff_render_tests {
+    use super::*;
+
+    /// 批 5 锁：变更段剥离——公共前后缀剥出、中段为变更字符。
+    #[test]
+    fn changed_span_公共前后缀() {
+        let (pre, mid, suf) = changed_span("let x = 1;", "let x = 2;");
+        assert_eq!((pre.as_str(), mid.as_str(), suf.as_str()), ("let x = ", "1", ";"));
+        // 完全相同→中段空
+        assert_eq!(changed_span("same", "same").1, "");
+        // 完全不同→前缀空
+        assert_eq!(changed_span("abc", "xyz").0, "");
+    }
+
+    /// 批 5 锁：行内高亮——配对行变更中段夹 bold；无对面行退整行不加粗。
+    #[test]
+    fn inline_highlight_变更中段加粗() {
+        let line = inline_highlight(Profile::Full, "-", "let x = 1;", Some("let x = 2;"), super::super::terminal::SGR_FEEDBACK_DANGER_256);
+        let plain = line;
+        assert!(plain.contains("\x1b[1m"), "变更中段应加粗：{plain:?}");
+        assert!(plain.contains("let x = ") && plain.contains(';'), "公共前后缀保留：{plain:?}");
+        let full_line = inline_highlight(Profile::Full, "-", "全新行", None, super::super::terminal::SGR_FEEDBACK_DANGER_256);
+        assert!(!full_line.contains("\x1b[1m"), "无对面行不加粗：{full_line:?}");
+    }
+
+    /// 批 5 锁：gutter 行号列——old_start 存在且宽终端出行号；None 退位。
+    #[test]
+    fn gutter_行号列防御() {
+        let hunk = crate::render::event::DiffHunk {
+            path: None,
+            old_start: Some(41),
+            context_lines: 0,
+            removed: vec!["old".to_string()],
+            added: vec!["new".to_string(), "new2".to_string()],
+        };
+        let mut out: Vec<u8> = Vec::new();
+        render_diff(&mut out, Profile::Full, 2, 1, &[hunk], 100).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        assert!(text.contains("  41 "), "removed 行号=old_start：{text:?}");
+        assert!(text.contains("  42 "), "added 行号=old_start+removed.len()：{text:?}");
+        // 窄终端退位
+        let hunk2 = crate::render::event::DiffHunk {
+            path: None,
+            old_start: Some(41),
+            context_lines: 0,
+            removed: vec!["old".to_string()],
+            added: vec!["new".to_string()],
+        };
+        let mut out2: Vec<u8> = Vec::new();
+        render_diff(&mut out2, Profile::Full, 1, 1, &[hunk2], 60).unwrap();
+        assert!(!String::from_utf8(out2).unwrap().contains("  41 "), "窄终端 gutter 退位");
+    }
 }

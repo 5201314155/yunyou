@@ -100,7 +100,11 @@ impl Editor {
     ///
     /// `initial` 为回填初始缓冲（展开类命令的输入框回填，设计 §七）：
     /// 提示符+回填文本先上屏，用户可增删改后回车发送。
-    pub async fn read_line(&self, initial: Option<String>) -> std::io::Result<LineInput> {
+    pub async fn read_line(
+        &self,
+        initial: Option<String>,
+        scheduled: Option<&mut tokio::sync::mpsc::Receiver<String>>,
+    ) -> std::io::Result<LineInput> {
         // task-73 A1：会话级 cbreak（外层 repl_loop 持守卫）——此处 enable=
         // 幂等重入（tcsetattr 同值无害），Drop 只恢复到会话级形态而非 cooked
         // （防逐行守卫先 drop 把会话守卫的 cbreak 打回 cooked）。
@@ -126,11 +130,32 @@ impl Editor {
         // 输入源（task-43）：长命读线程+通道——tokio::io::stdin() 的 blocking
         // read 不可取消，Runtime 关停干等（编辑态 Ctrl-C 退出拖 14s+ 真根）。
         let source = InputSource::global();
+        // 定时注入臂（proto v1.1 真投递，task-14 续）：到期消息=合成用户输入
+        // （回合边界排队投递同律——回合中到期则回合结束回到读行时注入）
+        let mut scheduled = scheduled;
         loop {
             tokio::select! {
                 biased;
                 _ = tokio::signal::ctrl_c() => return Ok(LineInput::Interrupted),
                 _ = self.exit.cancelled() => return Ok(LineInput::ExitRequested),
+                msg = async {
+                    match scheduled.as_deref_mut() {
+                        Some(rx) => rx.recv().await,
+                        None => std::future::pending().await,
+                    }
+                } => {
+                    // 上屏注入痕迹（提示行换行防撕裂；与回合输出互斥由单线程终端写保证）
+                    writeln!(stdout, "
+[定时触发] 到期——即将执行注入任务")?;
+                    stdout.flush()?;
+                    if panel.is_open() {
+                        panel.collapse(&mut stdout, &self.prompt, &buffer)?;
+                    }
+                    writeln!(stdout)?;
+                    stdout.flush()?;
+                    let text = msg.unwrap_or_default();
+                    return Ok(LineInput::Submitted(format!("[定时触发] {text}")));
+                }
                 read = source.read_byte() => {
                     let Some(b) = read? else {
                         return Ok(LineInput::Eof);

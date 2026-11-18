@@ -134,6 +134,7 @@ fn diff_详情_着色与折叠() {
             removed: 1,
             hunks: vec![DiffHunk {
                 path: None,
+                old_start: None,
                 added: vec!["let x = recompute();".into()],
                 removed: vec!["let x = old();".into()],
                 context_lines: 2,
@@ -152,7 +153,10 @@ fn diff_详情_着色与折叠() {
     assert!(text.contains("\x1b[2m▎\x1b[0m"), "diff 抽屉束线应连续：{text:?}");
     assert!(text.contains("\x1b[38;5;167m−"), "删行应绯红 −");
     assert!(text.contains("\x1b[38;5;71m+"), "增行应苔绿 +");
-    assert!(text.contains("let x = recompute();"), "增行内容应保留");
+    // 批 5 行内高亮契约：增行拆「公共前缀+bold 变更段+后缀」三段 SGR——内容保留性按剥 SGR 后验证（字面 contains 会被行内转义隔断=旧单段契约）
+    let clean = strip_ansi(&text);
+    assert!(clean.contains("let x = recompute();"), "增行内容应保留（剥 SGR）：{clean:?}");
+    assert!(clean.contains("let x = old();"), "删行内容应保留（剥 SGR）：{clean:?}");
 }
 
 

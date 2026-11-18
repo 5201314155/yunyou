@@ -59,6 +59,16 @@ pub(crate) fn tool_result_event(
             summary.push_str(&format!(" · 失败：{reason}"));
         }
     }
+    // 批 5（diff 三层·完成卡统计）：edit/apply_patch 成功时摘要尾追加
+    // 「+增 −删」行计数（claude code DiffFileList 形态，〈挖掘〉§6.4；数据
+    // 自 canonical structuredPatch 逐行统计，缺键/失败静默不加——不编造）。
+    // 取舍注记：计数随 summary 单段呈 dim 灰阶，绿红分色候 summary 分段
+    // 渲染改造（摘要入会话记录面，内嵌 SGR 会污染记录文本）。
+    if !is_error && (name == "edit" || name == "apply_patch") {
+        if let Some(stats) = patch_stats(content) {
+            summary.push_str(&format!(" +{} −{}", stats.0, stats.1));
+        }
+    }
     // task-37①：bash 非零退出 → 卡面失败态（渲染侧翻转，is_error 语义不动）
     let bash_failed = name == "bash" && matches!(exit_code, Some(code) if code != 0);
     RenderEvent::ToolResult {
@@ -74,6 +84,50 @@ pub(crate) fn tool_result_event(
 // error_reason/parse_detail/parse_numbered/diff_detail → adapter/parse.rs
 // （task-22 搬移）。
 
+/// structuredPatch 行计数（批 5）：双形兼容——apply_patch 文件包装
+/// （[{path, hunks:[…]}]）与 edit 单文件直排（[{old_start, removed, added}]，
+/// 元素无 path/hunks 键即 hunk 本体）；形状不符返回 None（旧 canonical/
+/// 回放静默退位，不编造）。
+fn patch_stats(content: &serde_json::Value) -> Option<(usize, usize)> {
+    let items = content.get("structuredPatch")?.as_array()?;
+    let is_file_wrapped = items.first().is_some_and(|f| f.get("hunks").is_some());
+    let (mut added, mut removed) = (0usize, 0usize);
+    let count = |h: &serde_json::Value, added: &mut usize, removed: &mut usize| -> Option<()> {
+        *added += h.get("added")?.as_array()?.len();
+        *removed += h.get("removed")?.as_array()?.len();
+        Some(())
+    };
+    for item in items {
+        if is_file_wrapped {
+            for h in item.get("hunks")?.as_array()? {
+                count(h, &mut added, &mut removed)?;
+            }
+        } else {
+            count(item, &mut added, &mut removed)?;
+        }
+    }
+    (added + removed > 0).then_some((added, removed))
+}
+
+    #[test]
+    fn 完成卡加删计数_双形() {
+        use serde_json::json;
+        // edit 直排形
+        let content = json!({"structuredPatch": [{"old_start": 1, "context": 0, "removed": ["a","b"], "added": ["c"]}]});
+        assert_eq!(patch_stats(&content), Some((1, 2)));
+        // apply_patch 包装形
+        let content2 = json!({"structuredPatch": [{"path": "x", "hunks": [{"old_start": 1, "context": 0, "removed": ["a"], "added": ["b","c"]}], "hunks2": []}]});
+        assert_eq!(patch_stats(&content2), Some((2, 1)));
+        // 缺键静默退位
+        assert_eq!(patch_stats(&json!({"old": "x"})), None);
+        // 完成 summary 追加：edit 成功卡尾含 +N −R
+        let ev = tool_result_event("edit", "", &content, None, false, Some("{\"path\":\"a.rs\"}"));
+        if let crate::render::event::TurnEvent::ToolResult { summary, .. } = &ev {
+            assert!(summary.ends_with("+1 −2"), "完成卡计数：{summary:?}");
+        } else {
+            panic!("应为 ToolResult");
+        }
+    }
 #[cfg(test)]
 mod tests {
     use super::*;

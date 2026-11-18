@@ -132,6 +132,9 @@ pub struct ProxyPlugin {
     pub enforcer: Option<Arc<dyn yunyou_tools::sandbox::SandboxEnforcer>>,
     /// spawn 形态（默认 Sandbled；生产恒 Sandbled——Direct 为测试缝显式声明）。
     pub spawn_form: SpawnForm,
+    /// 会话消息投递回调（v1.1 真投递，task-14 续）：DeliverMessage→注入会话。
+    /// 装配层注入（接 REPL 定时注入队列）；None=降级日志留痕+Ack ok（不悬挂插件）。
+    pub deliver: Option<Arc<dyn Fn(Option<String>, String) -> Result<String, String> + Send + Sync>>,
 }
 
 impl Plugin for ProxyPlugin {
@@ -267,6 +270,10 @@ impl Plugin for ProxyPlugin {
                 Arc::new(Mutex::new(HashMap::new()));
             let (tx, mut rx) = mpsc::channel::<PluginProtoFrame>(64);
             let pending_reader = Arc::clone(&pending);
+            // v1.1 真投递捕获：回调（装配注入）+写通道 clone（回 Ack）+诊断 id
+            let deliver_handler = self.deliver.clone();
+            let pump_tx = tx.clone();
+            let plugin_id_for_pump = self.manifest_v2.id.clone();
             tokio::spawn(async move {
                 loop {
                     line.clear();
@@ -275,17 +282,45 @@ impl Plugin for ProxyPlugin {
                         Ok(_) => {}
                     }
                     if let Ok(frame) = decode_frame(line.trim()) {
-                        let invoke_id = match &frame {
-                            PluginProtoFrame::ToolResult(r) => Some(r.invoke_id.clone()),
-                            _ => None,
-                        };
-                        if let Some(id) = invoke_id {
-                            if let Some(sender) = pending_reader.lock().await.remove(&id) {
-                                let _ = sender.send(frame);
-                                continue;
+                        match &frame {
+                            PluginProtoFrame::ToolResult(r) => {
+                                if let Some(sender) =
+                                    pending_reader.lock().await.remove(&r.invoke_id)
+                                {
+                                    let _ = sender.send(frame);
+                                    continue;
+                                }
                             }
+                            // v1.1 真投递（task-14 续）：DeliverMessage→回调注入会话
+                            PluginProtoFrame::DeliverMessage(m) => {
+                                let deliver_id = m.deliver_id.clone();
+                                let result = match deliver_handler.as_ref() {
+                                    Some(handler) => {
+                                        let session = m.session_id.clone();
+                                        let text = m.text.clone();
+                                        handler(session, text)
+                                    }
+                                    None => Ok("投递面未接线（日志留痕）".into()),
+                                };
+                                let (ok, detail) = match result {
+                                    Ok(route) => (true, route),
+                                    Err(err) => (false, err),
+                                };
+                                eprintln!(
+                                    "[plugin:{plugin_id_for_pump}] 投递 {deliver_id}: ok={ok} {detail}"
+                                );
+                                let _ = pump_tx
+                                    .send(PluginProtoFrame::DeliverAck(
+                                        yunyou_plugin_proto::DeliverAck {
+                                            deliver_id,
+                                            ok,
+                                            detail,
+                                        },
+                                    ))
+                                    .await;
+                            }
+                            _ => {}
                         }
-                        // 非结果帧/未知 id：MVP 丢弃（tools_changed 等 L2.1）
                     }
                 }
             });

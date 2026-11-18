@@ -60,6 +60,7 @@ fn snap_diff() {
                 removed: 1,
                 hunks: vec![DiffHunk {
                 path: None,
+                old_start: None,
                     added: vec!["let epoch = self.recompute_epoch(id);".into(), "epoch_gate(epoch)?;".into()],
                     removed: vec!["let epoch = self.epochs[id];".into()],
                     context_lines: 2,

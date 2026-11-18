@@ -1,12 +1,24 @@
 //! 启动横幅视觉块（规范 §4.1：品牌仪式，一次性输出，不闪不动）。
 //!
-//! 双版式（任务30 二期①，定稿见 docs/设计/CLI横幅升格设计稿-任务30二期.md）：
-//! - 宽终端大字版（列宽 ≥40 且非 Plain）：块艺术 LOGO + 品牌行 + 信息行 + Tips；
-//! - 单行版（<40 列或 Plain 档）：三行文本——窄终端与纯文本档的**正式形态**
-//!   而非劣化形态（块字符 █▀▄ 在纯文本档契约下不可靠，故整体退化）。
+//! **字模=位图矩阵程序化拼装（业主令 2026-11-18 02:3x/02:5x 三连定稿，本批
+//! 落码候选=业主过眼实心样稿）**：①每字母一个 bool 矩阵 const（数据与渲染
+//! 分离——改字母/改字号只改数据，废弃手排字符串字模）；②容器宽=Σ字模宽+
+//! 字间距×2 数学推导（零硬编码魔法数）；③基线底对齐（小写 x-height 上方
+//! 留空）+末行 1→▄ 出脚（渲染层处理，见 [`GLYPH_U`]/[`GLYPH_N`] descender
+//! 标注）；④带色=tokens 单源三级品牌蓝行级渐变（深→亮=云层透光既定语义），
+//! Plain 档整体退化（块字符不可靠契约不变）。
+//!
+//! 三级降级矩阵（业主拍板「大版为主+并存分级」）：
+//! - ≥60 列：大版字模（Y 大写 6×7 + u/n 小写）+ 品牌行 + 信息行 + Tips；
+//! - 40~59 列：紧凑版字模（5 行档）+ 同上；
+//! - <40 列或 Plain：单行品牌行（正式形态而非劣化形态）。
 //!
 //! 两版共用逐行落定输出形态（[`freeze_line`]）：零 `\r`、零 `\e[K`，
 //! 落定即历史（§5 不闪不动不重绘，不因行数增多放宽）。
+//!
+//! 历史注记（违规在案更正）：task-69 B 案细块字模曾于业主 gate 前先行落码
+//! （前版注释自称「定稿」）——业主判「笔画稀疏看不出来」作废；本批=业主
+//! 看过实心样稿后明确拍板的落码授权，gate 先行问题自此更正。
 
 use super::terminal::{
     ascii, freeze_line, Profile, SGR_BRAND_BRIGHT_256, SGR_BRAND_PRIMARY_256,
@@ -14,18 +26,54 @@ use super::terminal::{
 };
 use std::io::Write;
 
-/// 大字版起用列宽下限：LOGO 31 列 + 缩进 2 + 右侧呼吸空间——40 列以下排不下
-/// 完整字形，与其挤压变形不如退单行版（设计稿降级矩阵定稿）。
-const WIDE_MIN_COLS: usize = 40;
+/// 大版起用列宽下限：字模容器 22 列+品牌行全句+信息行——60 列以下退紧凑版
+/// （三级降级矩阵定稿，业主 2026-11-18）。
+const WIDE_MIN_COLS: usize = 60;
 
-/// 块艺术 LOGO 字模（task-69 B 案定稿：3 行 27 列——唯一底稿=
-/// docs/设计/演示/task-69-样稿/B-Full-100.txt 真字节，禁按记忆重排；
-/// task-44③ 修形稿作废）。等宽契约由 banner 快照测试锁（三行 27 列）。
-const LOGO: [&str; 3] = [
-    "█▀█ █  █ █ ▀ █ █▀█ ▄▄▄ █  █",
-    "█ █ █  █ ██ █ █▀▄ █   █ ██",
-    "▀ ▀ ▀▀▀ █  █  ▀█▀  ▀▀▀ ▀██",
+/// 紧凑版起用列宽下限（40~59 列档）；<40 退单行版。
+const COMPACT_MIN_COLS: usize = 40;
+
+/// 'Y' 6×7（lead 亲画示范件原样采用，业主定稿链 2026-11-18）。
+const GLYPH_Y: [[u8; 6]; 7] = [
+    [1, 0, 0, 0, 1, 0],
+    [1, 0, 0, 0, 1, 0],
+    [1, 1, 1, 1, 1, 0],
+    [0, 1, 1, 1, 0, 0],
+    [0, 0, 1, 0, 0, 0],
+    [0, 0, 1, 0, 0, 0],
+    [0, 1, 1, 1, 0, 0],
 ];
+
+/// 'u' 6×7（云穆同规格自产：小写 x-height=4 行，与 Y 基线底对齐；
+/// `descender=true`=矩阵末行 1 渲染为 ▄ 出脚）。
+const GLYPH_U: [[u8; 6]; 4] = [
+    [1, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 1],
+    [1, 1, 1, 1, 1, 1],
+];
+
+/// 'n' 6×7（同规格自产：顶横=肩拱+双柱，底部开放与 u 的闭合底对比可辨）。
+const GLYPH_N: [[u8; 6]; 4] = [
+    [1, 1, 1, 1, 1, 1],
+    [1, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 1],
+];
+
+/// 紧凑版 5 行档字模（y 压 5 行、u/n x-height 3 行；同拼装同降级纪律）。
+const GLYPH_Y5: [[u8; 5]; 5] = [
+    [1, 0, 0, 0, 1],
+    [1, 1, 1, 1, 1],
+    [0, 0, 1, 0, 0],
+    [0, 0, 1, 0, 0],
+    [0, 1, 1, 1, 0],
+];
+const GLYPH_U5: [[u8; 5]; 3] = [[1, 0, 0, 0, 1], [1, 0, 0, 0, 1], [1, 1, 1, 1, 1]];
+const GLYPH_N5: [[u8; 5]; 3] = [[1, 1, 1, 1, 1], [1, 0, 0, 0, 1], [1, 0, 0, 0, 1]];
+
+/// 字间距（字母间空 2 列；容器宽推导用）。
+const GLYPH_GAP: usize = 2;
 
 /// LOGO 行级渐变（上深下亮=云层透光：顶部品牌主色沉底、底部提亮衔接 Tips 区）；
 /// 全部既有 SGR token（tokens.json 生成 palette 单源），零新增色号。
@@ -39,6 +87,70 @@ const LOGO_GRADIENT: [&str; 3] = [
 /// 不得提及——宣称不存在的命令即撒谎）。
 const TIPS: [&str; 3] = ["直接说需求，云悠替你干活", "会话自动落盘，重启接着聊", "Esc 打断 · /quit 或 Ctrl-C 退出"];
 
+/// 矩阵抽象（const 泛型——任意 W×H bool 矩阵同容器拼装，改字号只改数据）。
+trait Matrix {
+    fn dims(&self) -> (usize, usize);
+    fn cell(&self, j: usize, i: usize) -> u8;
+}
+
+impl<const W: usize, const H: usize> Matrix for [[u8; W]; H] {
+    fn dims(&self) -> (usize, usize) { (W, H) }
+    fn cell(&self, j: usize, i: usize) -> u8 { self[j][i] }
+}
+
+/// 字母档：矩阵 + 是否出脚（descender——末行 1 渲染 ▄）。
+struct Glyph {
+    matrix: &'static dyn Matrix,
+    descender: bool,
+}
+
+/// 矩阵拼装（渲染函数只做拼装，不识字母语义）：基线底对齐（以最高字母为
+/// 基准，矮字母顶部留空）+字间距 [`GLYPH_GAP`]；返回（画布行文本, 容器宽）。
+/// 容器宽=Σ矩阵宽+GAP×(n−1)，数学推导零魔法数。
+fn compose(letters: &[Glyph]) -> (Vec<String>, usize) {
+    let height = letters.iter().map(|g| g.matrix.dims().1).max().unwrap_or(0);
+    let width =
+        letters.iter().map(|g| g.matrix.dims().0).sum::<usize>() + GLYPH_GAP * (letters.len() - 1);
+    let mut canvas = vec![vec![' '; width]; height];
+    let mut x = 0;
+    for glyph in letters {
+        let (w, h) = glyph.matrix.dims();
+        let offset = height - h; // 底对齐
+        for j in 0..h {
+            for i in 0..w {
+                if glyph.matrix.cell(j, i) == 1 {
+                    let feet = glyph.descender && j == h - 1;
+                    canvas[offset + j][x + i] = if feet { '▄' } else { '█' };
+                }
+            }
+        }
+        x += w + GLYPH_GAP;
+    }
+    (canvas.iter().map(|r| r.iter().collect()).collect(), width)
+}
+
+/// 矩阵行 → 带渐变落定行：整块居中（两侧留白对称，余数归右），行级三级
+/// 品牌蓝渐变（深→亮），Plain 档由调用方保证不进此路径（块字符契约）。
+fn logo_line(profile: Profile, row: &str, row_idx: usize, total: usize, width: usize) -> String {
+    let pad = (width.saturating_sub(row.chars().count())).max(2) / 2 + 2;
+    let grad = LOGO_GRADIENT[(row_idx * 3 / total.max(1)).min(2)];
+    let indent = " ".repeat(pad);
+    format!("{indent}{}{row}{}", profile.color(grad), profile.reset())
+}
+
+/// Tips 行（大/紧凑两版共用）。
+fn tips_line(profile: Profile, tip: &str) -> String {
+    format!(
+        "    {}{}{} {}{}{}",
+        profile.color(SGR_BRAND_PRIMARY_256),
+        profile.symbol(SYM_BULLET, ascii::BULLET),
+        profile.reset(),
+        profile.color(SGR_TEXT_SECONDARY_256),
+        tip,
+        profile.reset()
+    )
+}
+
 /// 渲染启动横幅（模型名与会话目录来自装配配置；列宽来自 Renderer 单源）。
 /// `notice`：启动提示行（task-34② 凭据缺失指路；None=零增量，不加行）。
 pub fn render<W: Write>(
@@ -50,16 +162,40 @@ pub fn render<W: Write>(
     notice: Option<&str>,
     tips: bool,
 ) -> std::io::Result<()> {
-    if width >= WIDE_MIN_COLS && profile != Profile::Plain {
-        wide(out, profile, model, session_dir, width, notice, tips)
+    if profile != Profile::Plain && width >= WIDE_MIN_COLS {
+        wordmark(
+            out,
+            profile,
+            model,
+            session_dir,
+            width,
+            notice,
+            tips,
+            &[Glyph { matrix: &GLYPH_Y, descender: false }, Glyph { matrix: &GLYPH_U, descender: true }, Glyph { matrix: &GLYPH_N, descender: true }],
+        )
+    } else if profile != Profile::Plain && width >= COMPACT_MIN_COLS {
+        wordmark(
+            out,
+            profile,
+            model,
+            session_dir,
+            width,
+            notice,
+            tips,
+            &[
+                Glyph { matrix: &GLYPH_Y5, descender: false },
+                Glyph { matrix: &GLYPH_U5, descender: true },
+                Glyph { matrix: &GLYPH_N5, descender: true },
+            ],
+        )
     } else {
         single_line(out, profile, model, session_dir, width, notice, tips)
     }
 }
 
-/// 宽终端大字版：LOGO 渐变 5 行 + 品牌行 + 模型/会话行 + Tips 3 行（+提示行）。
-/// `tips=false`（task-38②：--task 单任务模式自退出，退出指引是噪音）不渲染 Tips。
-fn wide<W: Write>(
+/// 大/紧凑两版共用渲染：字模渐变行 + 空行 + 中文主品牌行（☁ 云悠 yunyou
+/// 粗体云青+定位语烟灰=业主定稿 D 案形态）+ 模型/会话行 + Tips + 提示行。
+fn wordmark<W: Write>(
     out: &mut W,
     profile: Profile,
     model: &str,
@@ -67,45 +203,44 @@ fn wide<W: Write>(
     width: usize,
     notice: Option<&str>,
     tips: bool,
+    glyphs: &[Glyph],
 ) -> std::io::Result<()> {
     let brand = profile.color(SGR_BRAND_PRIMARY_256);
     let dim = profile.color(SGR_TEXT_SECONDARY_256);
     let (reset, bold) = (profile.reset(), profile.bold());
-    for (idx, row) in LOGO.iter().enumerate() {
-        let rendered = format!("  {}{row}{}", profile.color(LOGO_GRADIENT[idx]), reset);
-        freeze_line(out, &rendered)?;
+    let (rows, container) = compose(glyphs);
+    let total = rows.len();
+    for (idx, row) in rows.iter().enumerate() {
+        freeze_line(out, &logo_line(profile, row, idx, total, container))?;
     }
     freeze_line(out, "")?;
-    // 品牌行（task-69 B 案精简版：无 ☁ 无版本号——业主选 B 即选精简）
+    // 中文主品牌行（业主定稿：☁+粗体「云悠 yunyou」+定位语——横幅第一眼可辨）
     freeze_line(
         out,
-        &format!("  {bold}{brand}云悠 yunyou{reset} {dim}—— 终端里，云替你干活{reset}"),
+        &format!(
+            "  {bold}{brand}{} 云悠 yunyou{reset} {dim}—— 终端里，云替你干活{reset}",
+            profile.symbol(SYM_BRAND, ascii::BRAND)
+        ),
     )?;
-    // 信息行：模型/会话拆两行——合排一行在 48 列必折行，拆行后各行全宽稳排
     freeze_line(out, &format!("    {dim}模型 {model}{reset}"))?;
     freeze_line(out, &format!("    {dim}会话 {session_dir}{reset}"))?;
     freeze_line(out, "")?;
-    // Tips：bullet 云青（与正文列表同符号体系）、文本烟灰（次要信息不与正文抢）
     if tips {
         for tip in TIPS {
-            freeze_line(
-                out,
-                &format!(
-                    "    {brand}{}{reset} {dim}{tip}{reset}",
-                    profile.symbol(SYM_BULLET, ascii::BULLET)
-                ),
-            )?;
+            freeze_line(out, &tips_line(profile, tip))?;
         }
     }
-    // 启动提示行（task-34②）：仅在有提示时追加，bullet+dim 与 Tips 同形态；
-    // 截断护栏复用 clip_width（提示可能含长路径，宁截断不折行——§4 摘要口径）
     if let Some(text) = notice {
         freeze_line(
             out,
             &format!(
-                "    {brand}{}{reset} {dim}{}{reset}",
+                "    {}{}{} {}{}{}",
+                brand,
                 profile.symbol(SYM_BULLET, ascii::BULLET),
+                reset,
+                dim,
                 super::tool::clip_width(text, width.saturating_sub(6)),
+                reset
             ),
         )?;
     }
@@ -127,18 +262,18 @@ fn single_line<W: Write>(
     let dim = profile.color(SGR_TEXT_SECONDARY_256);
     let (reset, bold) = (profile.reset(), profile.bold());
     let cloud = profile.symbol(SYM_BRAND, ascii::BRAND);
-    // 第一行：display 层（task-69 B 案精简版——与 B-Full-48 样稿形态一致）
+    // 第一行：display 层（中文主品牌行=业主定稿形态，与 D 案样稿一致）
     freeze_line(
         out,
         &format!("  {brand}{cloud}{reset} {bold}{brand}云悠 yunyou{reset} {dim}—— 终端里，云替你干活{reset}"),
     )?;
     // 第二三行：caption 层（烟灰 dim）；退出指引与大字版 Tips 同句式同源
-    //（任务30 四期④：「Ctrl-C 退出 · /quit 退出」结巴句并句）；task-38②：--task 模式自退出不渲染
+    //（任务30 四期④结巴句并句）；task-38②：--task 模式自退出不渲染
     freeze_line(
         out,
         &format!(
             "    {dim}模型 {model} {} 会话 {session_dir}{reset}",
-            profile.symbol(SYM_FENCE_DOT, ascii::FENCE_DOT) // task-35② 追加小刀：间隔符走 D3 降级映射（Plain 出 .）
+            profile.symbol(SYM_FENCE_DOT, ascii::FENCE_DOT)
         ),
     )?;
     if tips {
@@ -158,13 +293,52 @@ fn single_line<W: Write>(
 mod tests {
     use super::*;
 
-    /// task-69 B 案锁：LOGO 三行宽 27/26/27 列（唯一底稿 B-Full-100.txt 真字节）。
+    /// 三断言之一·容器宽：大版=6×3+2×2=22 列、紧凑=5×3+2×2=19 列（数学
+    /// 推导，零魔法数——业主令②）。
     #[test]
-    fn logo_三行b案等宽() {
-        let expect_widths = [27usize, 26, 26];
-        for (idx, row) in LOGO.iter().enumerate() {
-            let w = crate::render::tool::visible_width(row);
-            assert_eq!(w, expect_widths[idx], "LOGO 行 {} 应等宽 B 案定稿", idx + 1);
-        }
+    fn 容器宽_数学推导() {
+        let (rows, w) = compose(&[
+            Glyph { matrix: &GLYPH_Y, descender: false },
+            Glyph { matrix: &GLYPH_U, descender: true },
+            Glyph { matrix: &GLYPH_N, descender: true },
+        ]);
+        assert_eq!(w, 22, "大版容器宽=6×3+2×2");
+        assert_eq!(rows.len(), 7, "大版 7 行（Y 满高）");
+        let (rows2, w2) = compose(&[
+            Glyph { matrix: &GLYPH_Y5, descender: false },
+            Glyph { matrix: &GLYPH_U5, descender: true },
+            Glyph { matrix: &GLYPH_N5, descender: true },
+        ]);
+        assert_eq!(w2, 19, "紧凑容器宽=5×3+2×2（5 宽原生族）");
+        assert_eq!(rows2.len(), 5, "紧凑版 5 行");
+    }
+
+    /// 三断言之二·行数与基线：u/n x-height 4 行底对齐（前 3 行空）；
+    /// 出脚=末行 1→▄（u 底横/n 双柱底），Y 无出脚全 █。
+    #[test]
+    fn 基线对齐_出脚() {
+        let (rows, _) = compose(&[
+            Glyph { matrix: &GLYPH_Y, descender: false },
+            Glyph { matrix: &GLYPH_U, descender: true },
+            Glyph { matrix: &GLYPH_N, descender: true },
+        ]);
+        let seg = |row: &str, r: usize| -> String { row.chars().skip(8).take(6).collect() };
+        // u 区（列 8..14）：行 3=u 矩阵首行双柱（底对齐 offset=3，x-height 顶）
+        assert_eq!(seg(&rows[3], 3), "█    █", "u 顶行=双柱（底对齐 x-height 顶）");
+        // 出脚：末行 u 区 ▄、n 区 ▄；Y 区（列 0..6）无出脚
+        assert_eq!(seg(&rows[6], 6), "▄▄▄▄▄▄", "u 末行出脚 ▄");
+        assert!(!rows[..6].iter().any(|r| r.chars().take(6).any(|c| c == '▄')), "Y 无出脚");
+    }
+
+    /// 三断言之三·居中对称：pad 公式=(容器宽−行宽).max(2)/2+2，两侧留白
+    /// 对称性=公式单点决定（余数归右由整除承载）。
+    #[test]
+    fn 居中对称() {
+        let line = logo_line(Profile::Full, "██████", 0, 7, 22);
+        // 行首空格计数（SGR 在空格之后，不污染前导空白；禁字节长度法——SGR 字节不可见）
+        let lead = line.chars().take_while(|&c| c == ' ').count();
+        let expect = (22usize.saturating_sub(6)).max(2) / 2 + 2;
+        assert_eq!(lead, expect, "pad=公式直算（居中单点，余数归右）");
+        assert!(lead >= 2, "最小呼吸 2 列");
     }
 }

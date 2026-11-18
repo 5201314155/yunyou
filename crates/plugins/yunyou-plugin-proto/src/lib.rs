@@ -17,7 +17,7 @@ pub mod messages;
 
 pub use codec::{decode_frame, encode_frame, FRAME_SEPARATOR};
 pub use messages::{
-    Hello, HelloErr, HelloOk, PluginProtoFrame, Shutdown, ToolDescriptor, ToolInvoke,
-    ToolOutcome, ToolResult, ToolResultErr, ToolResultOk, ToolsList, ToolsListOk,
-    PROTOCOL_VERSION,
+    DeliverAck, DeliverMessage, Hello, HelloErr, HelloOk, PluginProtoFrame, Shutdown,
+    ToolDescriptor, ToolInvoke, ToolOutcome, ToolResult, ToolResultErr, ToolResultOk, ToolsList,
+    ToolsListOk, PROTOCOL_VERSION,
 };

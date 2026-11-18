@@ -71,6 +71,9 @@ pub struct DiffHunk {
     /// 文件归属（批 2-T2a：apply_patch 多文件补丁按 hunk 标路径，渲染为
     /// hunk 前的 ▎ path 行；edit 单文件语义=None 不加行）。
     pub path: Option<String>,
+    /// 变更区旧文起始行号（1-based，批 5 gutter 数据面；None=旧 canonical
+    /// 无行号→gutter 退位，窄终端防御同源）。
+    pub old_start: Option<usize>,
     /// 增行（含 `+` 前缀渲染由渲染层加）。
     pub added: Vec<String>,
     /// 删行。

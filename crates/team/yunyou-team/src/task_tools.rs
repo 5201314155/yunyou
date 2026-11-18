@@ -20,7 +20,9 @@ impl ToolDefinition for TaskCreateTool {
         "team_task_create"
     }
     fn description(&self) -> &str {
-        "在共享任务板创建任务（created_by=lead）。成员用 team_task_claim 认领。"
+        "在共享任务板创建任务（created_by=lead）。成员用 team_task_claim 认领。\
+         自动通知：成员提交送审时系统自动通知你审查（无需成员另行发消息）；\
+         前置任务被 approve 时系统自动通知被阻塞任务的负责人解锁。"
     }
     fn parameters(&self) -> Value {
         json!({
@@ -74,7 +76,8 @@ impl ToolDefinition for TaskClaimTool {
     fn description(&self) -> &str {
         match &self.actor {
             None => "认领任务板上的任务到指定成员名下（owner 落真实成员名，pending→claimed）。",
-            Some(_) => "认领一个任务到自己名下（pending→claimed；非 pending 不可认领）。",
+            Some(_) => "认领一个任务到自己名下（pending→claimed；非 pending 不可认领）。\
+                        自动通知：该任务的前置任务被 approve 时，你会自动收到「前置已通过、任务解锁」系统通知（无需轮询任务板）。",
         }
     }
     fn parameters(&self) -> Value {
@@ -128,8 +131,10 @@ impl ToolDefinition for TaskSubmitTool {
     }
     fn description(&self) -> &str {
         match &self.actor {
-            None => "把认领的任务提交送审（仅任务负责人本人；claimed→submitted，待审查人裁决）。",
-            Some(_) => "把自己名下已完成的任务提交送审（claimed→submitted；审查人裁决前状态不变）。",
+            None => "把认领的任务提交送审（仅任务负责人本人；claimed→submitted，待审查人裁决）。\
+                     自动通知：提交后系统自动通知 lead 审查（自动送审，无需再发消息）。",
+            Some(_) => "把自己名下已完成的任务提交送审（claimed→submitted；审查人裁决前状态不变）。\
+                        自动通知：提交后系统自动通知 lead 审查（自动送审，无需再发消息）。",
         }
     }
     fn parameters(&self) -> Value {
@@ -182,7 +187,8 @@ impl ToolDefinition for TaskReviewTool {
     }
     fn description(&self) -> &str {
         "审查裁决成员提交的任务：approve=通过（终态）/reject=驳回（终态）。\
-         写审分离系统级强制：审查人=提交人（含 lead 自审自己的活）一律被系统拒绝。"
+         写审分离系统级强制：审查人=提交人（含 lead 自审自己的活）一律被系统拒绝。\
+         自动通知：approve 后系统自动通知被阻塞任务的 owner「前置已通过」（owner 下一回合即可推进，无需你人工转达）；reject 不触发解锁通知。"
     }
     fn parameters(&self) -> Value {
         json!({

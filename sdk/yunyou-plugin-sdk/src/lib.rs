@@ -181,13 +181,14 @@ pub struct Plugin {
     category: Option<String>,
     description: Option<String>,
     tools: Vec<Arc<dyn Tool>>,
+    scheduler: Option<Arc<crate::scheduler::Scheduler>>,
 }
 
 impl Plugin {
     /// 构建器入口：`id`=全局唯一插件标识（与 manifest.toml 的 `id` 一致），
     /// `version`=semver 字符串。
     pub fn new(id: impl Into<String>, version: impl Into<String>) -> Self {
-        Self { id: id.into(), version: version.into(), category: None, description: None, tools: Vec::new() }
+        Self { id: id.into(), version: version.into(), category: None, description: None, tools: Vec::new(), scheduler: None }
     }
 
     /// 分类目录约定（install 自动归类落 `plugins/<类>/<id>/`；与 manifest.toml
@@ -209,14 +210,22 @@ impl Plugin {
         self
     }
 
+    /// 挂接定时调度器（scheduler.v1；serve 时桥接投递通道——到期消息经
+    /// DeliverMessage 投给宿主会话，v1.1 起真投递）。
+    pub fn scheduler(mut self, scheduler: Arc<crate::scheduler::Scheduler>) -> Self {
+        self.scheduler = Some(scheduler);
+        self
+    }
+
     /// 插件标识（诊断面用）。
     pub fn id(&self) -> &str {
         &self.id
     }
 
     /// 进入协议服务循环（阻塞至 shutdown/宿主退出；帧序见模块文档）。
-    pub fn serve(self) -> std::process::ExitCode {
-        serve::serve(self)
+    pub fn serve(mut self) -> std::process::ExitCode {
+        let scheduler = self.scheduler.take();
+        serve::serve(self, scheduler)
     }
 
     // ---- 以下为 serve 内部消费面（crate 内可见）----

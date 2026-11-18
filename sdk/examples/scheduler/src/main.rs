@@ -12,7 +12,7 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
-use yunyou_plugin_sdk::scheduler::{ScheduleSpec, Scheduler, SchedulerTrigger, ScheduleEntry};
+use yunyou_plugin_sdk::scheduler::{ScheduleSpec, Scheduler};
 use yunyou_plugin_sdk::{tool, Plugin, ToolFailure};
 
 /// schedule_create 参数（三选一必填恰一；设计 §四）。
@@ -43,8 +43,8 @@ fn epoch_ms() -> u64 {
 
 fn main() -> std::process::ExitCode {
     let sched = Arc::new(Scheduler::new(epoch_ms));
-    // 到期执行体（v1=stderr 留痕占位；真会话投递=proto v1.1 开闸后换注入）
-    sched.set_trigger(Arc::new(StdoutTrigger));
+    // 到期投递（proto v1.1 真投递）：serve 桥接 DeliverHandle——到期消息经
+    // DeliverMessage 投给宿主会话（回合边界排队投递），不再 stderr 占位
     sched.spawn_thread();
 
     let sched_create = Arc::clone(&sched);
@@ -54,6 +54,7 @@ fn main() -> std::process::ExitCode {
     Plugin::new("scheduler", "0.1.0")
         .category("workflows")
         .description("定时任务：创建/查看/删除（模型自主选择时间）")
+        .scheduler(Arc::clone(&sched))
         .tool(tool(
             "schedule_create",
             "创建定时任务：到点把 message 注入会话提醒用户。创建前先从环境获知当前时间（结果回显 now 辅助换算「1 小时后」等相对时间）。durable 仅当用户明确要求跨重启保留时才置 true。",
@@ -137,20 +138,3 @@ struct DeleteArgs {
     id: String,
 }
 
-/// v1 到期执行体：stderr 留痕（宿主 drain 透传主板日志）；真投递候缝。
-struct StdoutTrigger;
-
-impl SchedulerTrigger for StdoutTrigger {
-    fn name(&self) -> &str {
-        "stderr-echo"
-    }
-
-    fn on_fire(&self, entry: &ScheduleEntry, fired_at_ms: u64) -> Result<(), String> {
-        let text = entry
-            .message
-            .replace("{id}", &entry.id)
-            .replace("{fired_at}", &fired_at_ms.to_string());
-        eprintln!("[scheduler][定时触发 {}] {text}", entry.id);
-        Ok(())
-    }
-}

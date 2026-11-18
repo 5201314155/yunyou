@@ -8,6 +8,9 @@
 //! 边界（本模块不含）：会话投递缝（proto v1.1 开闸）/持久化 durable（S4）/
 //! 审批联动（审批词汇开闸）——见设计 §九实施批次。
 //!
+//! 锁豁免口径（K-14 同族）：调度表/触发器槽 std 锁 expect 直取——中毒=SDK
+//! 缺陷必须炸出来，文件级声明保留警报不可静默。
+//!
 //! ## 最小用法
 //!
 //! ```no_run
@@ -24,6 +27,7 @@
 //! sched.spawn_thread();
 //! ```
 
+#![allow(clippy::expect_used)] // 中毒 tripwire（std 锁保留裁决，见模块头）：调度表锁边界后触发=SDK 缺陷
 use std::str::FromStr;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -256,6 +260,11 @@ impl Scheduler {
             }
         }
         fired
+    }
+
+    /// 取出当前触发器（serve 桥接用：桥包装作者触发器后回填 set_trigger）。
+    pub fn take_trigger(&self) -> Option<Arc<dyn SchedulerTrigger>> {
+        self.trigger.lock().expect("触发器槽锁").take()
     }
 
     /// 起调度线程（1s 粒度 tick；进程退出即焚——SDK serve() 主循环退出即收）。

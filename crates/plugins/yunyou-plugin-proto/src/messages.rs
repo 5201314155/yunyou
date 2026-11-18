@@ -132,6 +132,32 @@ pub struct ToolResult {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Shutdown;
 
+/// 插件→宿主：会话消息投递请求（v1.1 加法演进，scheduler.v1 设计 §五）：
+/// 到期触发器把注入消息交宿主投给会话（回合边界排队投递，与任务池信箱同律）。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct DeliverMessage {
+    /// 投递关联 id（插件铸造；DeliverAck 回带——等待回执的关联键）。
+    pub deliver_id: String,
+    /// 目标会话 id（None=当前会话/全局；宿主侧按会话路由）。
+    #[serde(default)]
+    pub session_id: Option<String>,
+    /// 注入消息全文（用户角色；`[定时触发 <id>]` 前缀由宿主统一加，防伪）。
+    pub text: String,
+}
+
+/// 宿主→插件：投递回执（ok=已入会话投递面；false+人话 detail=失败原因——
+/// 插件侧按设计 §五 miss 策略处置：间隔型顺延一轮，At 型补送一次后销）。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct DeliverAck {
+    /// 与 [`DeliverMessage::deliver_id`] 配对。
+    pub deliver_id: String,
+    /// 投递结果。
+    pub ok: bool,
+    /// 人话详情（失败原因/成功路由面）。
+    #[serde(default)]
+    pub detail: String,
+}
+
 /// 插件协议封闭帧（§3.2 MVP 词汇；新增变体=设计修订评审线一）。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -152,4 +178,8 @@ pub enum PluginProtoFrame {
     ToolResult(ToolResult),
     /// 宿主→插件卸载通知。
     Shutdown(Shutdown),
+    /// 插件→宿主会话消息投递请求（v1.1；旧宿主端=未知标签拒收 fail-loud 可见）。
+    DeliverMessage(DeliverMessage),
+    /// 宿主→插件投递回执（v1.1）。
+    DeliverAck(DeliverAck),
 }

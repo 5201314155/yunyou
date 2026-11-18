@@ -243,7 +243,10 @@ impl<W: Write> Renderer<W> {
             return Ok(());
         }
         let profile = self.profile;
-        let view = tool::ToolCallView { name, summary };
+        // 批 4（T1-b）：spinner 进行时摘要走渲染器 activity 动词短语（未知
+        // 工具兜底=原样，零行为）；进行时是暂态帧，与完成卡 summary 分轨。
+        let activity = crate::render::tool_render::renderer(name).activity(name, Some(summary), summary);
+        let view = tool::ToolCallView { name, summary: &activity };
         let width = self.width;
         tool::tool_running_frame(&mut self.out, profile, &view, frame, Some(elapsed_secs), width, 0)?;
         self.commit()
@@ -261,7 +264,9 @@ impl<W: Write> Renderer<W> {
             return Ok(());
         }
         let profile = self.profile;
-        let view = tool::ToolCallView { name, summary };
+        // 批 4 同上：观察者 spinner 帧同人话化（单源=renderer activity）
+        let activity = crate::render::tool_render::renderer(name).activity(name, Some(summary), summary);
+        let view = tool::ToolCallView { name, summary: &activity };
         let width = self.width;
         tool::tool_running_frame(&mut self.out, profile, &view, frame, elapsed_secs, width, 0)?;
         self.commit()
@@ -274,7 +279,7 @@ impl<W: Write> Renderer<W> {
         tool::tool_done(&mut self.out, self.profile, event, self.width, 0)?;
         // 详情块（新插入的行，线性流末尾追加）
         if let TurnEvent::ToolResult { detail: Some(kind), .. } = event {
-            detail::render(&mut self.out, self.profile, kind)?;
+            detail::render(&mut self.out, self.profile, kind, self.width)?;
         }
         self.commit()
     }
@@ -286,7 +291,7 @@ impl<W: Write> Renderer<W> {
         write!(self.out, "{prefix}")?;
         tool::tool_done(&mut self.out, self.profile, event, self.width, tool::visible_width(prefix))?;
         if let TurnEvent::ToolResult { detail: Some(kind), .. } = event {
-            detail::render(&mut self.out, self.profile, kind)?;
+            detail::render(&mut self.out, self.profile, kind, self.width)?;
         }
         // task-51 移交②（云刺指认 flush 纪律缺口）：树归集完成卡与其他写入口
         // 同规 commit，防字节滞留 LineWriter 缓冲。

@@ -97,6 +97,7 @@ async fn hello_sdk自举全链_独立编译到真调用() {
             plugin_dir: plugin_dir.clone(),
             enforcer: None,
             spawn_form: yunyou_cli::proxy_plugin::SpawnForm::Direct,
+            deliver: None,
         },
         serde_json::Value::Null,
     );

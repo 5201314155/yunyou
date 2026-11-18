@@ -81,7 +81,8 @@ pub(crate) fn humanize(
 }
 
 /// 三层容错提取：映射字段 → 首字段值通法 → None（调用方回退原文）。
-fn extract(args: &str, field: &str) -> Option<String> {
+/// 批 4（T1-b）起 tool_render activity 钩子复用同源提取（单源不二写）。
+pub(crate) fn extract(args: &str, field: &str) -> Option<String> {
     field_value(args, field).or_else(|| first_field(args))
 }
 

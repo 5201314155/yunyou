@@ -198,11 +198,14 @@ impl ToolDefinition for ApplyPatchTool {
                             "path": path,
                             "hunks": crate::builtin::line_diff::diff_hunks(&text, &content)
                                 .iter()
-                                .map(|h| serde_json::json!({
-                                    "context": h.context,
-                                    "removed": h.removed,
-                                    "added": h.added,
-                                }))
+                                .map(|h| {
+                                    serde_json::json!({
+                                        "old_start": h.old_start,
+                                        "context": h.context,
+                                        "removed": h.removed,
+                                        "added": h.added,
+                                    })
+                                })
                                 .collect::<Vec<_>>(),
                         }));
                         match move_to {
