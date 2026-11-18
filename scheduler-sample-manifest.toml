@@ -1,0 +1,18 @@
+# scheduler-sample 落盘 manifest（market v2 形态；L2 设计 §3.1 字段）
+id = "scheduler"
+version = "0.1.0"
+format = 2
+level = "market"
+contracts = ["tools.v1"]
+category = "workflows"
+auto_enable = true
+
+[runtime]
+type = "subprocess"
+entry = ["scheduler-sample"]     # 相对插件目录=cargo build 产物名
+request_timeout_ms = 30000
+
+[permissions]
+writable = ["$SELF"]
+credentials = []
+network = false
