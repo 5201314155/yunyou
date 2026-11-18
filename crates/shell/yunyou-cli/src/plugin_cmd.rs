@@ -9,6 +9,7 @@
 //! 不另起炉灶）；本模块只做文件编排与拷贝。
 
 use std::path::Path;
+use std::process::Command;
 
 /// 脚手架模板 main.rs（SDK 最小插件全文；插件作者改工具逻辑即可）。
 const TEMPLATE_MAIN: &str = r#"//! <描述>：用 yunyou-plugin-sdk 写的独立可执行插件。
@@ -142,6 +143,131 @@ pub fn scaffold_new(name: &str, category: &str, dir: Option<&Path>) -> Result<St
         "脚手架已生成：{base}\n下一步：\n  1) cd {base} && cargo build --release\n  2) yunyou plugin install {base}\n（工具逻辑改 src/main.rs；参数 schema 自动进模型面）",
         base = base.display()
     ))
+}
+
+/// 官方插件远端资产映射（release-bin 分支；名→(二进制资产基名, manifest 资产名)。
+/// 与 install.sh v3 同源——单一事实源，禁双源漂移）。
+const OFFICIAL_REMOTE: &[(&str, &str, &str)] = &[("scheduler", "scheduler-sample", "scheduler-manifest.toml")];
+
+/// `plugin install` 入口三态分派（task-27 一条命令装插件）：
+/// ①本地目录（存在且含 manifest.toml）→既有本地安装；
+/// ②git/https url→clone 浅拷后按本地目录安装（产物须已在仓/可执行）；
+/// ③纯官方名（如 `scheduler`）→release-bin 拉 manifest+架构自适应二进制直装。
+pub fn install_dispatch(source: &str, home: &Path) -> Result<String, String> {
+    let as_path = Path::new(source);
+    if as_path.is_dir() && as_path.join("manifest.toml").is_file() {
+        return install(as_path, home);
+    }
+    if source.contains("://") {
+        return install_from_git(source, home);
+    }
+    install_official(source, home)
+}
+
+/// 远程源公共段：curl 下载（fail-loud 人话）。
+fn curl_to(url: &str, dest: &Path) -> Result<(), String> {
+    let output = Command::new("curl")
+        .args(["-fsSL", url, "-o"])
+        .arg(dest)
+        .output()
+        .map_err(|err| format!("curl 启动失败（请确认已安装 curl）：{err}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "下载失败（{url}）：{}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(())
+}
+
+/// ②git/https url 形态：浅 clone→目录内找 manifest+entry 产物→本地安装链。
+///
+/// 产物未构建=人话指路（社区插件仓库先本地构建再 install，或用官方名直装）。
+fn install_from_git(url: &str, home: &Path) -> Result<String, String> {
+    let tmp = std::env::temp_dir().join(format!("yunyou-plugin-clone-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    let output = Command::new("git")
+        .args(["clone", "--depth", "1", url])
+        .arg(&tmp)
+        .output()
+        .map_err(|err| format!("git 启动失败：{err}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "clone 失败（{url}）：{}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let result = install(&tmp, home).map(|msg| format!("{msg}\n（来源：git {url}）"));
+    let _ = std::fs::remove_dir_all(&tmp);
+    result
+}
+
+/// ③官方名形态：release-bin 拉 manifest+架构自适应二进制→组临时目录→本地安装链。
+///
+/// 下载校验 fail-loud（manifest 必在/二进制非零+可执行位）；与本地目录安装并存
+/// （复用同一 install 归类/五类校验/重复拒装链，零复制）。
+fn install_official(name: &str, home: &Path) -> Result<String, String> {
+    let (_, bin_base, manifest_asset) = OFFICIAL_REMOTE
+        .iter()
+        .find(|(id, _, _)| *id == name)
+        .ok_or_else(|| {
+            format!(
+                "「{name}」不在官方插件清单（{}）；社区插件用 git url 形态：yunyou plugin install <git url>",
+                OFFICIAL_REMOTE.iter().map(|(id, _, _)| *id).collect::<Vec<_>>().join("、")
+            )
+        })?;
+    let arch_suffix = match std::env::consts::ARCH {
+        "aarch64" => "-arm64",
+        _ => "",
+    };
+    let base = crate::update::RELEASE_BIN_BASE;
+    let tmp = std::env::temp_dir().join(format!("yunyou-plugin-remote-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    std::fs::create_dir_all(&tmp).map_err(|err| format!("临时目录创建失败：{err}"))?;
+    // ① manifest（必在——fail-loud）
+    curl_to(&format!("{base}/{manifest_asset}"), &tmp.join("manifest.toml"))
+        .map_err(|err| format!("官方插件 manifest 下载失败：{err}"))?;
+    // ② 二进制（架构自适应；非零校验）
+    let bin_url = format!("{base}/{bin_base}{arch_suffix}.gz");
+    curl_to(&bin_url, &tmp.join("plugin.gz")).map_err(|err| format!("官方插件二进制下载失败：{err}"))?;
+    let gz_size = std::fs::metadata(tmp.join("plugin.gz"))
+        .map_err(|err| format!("下载件不可读：{err}"))?
+        .len();
+    if gz_size == 0 {
+        return Err("下载件为空（release-bin 资产缺失？）——到 releases 页检查".into());
+    }
+    // ③ 解包→读 manifest 拿 entry（落位文件名=产物名）→可执行位
+    let unpacked = Command::new("gunzip")
+        .arg("-f")
+        .arg(tmp.join("plugin.gz"))
+        .status()
+        .map_err(|err| format!("gunzip 启动失败：{err}"))?;
+    if !unpacked.success() {
+        return Err("解包失败（gz 损坏？重试）".into());
+    }
+    let plugin_dir = tmp.join("plugin");
+    std::fs::create_dir_all(&plugin_dir).map_err(|err| format!("组装目录失败：{err}"))?;
+    std::fs::rename(tmp.join("plugin"), &plugin_dir.join("plugin.bin"))
+        .map_err(|err| format!("产物就位失败：{err}"))?;
+    std::fs::rename(tmp.join("manifest.toml"), plugin_dir.join("manifest.toml"))
+        .map_err(|err| format!("manifest 就位失败：{err}"))?;
+    let entry0 = crate::market_manifest::parse_and_validate(
+        &std::fs::read_to_string(plugin_dir.join("manifest.toml"))
+            .map_err(|err| format!("manifest 读取失败：{err}"))?,
+        &plugin_dir,
+    )
+    .map_err(|v| format!("manifest 五类校验违例：\n  {}", v.join("\n  ")))?
+    .runtime
+    .entry
+    .first()
+    .cloned()
+    .ok_or_else(|| "runtime.entry 为空".to_string())?;
+    std::fs::rename(plugin_dir.join("plugin.bin"), plugin_dir.join(&entry0))
+        .map_err(|err| format!("产物改名失败：{err}"))?;
+    // ④ 走本地安装链（归类/校验/重复拒装单源复用）
+    let result = install(&plugin_dir, home).map(|msg| format!("{msg}\n（来源：release-bin 官方名 {name}，架构{}）", std::env::consts::ARCH));
+    let _ = std::fs::remove_dir_all(&tmp);
+    result
 }
 
 /// `plugin install <目录>`：按 manifest 的 id+category 归类落盘。
@@ -470,6 +596,76 @@ mod tests {
         std::fs::write(src.join("manifest.toml"), "id = \"bad\"\nformat = 9\n").unwrap();
         let err = install(&src, &tmp.join("home")).expect_err("坏 manifest 应拒装");
         assert!(err.contains("校验违例"), "实际：{err}");
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+}
+
+#[cfg(test)]
+mod remote_tests {
+    #![allow(clippy::expect_used, clippy::unwrap_used)] // 测试面豁免（K-14 观察期口径）
+
+    use super::*;
+
+    #[test]
+    fn 分派_本地目录优先() {
+        let tmp = std::env::temp_dir().join(format!("yunyou-inst-dsp-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        scaffold_new("disp-probe", "tools", Some(&tmp)).expect("脚手架应生成");
+        let src = tmp.join("disp-probe");
+        let home = tmp.join("home");
+        // 本地目录（含 manifest.toml）走既有链——与远程形态并存不互斥
+        let msg = install_dispatch(src.to_str().unwrap(), &home).expect("本地安装应成功");
+        assert!(msg.contains("plugins/tools/disp-probe"), "{msg}");
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn 分派_未知官方名_人话清单() {
+        let home = std::env::temp_dir().join(format!("yunyou-inst-unk-{}", std::process::id()));
+        std::fs::create_dir_all(&home).unwrap();
+        let err = install_dispatch("no-such-official", &home).expect_err("未知名应报");
+        assert!(err.contains("官方插件清单") && err.contains("scheduler"), "应列已知名：{err}");
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    /// 网络真机档（ignore：真拉 release-bin，CI 不依赖外网；lead 真机验收同源）。
+    #[test]
+    #[ignore]
+    fn 网络档_官方名一条命令直装scheduler() {
+        let home = std::env::temp_dir().join(format!("yunyou-inst-net-{}", std::process::id()));
+        std::fs::create_dir_all(&home).unwrap();
+        let msg = install_dispatch("scheduler", &home).expect("官方名直装应成功");
+        assert!(msg.contains("plugins/workflows/scheduler"), "{msg}");
+        assert!(home.join("plugins/workflows/scheduler/scheduler-sample").is_file());
+        assert!(home.join("plugins/workflows/scheduler/manifest.toml").is_file());
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    /// git url 形态（本地裸仓模拟远端——同 task-18 验收口径）。
+    #[test]
+    fn git形态_本地裸仓模拟远端() {
+        let tmp = std::env::temp_dir().join(format!("yunyou-inst-git-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        // 造「远端」：脚手架产物仓
+        scaffold_new("git-probe", "tools", Some(&tmp)).expect("脚手架应生成");
+        let src = tmp.join("git-probe");
+        // 脚手架目录无 .git——先 init+commit 使其成为合法 clone 源
+        // [yun-ya P0 式机械修 2026-11-19 06:5x] 异构数组字面量尺寸不齐编译红
+        // （[[&str;2];3] 推断），改 Vec<Vec> 均齐——语义归承办席复核
+        for args in [
+            vec!["init"],
+            vec!["add", "."],
+            vec!["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "init"],
+        ] {
+            let st = Command::new("git").args(&args).current_dir(&src).status().unwrap();
+            assert!(st.success(), "git {args:?} 应成功");
+        }
+        let bare = tmp.join("remote.git");
+        let st = Command::new("git").args(["clone", "--bare"]).arg(&src).arg(&bare).status().unwrap();
+        assert!(st.success(), "裸仓应建成");
+        let home = tmp.join("home");
+        let msg = install_dispatch(bare.to_str().unwrap(), &home).expect("git 形态应装成功");
+        assert!(msg.contains("git"), "结算句应标来源：{msg}");
         let _ = std::fs::remove_dir_all(&tmp);
     }
 }

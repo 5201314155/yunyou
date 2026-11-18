@@ -102,21 +102,21 @@ const METHODS: &[(&str, Status)] = &[
     ("skills/get", Status::FrozenPending),
     // capabilities（契约 §9.3）
     ("capabilities/list", Status::FrozenPending),
-    // team / tasks 域（域-团队与任务.md）
-    ("team/spawn", Status::FrozenPending),
-    ("team/message", Status::FrozenPending),
-    ("team/roster", Status::FrozenPending),
-    ("team/kick", Status::FrozenPending),
-    ("tasks/create", Status::FrozenPending),
-    ("tasks/claim", Status::FrozenPending),
-    ("tasks/submit", Status::FrozenPending),
-    ("tasks/review", Status::FrozenPending),
-    ("tasks/reassign", Status::FrozenPending),
-    ("tasks/list", Status::FrozenPending),
-    // schedule 域（域-配置凭据与插件.md）
-    ("schedule/create", Status::FrozenPending),
-    ("schedule/list", Status::FrozenPending),
-    ("schedule/delete", Status::FrozenPending),
+    // team / tasks 域（域-团队与任务.md；W3 已接）
+    ("team/spawn", Status::Wired),
+    ("team/message", Status::Wired),
+    ("team/roster", Status::Wired),
+    ("team/kick", Status::Wired),
+    ("tasks/create", Status::Wired),
+    ("tasks/claim", Status::Wired),
+    ("tasks/submit", Status::Wired),
+    ("tasks/review", Status::Wired),
+    ("tasks/reassign", Status::Wired),
+    ("tasks/list", Status::Wired),
+    // schedule 域（域-配置凭据与插件.md §3；W4 已接）
+    ("schedule/create", Status::Wired),
+    ("schedule/list", Status::Wired),
+    ("schedule/delete", Status::Wired),
     // plugins 域
     ("plugins/list", Status::FrozenPending),
     ("plugins/enable", Status::FrozenPending),
@@ -210,6 +210,8 @@ mod tests {
             broadcast: sender,
             session_dir: PathBuf::from("/tmp/yunyou-contract-test-sessions"),
             wire: Arc::new(WireBridge::new("test-model".into())),
+            scheduler: Arc::new(yunyou_plugin_sdk::scheduler::Scheduler::new(|| 1_000_000)),
+            config_store: Arc::new(crate::config_store::ConfigStore::new(std::path::PathBuf::from("/tmp/yunyou-test-yunyou.toml"))),
         })
     }
 
@@ -237,7 +239,7 @@ mod tests {
     #[test]
     fn 注册表三档状态查询() {
         assert_eq!(status_of("session/prompt"), Some(Status::Wired));
-        assert_eq!(status_of("tasks/review"), Some(Status::FrozenPending));
+        assert_eq!(status_of("settings/sections"), Some(Status::FrozenPending));
         assert_eq!(status_of("market/install"), Some(Status::Later));
         assert_eq!(status_of("nope/x"), None);
     }
@@ -245,7 +247,7 @@ mod tests {
     /// not-implemented 兜底：契约内点名状态、契约外点名契约外；两态 code 一致。
     #[test]
     fn not_implemented点名() {
-        let frozen = not_implemented("team/roster");
+        let frozen = not_implemented("settings/sections");
         assert_eq!(frozen["error"]["code"], code::NOT_IMPLEMENTED);
         assert!(
             frozen["error"]["message"].as_str().unwrap_or("").contains("冻结待接"),
@@ -282,25 +284,29 @@ mod tests {
         let frozen = all.iter().filter(|(_, s)| *s == Status::FrozenPending).count();
         let later = all.iter().filter(|(_, s)| *s == Status::Later).count();
         // 锚点：openapi 已接 8 方法（session 6+commands 2）+session/open（域细则
-        // §1.1-3 冻结形状，openapi 加法演进未收录）；待接 28；后续 2（market）
-        assert_eq!((wired, frozen, later), (9, 29, 2), "契约方法计数漂移，先同步契约再改表：{all:?}");
+        // 冻结形状，openapi v1.1 已补录）+team/tasks 域 9 方法（W3）；待接 20；后续 2（market）
+        assert_eq!((wired, frozen, later), (22, 16, 2), "契约方法计数漂移，先同步契约再改表：{all:?}");
         // 已接方法必须确有分派（rpc.rs 契约面行为测试锁定形状，此处锁无遗漏）
         for (name, status) in all {
             if *status == Status::Wired {
                 assert!(
-                    name.starts_with("session/") || name.starts_with("commands/"),
-                    "已接面现态=session+commands 域：{name}"
+                    name.starts_with("session/")
+                        || name.starts_with("commands/")
+                        || name.starts_with("team/")
+                        || name.starts_with("tasks/")
+                        || name.starts_with("schedule/"),
+                    "已接面现态=session+commands+team+tasks 域：{name}"
                 );
             }
         }
     }
 
-    /// 兜底信封经真实 unary 通道回流：未接契约方法（tasks/list）应 ok:false
-    /// 且点名冻结待接（W1 验收口径：fail-visible 全量点名，不伪造值）。
+    /// 兜底信封经真实 unary 通道回流：未接契约方法（schedule/list）应
+    /// ok:false 且点名冻结待接（fail-visible 全量点名，不伪造值）。
     #[tokio::test(flavor = "multi_thread")]
     async fn 未接方法经unary兜底点名() {
         let state = state();
-        let body = r#"{"type":"client-request","rpcId":"r9","method":"tasks/list","payload":{}}"#;
+        let body = r#"{"type":"client-request","rpcId":"r9","method":"settings/sections","payload":{}}"#;
         let resp = crate::rpc::rpc_unary(State(state.clone()), axum::body::Bytes::from(body)).await;
         assert_eq!(resp.status(), StatusCode::OK);
         let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.expect("体可读");

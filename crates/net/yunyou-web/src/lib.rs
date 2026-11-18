@@ -28,6 +28,7 @@
 
 mod bridge;
 mod commands;
+mod config_store;
 mod contract;
 mod dist;
 mod error;
@@ -38,6 +39,9 @@ mod protocol;
 mod rpc;
 mod rpc_session;
 mod rpc_commands;
+mod rpc_schedule;
+mod rpc_team;
+mod schedule_fire;
 mod server;
 mod sessions;
 mod token;

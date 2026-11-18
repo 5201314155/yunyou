@@ -153,8 +153,16 @@ export function apply(ctx: Context): void {
   const rowToast = createSnapshotStore<RowToastState | null>(null)
   let toastSeq = 0
   const notify = (toast: RowToast): void => { rowToast.set({ ...toast, seq: ++toastSeq }) }
+  // Cold-session resume: switch the Host's active Session before its follow
+  // opens (web.v1 多会话步 2）. A deployment without the call keeps the legacy path.
+  const resumeSession = async (sessionId: SessionId) => {
+    const result = await ctx.remote.session.open({ sessionId })
+    return result.ok
+      ? { ok: true as const, skipped: result.value.skipped }
+      : { ok: false as const, code: result.error.code }
+  }
   const uiWorkspace = new UiWorkspaceService(
-    ctx, ctx.remote.directoryPicker, workspaces, sessions, viewInstance.actions, notify,
+    ctx, ctx.remote.directoryPicker, workspaces, sessions, viewInstance.actions, notify, resumeSession,
   )
   ctx.slots.provideRoot({
     hooks: { workspaces: workspaces.list },

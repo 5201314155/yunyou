@@ -106,10 +106,10 @@ pub enum PluginCmd {
         #[arg(long, value_name = "DIR")]
         dir: Option<PathBuf>,
     },
-    /// 安装插件目录（按 manifest.toml 的 id+category 归类落 <home>/plugins/）。
+    /// 安装插件（task-27 一条命令）：本地目录 / 官方插件名 / git url 三态自动分派。
     Install {
-        /// 插件目录（含 manifest.toml 与 cargo build 产物）。
-        path: PathBuf,
+        /// 本地目录（含 manifest.toml）| 官方插件名（如 scheduler）| git url。
+        source: String,
     },
     /// 装前自查（作者侧；与 install 同源校验+依赖形态/契约版本/撞名预警）。
     Check {

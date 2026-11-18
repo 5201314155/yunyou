@@ -334,6 +334,11 @@ export type RowToast =
    * a report can be searched by it — and any other failure's own message.
    */
   | { kind: 'createFailed'; message: string }
+  /**
+   * A listed Session resumed through the Host's open call; `count` names the
+   * events the bridge skipped (honest replay-gap disclosure, web.v1 §8).
+   */
+  | { kind: 'openResumed'; count: number }
 
 /** The notice on display; `seq` keys remounts so a repeated notice restarts its hold. */
 export type RowToastState = RowToast & { seq: number }

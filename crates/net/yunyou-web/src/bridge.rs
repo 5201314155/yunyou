@@ -18,6 +18,9 @@ pub(crate) enum StreamKind {
     Workspace,
     /// 全局会话控制投影流（session/control：基线+live 投影帧——侧栏真名）。
     Control,
+    /// 跨域事件下行流（$events：tasks/changed 等——websocket.md §4 增量提示，
+    /// 前端收到后重拉对应投影，单真源）。
+    Events,
 }
 
 /// 状态锁毒化恢复（ratchet：生产面零 expect/unwrap——桥状态是纯计数/缓冲，
@@ -38,6 +41,11 @@ impl WireBridge {
     pub(crate) fn new(model: String) -> Self {
         let (frames, _) = broadcast::channel(256);
         Self { state: Mutex::new(WireState::new(model)), frames }
+    }
+
+    /// 跨域事件广播（$events 流；写操作后推 tasks/changed 等——别让前端轮询）。
+    pub(crate) fn broadcast_event(&self, kind: StreamKind, value: Value) {
+        let _ = self.frames.send((kind, None, Arc::new(value)));
     }
 
     /// mux 订阅端（每条 mux 连接一个；无订阅者时事件安全丢弃）。

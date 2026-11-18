@@ -5,7 +5,7 @@
 //! member.rs 的身份化工具（成员自己的 fiber 上下文），不经本服务——两条身份
 //! 通道都收在 fiber 上下文里，模型与工具实现都无法自报发送者。
 
-use crate::board::{BoardOpError, TaskBoard, TeamTaskView};
+use crate::board::{BoardOpError, TaskBoard, TeamTask, TeamTaskView};
 use crate::task_types::{ContextMode, TeamConfig, TeamService, TeammateSpawned, TeammateSpec};
 use crate::member::MemberPlugin;
 use crate::roster::{Roster, RosterEntry};
@@ -280,6 +280,10 @@ impl TeamService for TeamServiceState {
         // 与 send_message 同一身份通道（团队 fiber="lead"）：drain 的身份派发
         // 语义天然防越权（非 lead fiber 取不到此信箱）
         self.ctx()?.drain_inbox()
+    }
+
+    fn task_list_full(&self) -> Vec<TeamTask> {
+        self.core.board.lock().expect("任务板锁").list_full()
     }
 
     fn task_list(&self) -> Vec<TeamTaskView> {

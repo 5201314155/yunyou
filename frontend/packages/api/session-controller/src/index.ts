@@ -10,6 +10,7 @@ import { errorChain, ReasoningEffortId, type MessageSource } from '@deepseek-ai/
 import type {} from '@deepseek-ai/dsh-client-file-upload'
 import { canOpenNativePath, nativeFileManager, nativeFileApplications, openNativeFileApplication, openNativeAssociatedPath, revealNativePath } from '@deepseek-ai/dsh-native-command'
 import type { SessionId } from '@deepseek-ai/dsh-session'
+import { SessionQueryError } from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-session-projection-cache'
 import type { SessionObservation } from '@deepseek-ai/dsh-session-query'
 import { Remote, RemoteError, TypertRemoteService, principalOf, type TypertResourceResolveInput } from '@deepseek-ai/dsh-typert-protocol'
@@ -48,6 +49,8 @@ import type {
   SessionForkValue,
   SessionListRequest,
   SessionListValue,
+  SessionOpenRequest,
+  SessionOpenValue,
   SessionOpenWorkspacePathRequest,
   SessionOpenWorkspacePathValue,
   SessionEventsPage, SessionPageRequest, SessionEventFrame, SessionObserveEventRequest,
@@ -282,6 +285,32 @@ export class SessionController extends TypertRemoteService {
   async list(_request: SessionListRequest, signal: AbortSignal): Promise<SessionListValue> {
     const items = await this.listState.list(signal)
     return { items: items.filter(item => this.ctx.remoteAccess.allows({ kind: 'session', id: item.sessionId })) }
+  }
+
+  /**
+   * Resume one listed Session: verify it exists and activate it in the
+   * background so it becomes the prompt-able one. The replay-ring counts
+   * (`ingested`/`skipped`) are a wire-bridge deployment fact — this Host
+   * honestly reports zeros because its follow streams history directly.
+   * @param request - Session identity to open.
+   * @returns the resumed Session identity with honest zero bridge counters.
+   */
+  @Remote('open')
+  async open(request: SessionOpenRequest): Promise<SessionOpenValue> {
+    const { sessionId } = request
+    if (!this.ctx.remoteAccess.allows({ kind: 'session', id: sessionId })) {
+      throw new RemoteError('session/not-found', `session "${sessionId}" not found`, { sessionId })
+    }
+    try {
+      using observation = await this.ctx.sessionQuery.observeSession(sessionId)
+      this.promote(observation)
+    } catch (error: unknown) {
+      if (error instanceof SessionQueryError && error.code === 'SESSION_QUERY_SESSION_NOT_FOUND') {
+        throw new RemoteError('session/not-found', `session "${sessionId}" not found`, { sessionId })
+      }
+      throw error
+    }
+    return { sessionId, ingested: 0, skipped: 0, skippedNote: '' }
   }
 
   /**

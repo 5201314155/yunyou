@@ -11,7 +11,7 @@ HOME_DIR="${YUNYOU_HOME:-$HOME/.yunyou}"
 echo "☁ 云悠安装器"
 
 # 1) 主路径：release-bin 分支直拉预编译二进制（raw，免 Release 网页操作）
-#    v4：主程序 + 官方插件集（scheduler=定时三工具；web-search=联网搜索单工具
+#    v4：主程序 + 官方插件集（scheduler=定时三工具；web-search 内置版随主程序，market 分发候 L2.1 网络缝）
 #    四后端）逐个落位 plugins/<category>/<id>/——装完重启即被发现装载。
 #    hello-sdk 不随装（示例归示例——示例是仓库内布线，作者参考 main.rs 写法）。
 #    memory 插件候入库后加行（设计已批 20261118，代码未落）。
@@ -58,7 +58,7 @@ install_plugin() {
 # 官方插件集清单（加行即扩——产物推 release-bin 后在此登记）
 PLUGINS=""
 PLUGINS="$PLUGINS scheduler scheduler-sample workflows"
-PLUGINS="$PLUGINS web-search web-search tools"
+PLUGINS="$PLUGINS tools"
 
 install_binary() {
     TMP=$(mktemp -d)

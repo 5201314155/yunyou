@@ -55,6 +55,16 @@ silent changes are forbidden.
 - **Plugin management**: `yunyou plugin new|check|install|outdated|update|remove` (three update sources + contract compatibility gate)
 
 ## Writing a plugin (five minutes)
+## Installing plugins (one command)
+
+```bash
+yunyou plugin install scheduler        # official plugin: pull manifest+arch-matched binary from release-bin
+yunyou plugin install <git url>        # community plugin: shallow clone, install from repo
+yunyou plugin install ./my-plugin      # local directory (manifest.toml + built binary)
+```
+
+All three paths run the same validation chain (manifest five-class checks + duplicate guard) and land under `<home>/plugins/<category>/<id>/`. Restart yunyou → `/plugins` shows it → model can call its tools.
+
 
 ```bash
 yunyou plugin new weather --category tools   # scaffolds manifest + template main + README

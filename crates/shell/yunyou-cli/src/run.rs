@@ -83,8 +83,8 @@ pub async fn run(command: crate::cli::Cli) -> Result<(), AppError> {
                 crate::plugin_cmd::scaffold_new(name, category, dir.as_deref())
                     .map_err(AppError::Assemble)?
             }
-            cli::PluginCmd::Install { path } => {
-                crate::plugin_cmd::install(path, &home).map_err(AppError::Assemble)?
+            cli::PluginCmd::Install { source } => {
+                crate::plugin_cmd::install_dispatch(source, &home).map_err(AppError::Assemble)?
             }
             cli::PluginCmd::Check { path } => {
                 println!("{}", crate::plugin_cmd::check(path));
@@ -339,6 +339,11 @@ pub async fn run(command: crate::cli::Cli) -> Result<(), AppError> {
                     session_dir: session_dir_path(&config, &home),
                     model: config.llm.model.clone(),
                     addr: addr.clone(),
+                    // 定时注入消费臂（W4）：web 分支接宿主投递缝（rx 原被 drop=
+                    // 消费侧接线缺陷；回合边界投递同律由 Web 闸门承担）
+                    scheduled_rx: assembled.scheduled_rx.take(),
+                    // 配置修订写落点（W5 settings 域）
+                    config_path: config_path.clone(),
                 };
                 yunyou_web::serve(params).await.map_err(|err| AppError::Assemble(err.to_string()))
             }

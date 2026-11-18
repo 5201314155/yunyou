@@ -29,6 +29,10 @@ pub struct WebParams {
     pub model: String,
     /// 监听地址 host:port（None = 127.0.0.1:0 随机端口，冲突免疫；LAN 暴露需显式指定）。
     pub addr: Option<String>,
+    /// 宿主定时注入缝（assemble scheduled_rx；W4 消费臂——None=无宿主调度）。
+    pub scheduled_rx: Option<tokio::sync::mpsc::Receiver<String>>,
+    /// 配置文件路径（W5 settings 修订写落点；run.rs 传实际 yunyou.toml 路径）。
+    pub config_path: std::path::PathBuf,
 }
 
 /// 运行中的 web 服务实例（start_instance 产物；测试与嵌入方持有真实地址与令牌）。
@@ -47,8 +51,8 @@ pub struct WebInstance {
 ///
 /// web 语义里 /quit = 断开连接（WS 层处置，不落此函数）——杀服务是终端
 /// Ctrl-C 的职权；P3 起如需并听壳退出令牌在此扩展。
-pub async fn serve(params: WebParams) -> Result<(), WebError> {
-    let instance = start_instance(&params).await?;
+pub async fn serve(mut params: WebParams) -> Result<(), WebError> {
+    let instance = start_instance(&mut params).await?;
     tokio::signal::ctrl_c().await?;
     instance.stop.cancel();
     // 收场阶段的 IO 错误不再上抛（进程退出在即，报了也没人接）
@@ -57,19 +61,60 @@ pub async fn serve(params: WebParams) -> Result<(), WebError> {
 }
 
 /// 启动实例：铸造 token → 建态 → 绑定 → 打印访问地址 → 后台 serve。
-pub async fn start_instance(params: &WebParams) -> Result<WebInstance, WebError> {
+pub async fn start_instance(params: &mut WebParams) -> Result<WebInstance, WebError> {
     let token = token::mint();
     let addr = resolve_addr(params.addr.as_deref())?;
     // 广播容量：Delta 帧高频，256 条缓冲吸收瞬时积压（滞后由连接层人话告警）
     let (broadcast_tx, _) = broadcast::channel(256);
+    // 定时调度器（W4）：宿主持有+触发器挂接（到期→回合注入）+1s tick 线程
+    //（进程退出即焚；durable 持久化未闭环=会话内有效，诚实投影）
+    let scheduler = Arc::new(yunyou_plugin_sdk::scheduler::Scheduler::new(|| {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0)
+    }));
     let state = Arc::new(WebState {
         token,
         model: params.model.clone(),
         turns: Arc::new(TurnRunner::new(params.root_getter.clone(), params.model.clone())),
-        broadcast: broadcast_tx,
         session_dir: params.session_dir.clone(),
         wire: Arc::new(WireBridge::new(params.model.clone())),
+        config_store: Arc::new(crate::config_store::ConfigStore::new(params.config_path.clone())),
+        scheduler: {
+            scheduler.set_trigger(Arc::new(crate::schedule_fire::TurnFireTrigger {
+                turns: Arc::new(TurnRunner::new(params.root_getter.clone(), params.model.clone())),
+                broadcast: broadcast_tx.clone(),
+            }));
+            scheduler.spawn_thread();
+            scheduler
+        },
+        broadcast: broadcast_tx,
     });
+    // 定时注入消费臂（W4，lead 批）：宿主缝 scheduled_rx → 回合闸门内注入
+    // 活跃会话（事件流自然回显）。闸门占用=人话日志+5s 退避重试（不排队伪装、
+    // 防忙会话期打转刷屏）；其他失败=留痕放弃本条（miss 顺延语义）。
+    if let Some(mut scheduled_rx) = params.scheduled_rx.take() {
+        let turns = state.turns.clone();
+        let broadcast = state.broadcast.clone();
+        tokio::spawn(async move {
+            while let Some(text) = scheduled_rx.recv().await {
+                loop {
+                    match turns.run(&text, broadcast.clone()).await {
+                        Ok(()) => break,
+                        Err(err) if err.contains("正在对话中") => {
+                            eprintln!("[定时注入] 回合占用，5s 后重试：{text}");
+                            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                        }
+                        Err(err) => {
+                            eprintln!("[定时注入] 注入失败（miss 顺延放弃本条）: {err}");
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+    }
     start_with_state(addr, state).await
 }
 

@@ -167,7 +167,8 @@ async fn dispatch_open(
             .await;
             follows.push((stream_id, crate::bridge::StreamKind::Workspace, None));
         }
-        // 客户端事件下行流：ready 帧（waterfall 桥接远期——本片只建通道）
+        // 客户端事件下行流（$events）：ready 帧先行；live 事件经 Events 流别推流
+        // （websocket.md §4：tasks/changed 等，增量提示，前端重拉投影）
         "$events" => {
             let _ = send(
                 socket,
@@ -178,6 +179,7 @@ async fn dispatch_open(
                 }}),
             )
             .await;
+            follows.push((stream_id, crate::bridge::StreamKind::Events, None));
         }
         other => {
             let _ = send(
@@ -230,6 +232,8 @@ mod tests {
             broadcast: sender,
             session_dir: PathBuf::from("/tmp/yunyou-gw-test-sessions"),
             wire: Arc::new(WireBridge::new("test-model".into())),
+            scheduler: Arc::new(yunyou_plugin_sdk::scheduler::Scheduler::new(|| 1_000_000)),
+            config_store: Arc::new(crate::config_store::ConfigStore::new(std::path::PathBuf::from("/tmp/yunyou-test-yunyou.toml"))),
         })
     }
 

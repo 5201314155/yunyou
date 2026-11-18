@@ -6,6 +6,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+tokio = { workspace = true }
 yunyou = { workspace = true }
 yunyou-agent-loop = { workspace = true }
 yunyou-util = { workspace = true }

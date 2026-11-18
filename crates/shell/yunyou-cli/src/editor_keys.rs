@@ -28,7 +28,11 @@ pub(crate) enum CsiKey {
 /// * SS3（ESC O）→ O 后 A-D/H/F 同义（xterm 应用键盘态）；
 /// * 序列中途 50ms 无字节 → `None`（孤立序列放弃防卡）。
 pub(crate) async fn read_csi(source: &InputSource) -> Option<CsiKey> {
-    let lead = read_byte_timeout(source).await?;
+    // 孤立 Esc（50ms 无后续）=Escape（收面板语义）——原 read_csi 语义，勿丢
+    let lead = match read_byte_timeout(source).await {
+        Some(b) => b,
+        None => return Some(CsiKey::Escape),
+    };
     if lead == b'O' {
         // SS3：单 final 字节（xterm 应用光标键）
         return read_byte_timeout(source).await.map(|f| match f {
@@ -42,7 +46,8 @@ pub(crate) async fn read_csi(source: &InputSource) -> Option<CsiKey> {
         });
     }
     if lead != b'[' {
-        return Some(CsiKey::Other); // 非 CSI 引导序列（吞单字节）
+        // Alt 族（ESC b/f/0x7F）；其余 Alt 组合吞弃
+        return alt_key(lead).map_or(Some(CsiKey::Other), |_| Some(CsiKey::Other));
     }
     let mut param: Option<u8> = None;
     loop {
@@ -53,17 +58,15 @@ pub(crate) async fn read_csi(source: &InputSource) -> Option<CsiKey> {
                     (b'B', _) => CsiKey::Down,
                     (b'C', _) => CsiKey::Right,
                     (b'D', _) => CsiKey::Left,
-                    (b'H', _) => CsiKey::Home,
-                    (b'F', _) => CsiKey::End,
-                    (b'~', Some(p)) if p == b'3' => CsiKey::Delete,
-                    (b'~', Some(p)) if p == b'1' || p == b'7' => CsiKey::Home,
-                    (b'~', Some(p)) if p == b'4' || p == b'8' => CsiKey::End,
+                    (b'H', _) | (b'~', Some(b'1')) | (b'~', Some(b'7')) => CsiKey::Home,
+                    (b'F', _) | (b'~', Some(b'4')) | (b'~', Some(b'8')) => CsiKey::End,
+                    (b'~', Some(b'3')) => CsiKey::Delete,
                     _ => CsiKey::Other,
                 });
             }
             // 参数（0x30..=0x3F）与中间（0x20..=0x2F）字节：继续读（记住参数）
             Some(b) if csi_continues(b) => {
-                if (b'0'..=b'9').contains(&b) {
+                if b.is_ascii_digit() {
                     param.get_or_insert(b);
                 }
                 continue;
@@ -114,6 +117,36 @@ pub(crate) async fn read_byte_timeout(source: &InputSource) -> Option<u8> {
         .flatten()
 }
 
+/// ESC 分发统一入口（编辑行整族升级）：孤立=Key::Escape；Alt 族=alt_key；
+/// CSI/SS3=CsiKey 映射。lineedit 0x1B 分支只调本函数。
+pub(crate) async fn read_escape_key(source: &InputSource) -> Option<Key> {
+    // 50ms 内的第二字节决定形态（与 repl::esc_interrupt 同值同因口径）
+    let second = read_byte_timeout(source).await;
+    let Some(second) = second else { return Some(Key::Escape) };
+    match second {
+        b'[' | b'O' => {
+            // CSI/SS3：把第二字节回退后走 read_csi（其内部已支持 O 引导）
+            source.pushback(&[second]);
+            read_csi(source).await.map(csi_to_key)
+        }
+        b => alt_key(b).or(Some(Key::Escape)), // 其余 Alt 组合按 Esc 语义吞弃
+    }
+}
+
+fn csi_to_key(k: CsiKey) -> Key {
+    match k {
+        CsiKey::Up => Key::Up,
+        CsiKey::Down => Key::Down,
+        CsiKey::Left => Key::Left,
+        CsiKey::Right => Key::Right,
+        CsiKey::Home => Key::Home,
+        CsiKey::End => Key::End,
+        CsiKey::Delete => Key::Delete,
+        CsiKey::Escape => Key::Escape,
+        CsiKey::Other => Key::Escape,
+    }
+}
+
 fn csi_is_final(b: u8) -> bool {
     (0x40..=0x7e).contains(&b)
 }
@@ -130,6 +163,7 @@ fn csi_continues(b: u8) -> bool {
 /// 否则成为「删不掉的前缀」——cooked 退格按字节删，UTF-8 三字节字要按三下
 ///（中文必现、英文不现即此因）。TCIFLUSH 只清「已收未读」的输入，不动输出；
 /// fd 非终端时 tcflush 失败，调用方忽略（非 TTY 场景无本缺陷，失败不是错误）。
+#[allow(dead_code)] // 消费面=lineedit_tests.rs（独立测试 target；lib 路径暂无消费，迁入件原语义保留）
 pub(crate) fn flush_stdin_fd(fd: i32) -> std::io::Result<usize> {
     // task-39 批 A 三步：FIONREAD 前置计数（tcflush 内核级丢弃不可感——计数
     // 必须先行）→ TCIFLUSH（原缺陷①修法保留不回退）→ 回报丢弃字节数。
@@ -146,6 +180,7 @@ pub(crate) fn flush_stdin_fd(fd: i32) -> std::io::Result<usize> {
 /// task-39 批 A 提示行文案（字节口径锁）：FIONREAD 计数为**字节**，UTF-8
 /// 多字节下按「字符」报数即伪造计数（报告5 P1-3 退出码 -1 同族病，不再犯）
 /// ——测试锁死「字节」用词与 N=0 静默语义。
+#[allow(dead_code)] // 同上：lineedit_tests.rs 消费面
 pub(crate) fn pretype_hint(n: usize) -> String {
     format!("已忽略 {n} 字节预输入")
 }
@@ -195,25 +230,25 @@ mod tests {
     /// 方向键四向/Home/End/Del(`3~`)/SS3 形态。
     #[tokio::test]
     async fn csi扩展解析_编辑族键全通() {
-        let feed = |bytes: &[u8]| {
+        let feed = |bytes: Vec<u8>| {
             let (tx, rx) = tokio::sync::mpsc::channel(16);
             let src = InputSource::from_receiver(rx);
             async move {
                 for b in bytes {
-                    tx.send(*b).await.unwrap();
+                    tx.send(b).await.unwrap();
                 }
                 drop(tx);
                 read_csi(&src).await
             }
         };
-        assert_eq!(feed(&[b'[', b'D']).await, Some(CsiKey::Left));
-        assert_eq!(feed(&[b'[', b'C']).await, Some(CsiKey::Right));
-        assert_eq!(feed(&[b'[', b'H']).await, Some(CsiKey::Home));
-        assert_eq!(feed(&[b'[', b'F']).await, Some(CsiKey::End));
-        assert_eq!(feed(&[b'[', b'3', b'~']).await, Some(CsiKey::Delete));
-        assert_eq!(feed(&[b'O', b'A']).await, Some(CsiKey::Up));
-        assert_eq!(feed(&[b'O', b'H']).await, Some(CsiKey::Home));
-        assert_eq!(feed(&[b'[', b'Z']).await, Some(CsiKey::Other));
+        assert_eq!(feed(vec![b'[', b'D']).await, Some(CsiKey::Left));
+        assert_eq!(feed(vec![b'[', b'C']).await, Some(CsiKey::Right));
+        assert_eq!(feed(vec![b'[', b'H']).await, Some(CsiKey::Home));
+        assert_eq!(feed(vec![b'[', b'F']).await, Some(CsiKey::End));
+        assert_eq!(feed(vec![b'[', b'3', b'~']).await, Some(CsiKey::Delete));
+        assert_eq!(feed(vec![b'O', b'A']).await, Some(CsiKey::Up));
+        assert_eq!(feed(vec![b'O', b'H']).await, Some(CsiKey::Home));
+        assert_eq!(feed(vec![b'[', b'Z']).await, Some(CsiKey::Other));
     }
 
     /// plain_key 映射：Ctrl 族全表+回车/退格；可见字符返回 None（UTF-8 拼读

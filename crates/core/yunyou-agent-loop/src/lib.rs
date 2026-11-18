@@ -42,7 +42,8 @@ pub use hooks::{
     PreComposeHook, PreComposeRequest,
 };
 pub use gate::{
-    ApprovalDecision, ApprovalPresenter, ApprovalSubject, ApprovalSubjectKind, ApprovalUiService,
+    ApprovalDecision, ApprovalPresenter, ApprovalSubject, ApprovalSubjectKind, ApprovalUiRegistry,
+    ApprovalUiService,
     GateContext, GateDecision, GateHub, GateRegistryService, GateRegistry, PreToolUseGate,
     ToolCallView,
 };

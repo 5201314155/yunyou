@@ -75,6 +75,51 @@ pub(crate) async fn rpc_unary(
         "session/prompt" => crate::rpc_session::rpc_prompt(&state, &body).await,
         // 会话恢复（多会话步 2，域细则 §1.1-3）：切活跃+JSONL 尾部灌入重放环
         "session/open" => return crate::rpc_session::rpc_open(&state, &body).await,
+        // team/tasks 域（W3，契约域-团队与任务.md）：名册/消息/踢人/任务板
+        "team/roster" => crate::rpc_team::team_roster(&state),
+        "tasks/list" => crate::rpc_team::tasks_list(&state),
+        "team/spawn" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_team::team_spawn(&state, &payload).await
+        }
+        "team/message" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_team::team_message(&state, &payload)
+        }
+        "team/kick" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_team::team_kick(&state, &payload).await
+        }
+        "tasks/create" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_team::tasks_create(&state, &payload)
+        }
+        "tasks/claim" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_team::tasks_claim(&state, &payload)
+        }
+        "tasks/submit" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_team::tasks_submit(&state, &payload)
+        }
+        "tasks/review" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_team::tasks_review(&state, &payload)
+        }
+        "tasks/reassign" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_team::tasks_reassign(&state, &payload)
+        }
+        // schedule 域（W4，契约域-配置凭据与插件.md §3）：三方法管理面
+        "schedule/create" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_schedule::schedule_create(&state, &payload)
+        }
+        "schedule/list" => crate::rpc_schedule::schedule_list(&state),
+        "schedule/delete" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_schedule::schedule_delete(&state, &payload)
+        }
         // commands 域（W2，契约 §9.1）：目录投影+命令缝执行桥
         "commands/list" => crate::rpc_commands::commands_list(&state),
         "commands/execute" => {
@@ -121,6 +166,8 @@ mod tests {
             broadcast: sender,
             session_dir: PathBuf::from("/tmp/yunyou-rpc-test-sessions"),
             wire: Arc::new(WireBridge::new("test-model".into())),
+            scheduler: Arc::new(yunyou_plugin_sdk::scheduler::Scheduler::new(|| 1_000_000)),
+            config_store: Arc::new(crate::config_store::ConfigStore::new(std::path::PathBuf::from("/tmp/yunyou-test-yunyou.toml"))),
         })
     }
 

@@ -881,6 +881,17 @@ const _deepseek_ai_dsh_api_session_controller_session_observeState_result$schema
 }))]).readonly(),
   'pendingInput': z.array(z.union([z.literal("approval"), z.literal("question"), z.literal("other")])).readonly().describe('Pending Remote requests sampled when this state was read. A pending change alone does not trigger `observeState`; `wait` refreshes on its own interval.'),
 }))
+let _deepseek_ai_dsh_api_session_controller_session_open_parameter_0$schema$value
+const _deepseek_ai_dsh_api_session_controller_session_open_parameter_0$schema = () => (_deepseek_ai_dsh_api_session_controller_session_open_parameter_0$schema$value ??= z.object({
+  'sessionId': z.string().readonly(),
+}))
+let _deepseek_ai_dsh_api_session_controller_session_open_result$schema$value
+const _deepseek_ai_dsh_api_session_controller_session_open_result$schema = () => (_deepseek_ai_dsh_api_session_controller_session_open_result$schema$value ??= z.object({
+  'sessionId': z.string().readonly(),
+  'ingested': z.number().readonly(),
+  'skipped': z.number().readonly(),
+  'skippedNote': z.string().readonly(),
+}))
 let _deepseek_ai_dsh_api_session_controller_session_openWorkspacePath_parameter_0$schema$value
 const _deepseek_ai_dsh_api_session_controller_session_openWorkspacePath_parameter_0$schema = () => (_deepseek_ai_dsh_api_session_controller_session_openWorkspacePath_parameter_0$schema$value ??= z.object({
   'action': z.literal("reveal").readonly().optional().describe('File-manager navigation when requested; omission uses the default application.'),
@@ -1452,6 +1463,17 @@ const _deepseek_ai_dsh_api_session_controller_session_workspacePathApplications_
   'default': z.boolean().readonly(),
   'icon': z.union([z.literal(null), z.string()]).readonly().describe('PNG or SVG data URL, or null when the desktop supplies no icon.'),
 })))
+let _deepseek_ai_dsh_api_session_controller_skills_get_parameter_0$schema$value
+const _deepseek_ai_dsh_api_session_controller_skills_get_parameter_0$schema = () => (_deepseek_ai_dsh_api_session_controller_skills_get_parameter_0$schema$value ??= z.object({
+  'sessionId': z.string().readonly(),
+  'id': z.string().readonly(),
+}))
+let _deepseek_ai_dsh_api_session_controller_skills_get_result$schema$value
+const _deepseek_ai_dsh_api_session_controller_skills_get_result$schema = () => (_deepseek_ai_dsh_api_session_controller_skills_get_result$schema$value ??= z.object({
+  'name': z.string().readonly(),
+  'description': z.string().readonly(),
+  'body': z.string().readonly(),
+}))
 let _deepseek_ai_dsh_api_session_controller_skills_list_parameter_0$schema$value
 const _deepseek_ai_dsh_api_session_controller_skills_list_parameter_0$schema = () => (_deepseek_ai_dsh_api_session_controller_skills_list_parameter_0$schema$value ??= z.object({
   'sessionId': z.string().readonly(),
@@ -1565,6 +1587,10 @@ let _deepseek_ai_dsh_api_session_controller_session_observeState_parameter_0_str
 const _deepseek_ai_dsh_api_session_controller_session_observeState_parameter_0_strict$schema = () => (_deepseek_ai_dsh_api_session_controller_session_observeState_parameter_0_strict$schema$value ??= z.strictObject({
   'sessionId': z.string().readonly(),
 }))
+let _deepseek_ai_dsh_api_session_controller_session_open_parameter_0_strict$schema$value
+const _deepseek_ai_dsh_api_session_controller_session_open_parameter_0_strict$schema = () => (_deepseek_ai_dsh_api_session_controller_session_open_parameter_0_strict$schema$value ??= z.strictObject({
+  'sessionId': z.string().readonly(),
+}))
 let _deepseek_ai_dsh_api_session_controller_session_openWorkspacePath_parameter_0_strict$schema$value
 const _deepseek_ai_dsh_api_session_controller_session_openWorkspacePath_parameter_0_strict$schema = () => (_deepseek_ai_dsh_api_session_controller_session_openWorkspacePath_parameter_0_strict$schema$value ??= z.strictObject({
   'action': z.literal("reveal").readonly().optional().describe('File-manager navigation when requested; omission uses the default application.'),
@@ -1660,6 +1686,11 @@ let _deepseek_ai_dsh_api_session_controller_session_workspacePathApplications_pa
 const _deepseek_ai_dsh_api_session_controller_session_workspacePathApplications_parameter_0_strict$schema = () => (_deepseek_ai_dsh_api_session_controller_session_workspacePathApplications_parameter_0_strict$schema$value ??= z.strictObject({
   'path': z.string().readonly(),
 }))
+let _deepseek_ai_dsh_api_session_controller_skills_get_parameter_0_strict$schema$value
+const _deepseek_ai_dsh_api_session_controller_skills_get_parameter_0_strict$schema = () => (_deepseek_ai_dsh_api_session_controller_skills_get_parameter_0_strict$schema$value ??= z.strictObject({
+  'sessionId': z.string().readonly(),
+  'id': z.string().readonly(),
+}))
 let _deepseek_ai_dsh_api_session_controller_skills_list_parameter_0_strict$schema$value
 const _deepseek_ai_dsh_api_session_controller_skills_list_parameter_0_strict$schema = () => (_deepseek_ai_dsh_api_session_controller_skills_list_parameter_0_strict$schema$value ??= z.strictObject({
   'sessionId': z.string().readonly(),
@@ -1754,7 +1785,7 @@ const $remote = createTypertRemoteInfo({
         description: 'the durable attachment reference and base64-encoded bytes.',
         jsonSchema: {"type":"object","properties":{"attachment":{"type":"object","properties":{"attachmentId":{"type":"string","description":"Opaque storage identifier; never a filesystem path or bearer URL."},"mediaType":{"type":"string","enum":["image/png","image/jpeg","image/webp","image/gif"],"description":"Media type verified from the stored bytes."},"bytes":{"type":"number","description":"Exact encoded byte length."},"width":{"type":"number","description":"Intrinsic encoded width in pixels."},"height":{"type":"number","description":"Intrinsic encoded height in pixels."},"name":{"type":"string","description":"Optional display name stripped of local path information."},"originalDimensions":{"type":"object","properties":{"width":{"type":"number"},"height":{"type":"number"}},"required":["width","height"],"additionalProperties":true,"description":"Input dimensions after applying EXIF orientation and before normalization scaling. Present only when normalization reduced the image."}},"required":["attachmentId","mediaType","bytes","width","height"],"additionalProperties":true,"description":"Supplied reference after ID, format, byte length, and dimensions verification; display fields are preserved."},"data":{"type":"string"}},"required":["attachment","data"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":500,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":529,"column":3},
     },
     'session/cancel': {
       service: 'sessionController',
@@ -1786,7 +1817,7 @@ const $remote = createTypertRemoteInfo({
         description: 'acknowledgement that cancellation was requested.',
         jsonSchema: {"type":"object","properties":{"accepted":{"type":"boolean","const":true}},"required":["accepted"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":520,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":549,"column":3},
     },
     'session/canOpenWorkspacePath': {
       service: 'sessionController',
@@ -1801,7 +1832,7 @@ const $remote = createTypertRemoteInfo({
         description: 'true when the matching open operation is available.',
         jsonSchema: {"type":"boolean"},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":353,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":382,"column":3},
     },
     'session/control': {
       service: 'sessionController',
@@ -1818,7 +1849,7 @@ const $remote = createTypertRemoteInfo({
         description: 'one complete baseline followed by live replacement frames.',
         jsonSchemaError: 'typert tool schema: selected dictionaries require string keys and unconstrained JSON values',
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":631,"column":10},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":660,"column":10},
     },
     'session/create': {
       service: 'sessionController',
@@ -1850,7 +1881,7 @@ const $remote = createTypertRemoteInfo({
         description: 'the created or reused Session identity and its preset when configured.',
         jsonSchema: {"type":"object","properties":{"sessionId":{"type":"string","description":"The created or reused Session, which may differ from the requested `sessionId`."},"agentPreset":{"type":"string","description":"Preset the Session runs, when the deployment composes a preset roster."}},"required":["sessionId"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":307,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":336,"column":3},
     },
     'session/events': {
       service: 'sessionController',
@@ -1883,7 +1914,7 @@ const $remote = createTypertRemoteInfo({
         description: 'one chronological page with its inclusive cursor.',
         jsonSchema: {"type":"object","properties":{"cursor":{"type":"number"},"records":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","const":"event"},"event":{"type":"object","properties":{"type":{"type":"string"},"seq":{"type":"number"},"time":{"type":"number"},"data":{},"ignorable":{"type":"boolean","const":true},"sourceEventSeqs":{"description":"Earlier sources on current surface events; opaque JSON on unknown ignorable events."},"surfaceOp":{"description":"Canonical placement on current surface events; opaque JSON on unknown ignorable events."}},"required":["type","seq","time","data"],"additionalProperties":true}},"required":["type","event"],"additionalProperties":true}},"hasMore":{"type":"boolean"}},"required":["cursor","records","hasMore"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":543,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":572,"column":3},
     },
     'session/follow': {
       service: 'sessionController',
@@ -1917,7 +1948,7 @@ const $remote = createTypertRemoteInfo({
         description: 'a complete opening snapshot followed by gap-free durable event frames and optional cursorless assistant-stream frames.',
         jsonSchemaError: 'typert tool schema: selected dictionaries require string keys and unconstrained JSON values',
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":610,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":639,"column":3},
     },
     'session/fork': {
       service: 'sessionController',
@@ -1949,7 +1980,7 @@ const $remote = createTypertRemoteInfo({
         description: 'the new Session identity.',
         jsonSchema: {"type":"object","properties":{"sessionId":{"type":"string"}},"required":["sessionId"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":449,"column":9},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":478,"column":9},
     },
     'session/initializeDefaultModel': {
       service: 'sessionController',
@@ -1964,7 +1995,7 @@ const $remote = createTypertRemoteInfo({
         description: 'after saving the first available model or retaining the existing default.',
         jsonSchemaError: 'typert tool schema: unsupported void value',
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":326,"column":9},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":355,"column":9},
     },
     'session/list': {
       service: 'sessionController',
@@ -1997,7 +2028,7 @@ const $remote = createTypertRemoteInfo({
         description: 'visible Session summaries ordered by activity.',
         jsonSchemaError: 'typert tool schema: selected dictionaries require string keys and unconstrained JSON values',
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":282,"column":9},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":285,"column":9},
     },
     'session/modelCatalog': {
       service: 'sessionController',
@@ -2012,7 +2043,7 @@ const $remote = createTypertRemoteInfo({
         description: 'provider-grouped models, the deployment default, and isolated provider failures.',
         jsonSchemaError: 'typert tool schema: selected dictionaries require string keys and unconstrained JSON values',
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":344,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":373,"column":3},
     },
     'session/observeEvent': {
       service: 'sessionController',
@@ -2046,7 +2077,7 @@ const $remote = createTypertRemoteInfo({
         description: 'readiness and subsequent events, without a snapshot.',
         jsonSchema: {"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"event"},"event":{"type":"object","properties":{"type":{"type":"string"},"seq":{"type":"number"},"time":{"type":"number"},"data":{},"ignorable":{"type":"boolean","const":true},"sourceEventSeqs":{"description":"Earlier sources on current surface events; opaque JSON on unknown ignorable events."},"surfaceOp":{"description":"Canonical placement on current surface events; opaque JSON on unknown ignorable events."}},"required":["type","seq","time","data"],"additionalProperties":true}},"required":["type","event"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"ready"}},"required":["type"],"additionalProperties":true}]},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":554,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":583,"column":3},
     },
     'session/observeProjections': {
       service: 'sessionController',
@@ -2080,7 +2111,7 @@ const $remote = createTypertRemoteInfo({
         description: 'readiness followed by one projection change frame per committed event.',
         jsonSchema: {"oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"ready"}},"required":["type"],"additionalProperties":true},{"type":"object","properties":{"type":{"type":"string","const":"projection"},"seq":{"type":"number","description":"Seq of the committed event that caused every listed change."},"changes":{"type":"array","items":{"type":"object","properties":{"key":{"type":"string"},"val":{}},"required":["key","val"],"additionalProperties":true},"description":"One entry per client-visible key whose view the event changed, in registration order without duplicate keys, with the key's new value as `val`. A key absent from `changes` is unchanged; unlike a baseline, absence does not mean an absent capability."}},"required":["type","seq","changes"],"additionalProperties":true}]},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":565,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":594,"column":3},
     },
     'session/observeState': {
       service: 'sessionController',
@@ -2114,7 +2145,39 @@ const $remote = createTypertRemoteInfo({
         description: 'complete passive state replacements.',
         jsonSchema: {"type":"object","properties":{"cursor":{"type":"number"},"active":{"type":"boolean"},"running":{"type":"boolean"},"queue":{"oneOf":[{"type":"null","const":null},{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"placement":{"type":"string","enum":["queued","steering","context"]},"rpcId":{"type":"string"},"content":{"type":"array","items":{}}},"required":["id","placement","content"],"additionalProperties":true}}]},"pendingInput":{"type":"array","items":{"type":"string","enum":["approval","question","other"]},"description":"Pending Remote requests sampled when this state was read. A pending change alone does not trigger `observeState`; `wait` refreshes on its own interval."}},"required":["cursor","active","running","queue","pendingInput"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":587,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":616,"column":3},
+    },
+    'session/open': {
+      service: 'sessionController',
+      description: 'Resume one listed Session: verify it exists and activate it in the background so it becomes the prompt-able one. The replay-ring counts (`ingested`/`skipped`) are a wire-bridge deployment fact — this Host honestly reports zeros because its follow streams history directly.',
+      invocation: { kind: 'direct' },
+      parameters: [
+        {
+          name: 'request',
+          description: 'Session identity to open.',
+          source: 'json',
+          codec: {
+            mode: 'strict',
+            typeSymbol: '@deepseek-ai/dsh-api-session-controller/types#SessionOpenRequest',
+            create: _deepseek_ai_dsh_api_session_controller_session_open_parameter_0$schema,
+            jsonSchema: {"type":"object","properties":{"sessionId":{"type":"string"}},"required":["sessionId"],"additionalProperties":true},
+          },
+          strictCodec: {
+            mode: 'strict',
+            typeSymbol: '@deepseek-ai/dsh-api-session-controller/types#SessionOpenRequest',
+            create: _deepseek_ai_dsh_api_session_controller_session_open_parameter_0_strict$schema,
+            jsonSchema: {"type":"object","properties":{"sessionId":{"type":"string"}},"required":["sessionId"],"additionalProperties":false},
+          },
+        },
+      ],
+      result: {
+        mode: 'strict',
+        typeSymbol: '@deepseek-ai/dsh-api-session-controller/types#SessionOpenValue',
+        create: _deepseek_ai_dsh_api_session_controller_session_open_result$schema,
+        description: 'the resumed Session identity with honest zero bridge counters.',
+        jsonSchema: {"type":"object","properties":{"sessionId":{"type":"string"},"ingested":{"type":"number"},"skipped":{"type":"number"},"skippedNote":{"type":"string"}},"required":["sessionId","ingested","skipped","skippedNote"],"additionalProperties":true},
+      },
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":299,"column":9},
     },
     'session/openWorkspacePath': {
       service: 'sessionController',
@@ -2147,7 +2210,7 @@ const $remote = createTypertRemoteInfo({
         description: 'confirmation after the native opener accepts the path.',
         jsonSchema: {"type":"object","properties":{"opened":{"type":"boolean","const":true}},"required":["opened"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":374,"column":9},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":403,"column":9},
     },
     'session/page': {
       service: 'sessionController',
@@ -2180,7 +2243,7 @@ const $remote = createTypertRemoteInfo({
         description: 'one chronological page with its inclusive cursor; an omitted `throughSeq` selects the observed log end.',
         jsonSchema: {"type":"object","properties":{"cursor":{"type":"number"},"records":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","const":"event"},"event":{"type":"object","properties":{"type":{"type":"string"},"seq":{"type":"number"},"time":{"type":"number"},"data":{},"ignorable":{"type":"boolean","const":true},"sourceEventSeqs":{"description":"Earlier sources on current surface events; opaque JSON on unknown ignorable events."},"surfaceOp":{"description":"Canonical placement on current surface events; opaque JSON on unknown ignorable events."}},"required":["type","seq","time","data"],"additionalProperties":true}},"required":["type","event"],"additionalProperties":true}},"hasMore":{"type":"boolean"}},"required":["cursor","records","hasMore"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":532,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":561,"column":3},
     },
     'session/projections': {
       service: 'sessionController',
@@ -2213,7 +2276,7 @@ const $remote = createTypertRemoteInfo({
         description: 'a sequenced baseline, cached hints when migration is deferred, or null when absent.',
         jsonSchemaError: 'typert tool schema: selected dictionaries require string keys and unconstrained JSON values',
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":621,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":650,"column":3},
     },
     'session/prompt': {
       service: 'sessionController',
@@ -2246,7 +2309,7 @@ const $remote = createTypertRemoteInfo({
         description: 'acknowledgement that the Agent accepted the prompt.',
         jsonSchema: {"type":"object","properties":{"accepted":{"type":"boolean","const":true}},"required":["accepted"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":468,"column":9},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":497,"column":9},
     },
     'session/rename': {
       service: 'sessionController',
@@ -2278,7 +2341,7 @@ const $remote = createTypertRemoteInfo({
         description: 'the accepted title and durable event sequence.',
         jsonSchema: {"type":"object","properties":{"title":{"type":"string"},"seq":{"type":"number"}},"required":["title","seq"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":437,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":466,"column":3},
     },
     'session/search': {
       service: 'sessionController',
@@ -2311,7 +2374,7 @@ const $remote = createTypertRemoteInfo({
         description: 'authorized bounded Session search results.',
         jsonSchema: {"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"sessionId":{"type":"string"},"snippet":{"type":"string"}},"required":["sessionId","snippet"],"additionalProperties":true}},"hasMore":{"type":"boolean"}},"required":["items","hasMore"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":296,"column":9},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":325,"column":9},
     },
     'session/selectModel': {
       service: 'sessionController',
@@ -2343,7 +2406,7 @@ const $remote = createTypertRemoteInfo({
         description: 'the normalized selection installed for the Session, without waiting for default persistence.',
         jsonSchema: {"type":"object","properties":{"selected":{"type":"object","properties":{"provider":{"type":"string"},"model":{"type":"string"},"reasoningEffort":{"type":"string"}},"required":["provider","model"],"additionalProperties":true}},"required":["selected"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":317,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":346,"column":3},
     },
     'session/state': {
       service: 'sessionController',
@@ -2376,7 +2439,7 @@ const $remote = createTypertRemoteInfo({
         description: 'current passive state.',
         jsonSchema: {"type":"object","properties":{"cursor":{"type":"number"},"active":{"type":"boolean"},"running":{"type":"boolean"},"queue":{"oneOf":[{"type":"null","const":null},{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"placement":{"type":"string","enum":["queued","steering","context"]},"rpcId":{"type":"string"},"content":{"type":"array","items":{}}},"required":["id","placement","content"],"additionalProperties":true}}]},"pendingInput":{"type":"array","items":{"type":"string","enum":["approval","question","other"]},"description":"Pending Remote requests sampled when this state was read. A pending change alone does not trigger `observeState`; `wait` refreshes on its own interval."}},"required":["cursor","active","running","queue","pendingInput"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":576,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":605,"column":3},
     },
     'session/updateQueue': {
       service: 'sessionController',
@@ -2408,7 +2471,7 @@ const $remote = createTypertRemoteInfo({
         description: 'acknowledgement that the queue mutation was applied.',
         jsonSchema: {"type":"object","properties":{"accepted":{"type":"boolean","const":true}},"required":["accepted"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":510,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":539,"column":3},
     },
     'session/wait': {
       service: 'sessionController',
@@ -2441,7 +2504,7 @@ const $remote = createTypertRemoteInfo({
         description: 'stopping state and bounded assistant output.',
         jsonSchema: {"type":"object","properties":{"reason":{"type":"string","enum":["idle","input-required","timeout"]},"state":{"type":"object","properties":{"cursor":{"type":"number"},"active":{"type":"boolean"},"running":{"type":"boolean"},"queue":{"oneOf":[{"type":"null","const":null},{"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"placement":{"type":"string","enum":["queued","steering","context"]},"rpcId":{"type":"string"},"content":{"type":"array","items":{}}},"required":["id","placement","content"],"additionalProperties":true}}]},"pendingInput":{"type":"array","items":{"type":"string","enum":["approval","question","other"]},"description":"Pending Remote requests sampled when this state was read. A pending change alone does not trigger `observeState`; `wait` refreshes on its own interval."}},"required":["cursor","active","running","queue","pendingInput"],"additionalProperties":true},"output":{"type":"object","properties":{"records":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","const":"event"},"event":{"type":"object","properties":{"type":{"type":"string"},"seq":{"type":"number"},"time":{"type":"number"},"data":{},"ignorable":{"type":"boolean","const":true},"sourceEventSeqs":{"description":"Earlier sources on current surface events; opaque JSON on unknown ignorable events."},"surfaceOp":{"description":"Canonical placement on current surface events; opaque JSON on unknown ignorable events."}},"required":["type","seq","time","data"],"additionalProperties":true}},"required":["type","event"],"additionalProperties":true}},"truncated":{"type":"boolean","description":"More eligible assistant messages exist in the selected interval."}},"required":["records","truncated"],"additionalProperties":true}},"required":["reason","state","output"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":598,"column":3},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":627,"column":3},
     },
     'session/workspacePathApplications': {
       service: 'sessionController',
@@ -2474,7 +2537,39 @@ const $remote = createTypertRemoteInfo({
         description: 'OS application names, icons, and default selection; empty when desktop opening is unavailable.',
         jsonSchema: {"type":"array","items":{"type":"object","properties":{"id":{"type":"string","description":"OS application identifier; callers must revalidate it against the file's current handlers before opening."},"name":{"type":"string"},"default":{"type":"boolean"},"icon":{"oneOf":[{"type":"null","const":null},{"type":"string"}],"description":"PNG or SVG data URL, or null when the desktop supplies no icon."}},"required":["id","name","default","icon"],"additionalProperties":true}},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":404,"column":9},
+      sourceLocation: {"file":"packages/api/session-controller/src/index.ts","line":433,"column":9},
+    },
+    'skills/get': {
+      service: 'sessionSkillCatalog',
+      description: 'Read one user-invocable skill\'s full body for human viewing and explicit fill-back (web.v1 §9.2: a skill is a read-only catalog entry, never an executable RPC).',
+      invocation: { kind: 'direct' },
+      parameters: [
+        {
+          name: 'request',
+          description: 'Session identity selecting the composition and the skill id.',
+          source: 'json',
+          codec: {
+            mode: 'strict',
+            typeSymbol: '@deepseek-ai/dsh-api-session-controller/types#SessionSkillGetRequest',
+            create: _deepseek_ai_dsh_api_session_controller_skills_get_parameter_0$schema,
+            jsonSchema: {"type":"object","properties":{"sessionId":{"type":"string"},"id":{"type":"string"}},"required":["sessionId","id"],"additionalProperties":true},
+          },
+          strictCodec: {
+            mode: 'strict',
+            typeSymbol: '@deepseek-ai/dsh-api-session-controller/types#SessionSkillGetRequest',
+            create: _deepseek_ai_dsh_api_session_controller_skills_get_parameter_0_strict$schema,
+            jsonSchema: {"type":"object","properties":{"sessionId":{"type":"string"},"id":{"type":"string"}},"required":["sessionId","id"],"additionalProperties":false},
+          },
+        },
+      ],
+      result: {
+        mode: 'strict',
+        typeSymbol: '@deepseek-ai/dsh-api-session-controller/types#SessionSkillGetValue',
+        create: _deepseek_ai_dsh_api_session_controller_skills_get_result$schema,
+        description: 'the skill metadata and its raw body text.',
+        jsonSchema: {"type":"object","properties":{"name":{"type":"string"},"description":{"type":"string"},"body":{"type":"string"}},"required":["name","description","body"],"additionalProperties":true},
+      },
+      sourceLocation: {"file":"packages/api/session-controller/src/skill-catalog.ts","line":76,"column":9},
     },
     'skills/list': {
       service: 'sessionSkillCatalog',
@@ -2507,7 +2602,7 @@ const $remote = createTypertRemoteInfo({
         description: 'user-invocable skill metadata without loading skill bodies.',
         jsonSchema: {"type":"object","properties":{"skills":{"type":"array","items":{"type":"object","properties":{"path":{"type":"string","description":"Absolute SKILL.md path when supplied by a filesystem provider."},"name":{"type":"string","description":"Kebab-case identifier referenced as `/name`."},"description":{"type":"string","description":"Short routing description."},"whenToUse":{"type":"string","description":"Optional extra routing guidance."},"modelInvocable":{"type":"boolean","description":"Whether the same skill is also advertised to the model."}},"required":["name","description","modelInvocable"],"additionalProperties":true}}},"required":["skills"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/skill-catalog.ts","line":36,"column":9},
+      sourceLocation: {"file":"packages/api/session-controller/src/skill-catalog.ts","line":48,"column":9},
     },
   },
 }, z)
@@ -2541,6 +2636,13 @@ export const TYPERT = {
             "signature": "@Remote('list') async list(_request: SessionListRequest, signal: AbortSignal): Promise<SessionListValue>",
             "summary": "Read all visible Session rows without resuming an Agent.",
             "jsDoc": "/**\n * Read all visible Session rows without resuming an Agent.\n * @param _request - reserved empty list request.\n * @param signal - cancellation for persistence reads and summary generation.\n * @returns visible Session summaries ordered by activity.\n */"
+          },
+          {
+            "kind": "method",
+            "name": "open",
+            "signature": "@Remote('open') async open(request: SessionOpenRequest): Promise<SessionOpenValue>",
+            "summary": "Resume one listed Session: verify it exists and activate it in the background so it becomes the prompt-able one.",
+            "jsDoc": "/**\n * Resume one listed Session: verify it exists and activate it in the\n * background so it becomes the prompt-able one. The replay-ring counts\n * (`ingested`/`skipped`) are a wire-bridge deployment fact — this Host\n * honestly reports zeros because its follow streams history directly.\n * @param request - Session identity to open.\n * @returns the resumed Session identity with honest zero bridge counters.\n */"
           },
           {
             "kind": "method",
@@ -3470,6 +3572,14 @@ export const TYPERT = {
           {
             "name": "SessionObserveEventRequest",
             "declaration": "export interface SessionObserveEventRequest {\n    readonly address: SessionAddress;\n}"
+          },
+          {
+            "name": "SessionOpenRequest",
+            "declaration": "export interface SessionOpenRequest {\n    readonly sessionId: SessionId;\n}"
+          },
+          {
+            "name": "SessionOpenValue",
+            "declaration": "export interface SessionOpenValue {\n    readonly sessionId: SessionId;\n    readonly ingested: number;\n    readonly skipped: number;\n    readonly skippedNote: string;\n}"
           },
           {
             "name": "SessionOpenWorkspacePathRequest",
@@ -4574,6 +4684,13 @@ export const TYPERT = {
             "signature": "@Remote async list(request: SkillListRequest, signal: AbortSignal): Promise<SkillListValue>",
             "summary": "List the user-invocable skills visible to one Session composition.",
             "jsDoc": "/**\n * List the user-invocable skills visible to one Session composition.\n * @param request - Session identity whose cwd and preset select the catalog view.\n * @param signal - caller lifetime carried by the Remote transport; admitted catalog reads retain their existing completion semantics.\n * @returns user-invocable skill metadata without loading skill bodies.\n * @throws RemoteError when the Session cannot be inspected or no registry can serve it.\n */"
+          },
+          {
+            "kind": "method",
+            "name": "get",
+            "signature": "@Remote async get(request: SessionSkillGetRequest): Promise<SessionSkillGetValue>",
+            "summary": "Read one user-invocable skill's full body for human viewing and explicit fill-back (web.v1 §9.2: a skill is a read-only catalog entry, never an executable RPC).",
+            "jsDoc": "/**\n * Read one user-invocable skill's full body for human viewing and explicit\n * fill-back (web.v1 §9.2: a skill is a read-only catalog entry, never an\n * executable RPC).\n * @param request - Session identity selecting the composition and the skill id.\n * @returns the skill metadata and its raw body text.\n * @throws RemoteError when the skill is absent from the Session's composition.\n */"
           }
         ],
         "types": [
@@ -4584,6 +4701,14 @@ export const TYPERT = {
           {
             "name": "SessionId",
             "declaration": "export type SessionId = Branded<'SessionId'>;"
+          },
+          {
+            "name": "SessionSkillGetRequest",
+            "declaration": "export interface SessionSkillGetRequest {\n    readonly sessionId: SessionId;\n    readonly id: string;\n}"
+          },
+          {
+            "name": "SessionSkillGetValue",
+            "declaration": "export interface SessionSkillGetValue {\n    readonly name: string;\n    readonly description: string;\n    readonly body: string;\n}"
           },
           {
             "name": "SkillEntry",

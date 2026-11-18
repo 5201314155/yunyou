@@ -17,6 +17,12 @@ path = "src/lib.rs"
 yunyou = { workspace = true }
 yunyou-agent-loop = { path = "../../core/yunyou-agent-loop" }
 yunyou-commands = { path = "../../shell/yunyou-commands" }
+# 团队服务缝（web.v1 team/tasks 域；lead 2026-11-19 批）：web→team 单向，无环
+yunyou-team = { path = "../../team/yunyou-team" }
+# 定时触发缝（web.v1 schedule 域；sdk 缝内建 v1，durable=S4 未闭环）
+yunyou-plugin-sdk = { path = "../../../sdk/yunyou-plugin-sdk" }
+yunyou-config = { path = "../../infra/yunyou-config" }
+yunyou-credentials = { path = "../../infra/yunyou-credentials" }
 yunyou-session = { workspace = true }
 yunyou-util = { workspace = true }
 # HTTP+WebSocket 一体（依赖预批：axum，tokio 系；前端零 node 构建链——
@@ -28,6 +34,9 @@ tokio-util = { workspace = true }
 # WS 协议序列化 + 访问令牌铸造（uuid v4）+ command_id 配对键（命令缝 D2）
 serde = { workspace = true }
 serde_json = { workspace = true }
+# 配置修订写（段值 toml 改写；load_from_str 深度校验在 yunyou-config）
+toml = { workspace = true }
+schemars = "1"
 uuid = { workspace = true }
 
 [build-dependencies]
@@ -38,6 +47,9 @@ serde_json = "1"
 [dev-dependencies]
 # 真机 HTTP 自测（token 鉴权 403/200 两态 + 资产可达；不 mock 通道）
 reqwest = { workspace = true }
+# 团队域测试装配（TeamPlugin 需 RegistryService 注入；yunyou-team 主依赖经
+# re-export 也含此类型，此处直引工具缝 crate 与 team.rs 集成测试同源）
+yunyou-tools = { path = "../../tools/yunyou-tools" }
 # WS 端到端自测（hello/回合失败路径）：两者皆 axum/hyper 的既有传递依赖，
 # 提为 dev 只补测试引用，零新增编译产物（依赖纪律内说明见 P2 简报）
 tokio-tungstenite = "0.29"

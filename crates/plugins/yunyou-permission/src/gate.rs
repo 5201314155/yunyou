@@ -36,6 +36,8 @@ impl PreToolUseGate for PermissionGate {
         let rules = Arc::clone(&self.rules);
         let tool = call.name.to_string();
         let arguments = call.arguments.to_string();
+        let mode = _ctx.mode.clone();
+        let workspace_root = _ctx.workspace_root.clone();
         Box::pin(async move {
             // L0 高危免疫层（最先判：任何规则/模式不可触达——设计稿 §一偏差 1）
             if let Some(reason) = denylist::check(&tool, &arguments) {
@@ -50,15 +52,50 @@ impl PreToolUseGate for PermissionGate {
                 Some(Behavior::Deny) => Ok(GateDecision::Deny {
                     message: format!("工具「{tool}」调用被 deny 规则拒绝（settings [permissions]）。"),
                 }),
-                Some(Behavior::Ask) => Ok(GateDecision::Ask {
-                    suggestions: vec![format!("allow {tool}")],
-                }),
+                // L7 模式后置变换：ask 规则仅 bypass 豁免（矩阵行「L2 ask 规则」）
+                Some(Behavior::Ask) => {
+                    if mode.as_deref().and_then(crate::mode::Mode::parse)
+                        == Some(crate::mode::Mode::Bypass)
+                    {
+                        Ok(GateDecision::Allow { sandboxed: false })
+                    } else {
+                        Ok(GateDecision::Ask { suggestions: vec![format!("allow {tool}")] })
+                    }
+                }
                 Some(Behavior::Allow) => Ok(GateDecision::Allow { sandboxed: false }),
-                // 无命中=Pass（缺省行为归模式层 S3；本引擎不越权定缺省）
-                None => Ok(GateDecision::Pass),
+                // 无命中=L7 模式矩阵（§四表尾三行；mode 未知=Default 保守）
+                None => {
+                    let class = crate::mode::tool_class(&tool);
+                    let parsed_mode = mode
+                        .as_deref()
+                        .and_then(crate::mode::Mode::parse)
+                        .unwrap_or(crate::mode::Mode::Default);
+                    let in_workspace = if class == crate::mode::ToolClass::Write {
+                        in_workspace(content.as_deref(), workspace_root.as_deref())
+                    } else {
+                        None
+                    };
+                    match crate::mode::decide_unmatched(parsed_mode, class, in_workspace) {
+                        crate::mode::Unmatched::Allow => Ok(GateDecision::Allow { sandboxed: false }),
+                        crate::mode::Unmatched::Ask => Ok(GateDecision::Ask {
+                            suggestions: vec![format!("allow {tool}")],
+                        }),
+                    }
+                }
             }
         })
     }
+}
+
+/// 区内判定（写类）：路径前缀比对（双端归一尾斜杠；root 未知=None=保守区外）。
+/// canonicalize 级防逃逸候 S4 工作区边界批（复用 resolve_workspace，此处 v1
+/// 为矩阵层最小实现——测试锁边界形态）。
+fn in_workspace(path: Option<&str>, root: Option<&str>) -> Option<bool> {
+    let (path, root) = (path?, root?);
+    fn norm(s: &str) -> &str {
+        s.trim_end_matches('/')
+    }
+    Some(norm(path).starts_with(norm(root)))
 }
 
 /// 参数 JSON 内容位提取（v1 启发式：常见键单点归一；deny_unknown_fields 的

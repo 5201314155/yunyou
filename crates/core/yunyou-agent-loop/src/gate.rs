@@ -40,8 +40,12 @@ pub struct ToolCallView<'a> {
 /// gate 判定上下文（v1 最小集；workspace_root/mode 随 S4 扩字段——加法演进）。
 #[derive(Debug, Clone, Default)]
 pub struct GateContext {
-    /// 当前权限模式（None=未设置/未接线；策略插件自解析）。
+    /// 当前权限模式（None=未设置/未接线；策略插件自解析；词汇对齐模式体系
+    /// 骨架附录 SessionMode 四态 kebab——default/accept_edits/plan/bypass）。
     pub mode: Option<String>,
+    /// 工作区根（S3/S4：acceptEdits 与 default 的「区内写免审」判定面；
+    /// None=root 未知→策略侧按区外保守处理）。
+    pub workspace_root: Option<String>,
 }
 
 /// gate 决策（三态+Pass；第一个非 Pass 短路）。
@@ -87,6 +91,10 @@ pub enum ApprovalSubjectKind {
     FileReview,
     /// 确认型变体占位（bypass 进入确认；v1 不实现——模式状态机卡客户）。
     Confirmation,
+    /// 插件权限型（task-16 修正令 2026-11-19：安装级授权——manifest
+    /// [permissions] network/credentials 走 Ask 缝，用户授权制替代恒拒；
+    /// 手机权限模型：审批粒度从调用级扩展到安装级）。
+    PluginPermission,
 }
 
 /// 审批对象载荷（借用形态；present 期间有效）。
@@ -95,6 +103,16 @@ pub enum ApprovalSubject<'a> {
     ToolCall(&'a ToolCallView<'a>),
     /// 文件审阅型：待审文件路径+文本预览（v1 文本；diff 渲染归呈现器）。
     FileReview { path: &'a str, preview: &'a str },
+    /// 插件权限型：安装/升级时插件申请的能力面（requested 项如
+    /// "network"/"credentials:openai_key"；purpose=manifest 声明的用途描述）。
+    PluginPermission {
+        /// 插件 id。
+        plugin_id: &'a str,
+        /// 申请项清单（逐项可授；空串元素=申请面畸形，呈现器拒）。
+        requested: &'a [String],
+        /// 用途描述（manifest 声明；呈现给用户）。
+        purpose: &'a str,
+    },
 }
 
 /// 呈现器产出（「记住本次选择」的策略落库在呈现器/策略侧，内核只取决定）。
@@ -231,11 +249,18 @@ impl ApprovalUiRegistry {
         self.presenters.read().expect("呈现器表锁").keys().copied().collect()
     }
 
+    /// 按类型取呈现器（Arc 克隆，锁即放——同步上下文探测/自管调用用；
+    /// [`Self::present`] 为异步入口，本方法供 setup 等同步路径使用）。
+    pub fn presenter_for(&self, kind: ApprovalSubjectKind) -> Option<Arc<dyn ApprovalPresenter>> {
+        self.presenters.read().expect("呈现器表锁").get(&kind).map(Arc::clone)
+    }
+
     /// 呈现取决定：无呈现器=None（调用方 fail-closed Deny）。
     pub async fn present(&self, subject: ApprovalSubject<'_>) -> Option<ApprovalDecision> {
         let kind = match &subject {
             ApprovalSubject::ToolCall(_) => ApprovalSubjectKind::ToolCall,
             ApprovalSubject::FileReview { .. } => ApprovalSubjectKind::FileReview,
+            ApprovalSubject::PluginPermission { .. } => ApprovalSubjectKind::PluginPermission,
         };
         let presenter = Arc::clone(self.presenters.read().expect("呈现器表锁").get(&kind)?);
         match tokio::time::timeout(GATE_TIMEOUT, presenter.present(subject)).await {

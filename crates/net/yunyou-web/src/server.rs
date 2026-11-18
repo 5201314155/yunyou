@@ -48,6 +48,10 @@ pub(crate) struct WebState {
     /// 对端 wire 桥（ServerMessage→对端帧；v2 mux follow 流与 prompt 桥共用，
     /// 任务40 适配层第二片）。
     pub(crate) wire: Arc<crate::bridge::WireBridge>,
+    /// 定时调度器（W4 schedule 域；到期触发器注入回合——instance.rs 装配）。
+    pub(crate) scheduler: Arc<yunyou_plugin_sdk::scheduler::Scheduler>,
+    /// 配置修订写（W5 settings 域；revision 单源+原子写——config_store.rs）。
+    pub(crate) config_store: Arc<crate::config_store::ConfigStore>,
 }
 
 /// 路由表：全部路由先过 token 鉴权中间件（from_fn_with_state），无匿名通道。

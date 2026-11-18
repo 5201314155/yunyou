@@ -13,14 +13,18 @@
 //! - 无命中=Pass（缺省行为归 S3 模式层；L4 沙箱穿越归 S4；L5 工作区边界归 S4；
 //!   L8 Ask 兜底的 suggestions 持久化归 S5）。
 
+mod authorization;
 mod denylist;
 mod gate;
 mod matchers;
+mod mode;
 mod plugin;
 mod rules;
 
 pub use gate::PermissionGate;
+pub use authorization::{authorize_plugin, granted, AuthorizationsFile, GrantRequest, PluginGrant};
 pub use plugin::PermissionPlugin;
+pub use mode::{Mode, ToolClass, Unmatched};
 pub use rules::{
     escape_rule_content, Behavior, PermissionsSection, Rule, RuleSet,
 };

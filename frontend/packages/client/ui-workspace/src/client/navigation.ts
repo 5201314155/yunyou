@@ -41,8 +41,9 @@ export interface UiWorkspace {
   /**
    * Select a Session and show its Conversation as one UI navigation action.
    * @param target - known Session identity or durable direct-parent subagent address to display.
+   * @returns completion of the selection, including a cold Session's resume round-trip.
    */
-  openSession(target: SessionTarget): void
+  openSession(target: SessionTarget): Promise<void>
   /**
    * Connect a Workspace and open its Session unless a later navigation supersedes it.
    * @param workspaceId - target Workspace.
@@ -183,6 +184,8 @@ class UiWorkspaceService extends Service implements UiWorkspace {
    * @param sessions - pure Session Controller.
    * @param view - the browser's viewing-store write set (one instance shared with its registration).
    * @param notify - show one notice through the Workspace notice channel.
+   * @param resumeSession - the Host's Session-resume call: success carries the replay bridge's
+   * skipped-event count; a failure carries its stable failure code.
    */
   constructor(
     ctx: Context,
@@ -191,6 +194,9 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     private readonly sessions: ISessions,
     private readonly view: Pick<WorkspaceViewStoreActions, 'pinSessionOrder'>,
     private readonly notify: (toast: RowToast) => void,
+    private readonly resumeSession: (sessionId: SessionId) => Promise<
+      { readonly ok: true; readonly skipped: number } | { readonly ok: false; readonly code: string }
+    >,
   ) {
     super(ctx, 'uiWorkspace')
     ctx.effect(() => {
@@ -290,8 +296,28 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     }
   }
 
-  openSession(target: SessionTarget): void {
-    this.replaceMain(target, this.lifetime.signal, 'reveal')
+  openSession(target: SessionTarget): Promise<void> {
+    return this.reveal(target, this.lifetime.signal)
+  }
+
+  /**
+   * Resume a cold Session when the deployment serves the resume call, then run
+   * the ordinary selection. A listed-but-unopened Session must become the
+   * Host's active one before its follow opens, or the bridge would answer the
+   * follow with the currently active Session's snapshot (web.v1 多会话步 2).
+   * A deployment without the resume call (the stable `gateway/not-implemented`)
+   * keeps the plain history-open path.
+   * @param target - the selection target.
+   * @param signal - the navigation lifetime.
+   */
+  private async reveal(target: SessionTarget, signal: AbortSignal, panel: 'reveal' | 'preserve' = 'reveal'): Promise<void> {
+    if (typeof target === 'string' && this.sessions.binding(target) === undefined) {
+      const resumed = await this.resumeSession(target)
+      if (resumed.ok && resumed.skipped > 0) {
+        this.notify({ kind: 'openResumed', count: resumed.skipped })
+      }
+    }
+    this.replaceMain(target, signal, panel)
   }
 
   openWorkspace(
@@ -465,14 +491,14 @@ class UiWorkspaceService extends Service implements UiWorkspace {
   private async restoreSelection(workspaces: WorkspaceSnapshot, sessions: SessionListState): Promise<void> {
     const saved = this.selection.getSnapshot()
     if (saved.subagentAddress !== undefined) {
-      this.replaceMain(saved.subagentAddress, this.lifetime.signal, 'preserve')
+      await this.reveal(saved.subagentAddress, this.lifetime.signal, 'preserve')
       return
     }
     const summary = saved.sessionId === undefined ? undefined : sessions.byId[saved.sessionId]
     const workspace = summary === undefined ? undefined
       : workspaces.items.find(item => item.sessionIds.includes(summary.id))
     if (summary !== undefined && (!summary.blank || workspace === undefined)) {
-      this.replaceMain(summary.id, this.lifetime.signal, 'preserve')
+      await this.reveal(summary.id, this.lifetime.signal, 'preserve')
       return
     }
     const navigation = AbortSignal.any([this.ctx.layout.beginNavigation(), this.lifetime.signal])
@@ -490,7 +516,7 @@ class UiWorkspaceService extends Service implements UiWorkspace {
     }
     if (sessionId === undefined && target !== undefined) sessionId = await this.connectWorkspace(target)
     if (sessionId !== undefined && !navigation.aborted) {
-      this.replaceMain(sessionId, navigation, 'preserve')
+      await this.reveal(sessionId, navigation, 'preserve')
     }
   }
 

@@ -28,6 +28,8 @@ pub(crate) async fn test_ws_connect(
 /// 测试参数：root_getter 给一次性 root（P1 无对话路径，不触达）。
 fn params() -> WebParams {
     WebParams {
+        scheduled_rx: None,
+        config_path: std::env::temp_dir().join("yunyou-web-server-test.toml"),
         root_getter: Arc::new(Context::new),
         session_dir: PathBuf::from("/tmp/yunyou-web-test-sessions"),
         model: "test-model".into(),
@@ -38,7 +40,8 @@ fn params() -> WebParams {
 /// 鉴权两态 + 资产可达（真机 HTTP：reqwest 打真实端口，不 mock）。
 #[tokio::test(flavor = "multi_thread")]
 async fn 鉴权两态与静态资产可达() {
-    let instance = start_instance(&params()).await.expect("启动实例");
+    let mut params = params();
+    let instance = start_instance(&mut params).await.expect("启动实例");
     let base = format!("http://{}/", instance.addr);
 
     // 无 token / 错 token → 403（页面、资产、WS 缝同判，无匿名通道）
@@ -136,7 +139,8 @@ async fn ws握手hello与回合失败路径() {
     use futures_util::{SinkExt, StreamExt};
     use tokio_tungstenite::tungstenite::Message as WsMessage;
 
-    let instance = start_instance(&params()).await.expect("启动实例");
+    let mut params = params();
+    let instance = start_instance(&mut params).await.expect("启动实例");
     let url = format!("ws://{}/ws?token={}", instance.addr, instance.token);
     let (mut ws_stream, _resp) = tokio_tungstenite::connect_async(url)
         .await

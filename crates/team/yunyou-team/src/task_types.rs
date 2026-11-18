@@ -173,6 +173,11 @@ pub trait TeamService: Send + Sync + 'static {
     /// 任务板列表（只读投影）。
     fn task_list(&self) -> Vec<TeamTaskView>;
 
+    /// Web 全量投影口（web.v1 tasks/list，lead 2026-11-19 批）：板内全字段
+    /// 只读快照（createdBy/submittedBy/reviewer/capability/blockedBy——看板
+    /// 渲染状态与自审锚点所需；薄版 task_list 保留供工具面，两版并存）。
+    fn task_list_full(&self) -> Vec<crate::board::TeamTask>;
+
     /// 名册观测（五点规格⑤）：本表元数据+hub members() 在线标志合成。
     fn roster(&self) -> Vec<RosterEntry>;
 }

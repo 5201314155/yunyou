@@ -303,6 +303,11 @@ impl TaskBoard {
     }
 
     /// 列表投影（板内号升序；输出稳定）。
+    /// 全字段快照（Web tasks/list 投影口；板锁内取齐，零风险只读）。
+    pub(crate) fn list_full(&self) -> Vec<TeamTask> {
+        self.tasks.values().cloned().collect()
+    }
+
     pub(crate) fn list(&self) -> Vec<TeamTaskView> {
         self.tasks
             .values()

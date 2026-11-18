@@ -5,7 +5,7 @@ import type {
   TypertRemoteInfo,
   TypertRemoteMethod,
 } from '@deepseek-ai/dsh-typert-protocol'
-import type { ModelCatalog, SessionAttachmentRequest, SessionAttachmentValue, SessionCancelRequest, SessionCancelValue, SessionControlFrame, SessionCreateRequest, SessionCreateValue, SessionEventFrame, SessionEventsPage, SessionFollowFrame, SessionFollowRequest, SessionForkRequest, SessionForkValue, SessionListRequest, SessionListValue, SessionObserveEventRequest, SessionOpenWorkspacePathRequest, SessionOpenWorkspacePathValue, SessionPageRequest, SessionProjectionFrame, SessionProjectionsRequest, SessionProjectionsValue, SessionPromptRequest, SessionPromptValue, SessionRenameRequest, SessionRenameValue, SessionSearchRequest, SessionSearchValue, SessionSelectModelRequest, SessionSelectModelValue, SessionState, SessionStateRequest, SessionUpdateQueueRequest, SessionUpdateQueueValue, SessionWaitRequest, SessionWaitValue, SessionWorkspacePathApplication, SkillListRequest, SkillListValue } from '@deepseek-ai/dsh-api-session-controller/types'
+import type { ModelCatalog, SessionAttachmentRequest, SessionAttachmentValue, SessionCancelRequest, SessionCancelValue, SessionControlFrame, SessionCreateRequest, SessionCreateValue, SessionEventFrame, SessionEventsPage, SessionFollowFrame, SessionFollowRequest, SessionForkRequest, SessionForkValue, SessionListRequest, SessionListValue, SessionObserveEventRequest, SessionOpenRequest, SessionOpenValue, SessionOpenWorkspacePathRequest, SessionOpenWorkspacePathValue, SessionPageRequest, SessionProjectionFrame, SessionProjectionsRequest, SessionProjectionsValue, SessionPromptRequest, SessionPromptValue, SessionRenameRequest, SessionRenameValue, SessionSearchRequest, SessionSearchValue, SessionSelectModelRequest, SessionSelectModelValue, SessionSkillGetRequest, SessionSkillGetValue, SessionState, SessionStateRequest, SessionUpdateQueueRequest, SessionUpdateQueueValue, SessionWaitRequest, SessionWaitValue, SessionWorkspacePathApplication, SkillListRequest, SkillListValue } from '@deepseek-ai/dsh-api-session-controller/types'
 import type { FileReferenceCandidate } from '@deepseek-ai/dsh-file-reference/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
@@ -28,6 +28,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     observeEvent: (request: SessionObserveEventRequest, signal?: AbortSignal) => RemoteStreamHandle<SessionEventFrame, never>
     observeProjections: (request: SessionProjectionsRequest, signal?: AbortSignal) => RemoteStreamHandle<SessionProjectionFrame, never>
     observeState: (request: SessionStateRequest, signal?: AbortSignal) => RemoteStreamHandle<SessionState, never>
+    open: (request: SessionOpenRequest) => Promise<RemoteResult<SessionOpenValue>>
     openWorkspacePath: (request: SessionOpenWorkspacePathRequest, signal?: AbortSignal) => Promise<RemoteResult<SessionOpenWorkspacePathValue>>
     page: (request: SessionPageRequest, signal?: AbortSignal) => Promise<RemoteResult<SessionEventsPage>>
     projections: (request: SessionProjectionsRequest, signal?: AbortSignal) => Promise<RemoteResult<SessionProjectionsValue>>
@@ -41,6 +42,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     workspacePathApplications: (request: { readonly path: string; }, signal?: AbortSignal) => Promise<RemoteResult<readonly SessionWorkspacePathApplication[]>>
   }
   interface TypertRemoteNamespace$736b696c6c73 {
+    get: (request: SessionSkillGetRequest) => Promise<RemoteResult<SessionSkillGetValue>>
     list: (request: SkillListRequest, signal?: AbortSignal) => Promise<RemoteResult<SkillListValue>>
   }
   interface TypertRemoteMap {
@@ -59,6 +61,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'session/observeEvent': (request: SessionObserveEventRequest, signal?: AbortSignal) => RemoteStreamHandle<SessionEventFrame, never>
     'session/observeProjections': (request: SessionProjectionsRequest, signal?: AbortSignal) => RemoteStreamHandle<SessionProjectionFrame, never>
     'session/observeState': (request: SessionStateRequest, signal?: AbortSignal) => RemoteStreamHandle<SessionState, never>
+    'session/open': (request: SessionOpenRequest) => Promise<RemoteResult<SessionOpenValue>>
     'session/openWorkspacePath': (request: SessionOpenWorkspacePathRequest, signal?: AbortSignal) => Promise<RemoteResult<SessionOpenWorkspacePathValue>>
     'session/page': (request: SessionPageRequest, signal?: AbortSignal) => Promise<RemoteResult<SessionEventsPage>>
     'session/projections': (request: SessionProjectionsRequest, signal?: AbortSignal) => Promise<RemoteResult<SessionProjectionsValue>>
@@ -70,6 +73,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'session/updateQueue': (request: SessionUpdateQueueRequest) => Promise<RemoteResult<SessionUpdateQueueValue>>
     'session/wait': (request: SessionWaitRequest, signal?: AbortSignal) => Promise<RemoteResult<SessionWaitValue>>
     'session/workspacePathApplications': (request: { readonly path: string; }, signal?: AbortSignal) => Promise<RemoteResult<readonly SessionWorkspacePathApplication[]>>
+    'skills/get': (request: SessionSkillGetRequest) => Promise<RemoteResult<SessionSkillGetValue>>
     'skills/list': (request: SkillListRequest, signal?: AbortSignal) => Promise<RemoteResult<SkillListValue>>
   }
   interface TypertRemoteNamespaceMap {
@@ -98,6 +102,7 @@ export declare const TYPERT_REMOTE: TypertRemoteInfo<{
   readonly 'session/observeEvent': TypertRemoteMethod<{ readonly 'request': SessionObserveEventRequest }, SessionEventFrame, 'stream'>
   readonly 'session/observeProjections': TypertRemoteMethod<{ readonly 'request': SessionProjectionsRequest }, SessionProjectionFrame, 'stream'>
   readonly 'session/observeState': TypertRemoteMethod<{ readonly 'request': SessionStateRequest }, SessionState, 'stream'>
+  readonly 'session/open': TypertRemoteMethod<{ readonly 'request': SessionOpenRequest }, SessionOpenValue>
   readonly 'session/openWorkspacePath': TypertRemoteMethod<{ readonly 'request': SessionOpenWorkspacePathRequest }, SessionOpenWorkspacePathValue>
   readonly 'session/page': TypertRemoteMethod<{ readonly 'request': SessionPageRequest }, SessionEventsPage>
   readonly 'session/projections': TypertRemoteMethod<{ readonly 'request': SessionProjectionsRequest }, SessionProjectionsValue>
@@ -109,6 +114,7 @@ export declare const TYPERT_REMOTE: TypertRemoteInfo<{
   readonly 'session/updateQueue': TypertRemoteMethod<{ readonly 'request': SessionUpdateQueueRequest }, SessionUpdateQueueValue>
   readonly 'session/wait': TypertRemoteMethod<{ readonly 'request': SessionWaitRequest }, SessionWaitValue>
   readonly 'session/workspacePathApplications': TypertRemoteMethod<{ readonly 'request': { readonly path: string; } }, readonly SessionWorkspacePathApplication[]>
+  readonly 'skills/get': TypertRemoteMethod<{ readonly 'request': SessionSkillGetRequest }, SessionSkillGetValue>
   readonly 'skills/list': TypertRemoteMethod<{ readonly 'request': SkillListRequest }, SkillListValue>
 }>
 export default TYPERT_REMOTE

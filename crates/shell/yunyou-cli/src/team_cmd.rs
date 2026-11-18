@@ -10,7 +10,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::render::terminal::{ascii, Profile, SYM_BRAND, SYM_PROMPT};
 use crate::shell_commands::ShellCore;
 use yunyou_commands::{CommandDefinition, CommandHandler, CommandInvocation, CommandKind, CommandOutput};
 use yunyou_team::{stalled_members, TeamService, TeamTaskState};
@@ -55,8 +54,9 @@ fn team_handler(shell: std::sync::Arc<ShellCore>) -> CommandHandler {
                 ));
             };
             match args.first().copied() {
-                None | Some("status") if args.len() <= 1 => {
-                    Ok(CommandOutput::success(overview_text(&service)))
+                None => Ok(CommandOutput::success(overview_text(&service))),
+                Some("status") if args.len() <= 1 => {
+                    Ok(CommandOutput::error("用法：/team status <成员名>"))
                 }
                 Some("tasks") => Ok(CommandOutput::success(tasks_text(&service))),
                 Some("status") => match args.get(1) {
@@ -78,26 +78,6 @@ fn team_handler(shell: std::sync::Arc<ShellCore>) -> CommandHandler {
             }
         }) as BoxFut<'static, _>
     })
-}
-
-/// hub 可见活动时刻表（from/to 命中成员名；All 广播计入全体）。
-fn activity_map(
-    hub: &dyn yunyou::hub::MessageHub,
-) -> HashMap<String, u64> {
-    let mut map: HashMap<String, u64> = HashMap::new();
-    let Ok(entries) = hub.history(yunyou::hub::HistoryQuery { limit: 500 }) else {
-        return map;
-    };
-    for e in entries {
-        let all = e.to.eq_ignore_ascii_case("all");
-        let mut names: Vec<&str> = if all { Vec::new() } else { vec![e.to.as_str()] };
-        names.push(e.from.as_str());
-        for name in names {
-            let slot = map.entry(name.to_string()).or_insert(0);
-            *slot = (*slot).max(e.at_ms);
-        }
-    }
-    map
 }
 
 /// ①一屏总览（三段式；渲染纯函数=测试面）。
@@ -149,7 +129,7 @@ fn tasks_text(service: &Arc<dyn TeamService>) -> String {
     let mut text = format!("任务板（{} 项）：{}\n", tasks.len(), state_counts(&tasks));
     for t in &tasks {
         let owner = t.owner.as_deref().unwrap_or("—");
-        text.push_str(&format!("  #{:<4} [{}] {}（负责人 {owner}）\n", t.id, t.state.state_str(), t.title));
+        text.push_str(&format!("  #{:<4} [{}] {}（负责人 {owner}）\n", t.id, state_label(t.state), t.title));
     }
     text
 }
@@ -178,7 +158,7 @@ fn member_detail(service: &Arc<dyn TeamService>, name: &str) -> CommandOutput {
         .collect();
     text.push_str(&format!("  名下任务 {} 项：", owned.len()));
     for t in owned {
-        text.push_str(&format!("\n    #{:<4} [{}] {}", t.id, t.state.state_str(), t.title));
+        text.push_str(&format!("\n    #{:<4} [{}] {}", t.id, state_label(t.state), t.title));
     }
     CommandOutput::success(text)
 }
@@ -217,7 +197,8 @@ async fn watch(
         let Ok(entries) = hub.history(yunyou::hub::HistoryQuery { limit: 500 }) else {
             continue;
         };
-        for e in entries.into_iter().filter(|e| e.log_id > cursor) {
+        let seen = cursor;
+        for e in entries.into_iter().filter(|e| e.log_id > seen) {
             cursor = cursor.max(e.log_id);
             if member_matches(&e, member) {
                 out.push_str(&format!("  {}\n", line_of(&e)));
@@ -263,6 +244,19 @@ fn now_ms() -> u64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
+}
+
+/// 六态标签（board::state_str 私有——显示层本地图，六态文案与板面同源；
+/// task-21 简报 §二：着色候 render 纪律自查时对表，v1 符号+素色）。
+fn state_label(state: TeamTaskState) -> &'static str {
+    match state {
+        TeamTaskState::Pending => "pending",
+        TeamTaskState::Claimed => "claimed",
+        TeamTaskState::Submitted => "submitted",
+        TeamTaskState::Reviewing => "reviewing",
+        TeamTaskState::Approved => "approved",
+        TeamTaskState::Rejected => "rejected",
+    }
 }
 
 fn short_time(at_ms: u64) -> String {

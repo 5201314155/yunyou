@@ -12,47 +12,21 @@
 use crate::history::LineHistory;
 use crate::editor_core;
 use crate::editor_keys;
-use crate::editor_keys::CsiKey;
+use crate::editor_keys::{flush_stdin_fd, pretype_hint};
 use crate::editor_render;
 use crate::panel::Panel;
 // RawMode 旧路径 re-export（input_source.rs/repl.rs 消费方零改动，家规五：
 // 改复用模块影响面=调用方不变）
 pub(crate) use editor_keys::RawMode;
 
-/// CsiKey → 状态机 Key（面板未消费时交语义层）。
-fn csi_to_key(k: CsiKey) -> editor_core::Key {
-    match k {
-        CsiKey::Up => editor_core::Key::Up,
-        CsiKey::Down => editor_core::Key::Down,
-        CsiKey::Left => editor_core::Key::Left,
-        CsiKey::Right => editor_core::Key::Right,
-        CsiKey::Home => editor_core::Key::Home,
-        CsiKey::End => editor_core::Key::End,
-        CsiKey::Delete => editor_core::Key::Delete,
-        CsiKey::Escape => editor_core::Key::Escape,
-        CsiKey::Other => editor_core::Key::Escape, // 未知序列：按 Esc 语义（收面板/吞弃）降级
-    }
-}
-use crate::render::Profile;
-use std::io::Write;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use crate::input_source::InputSource;
+use crate::render::Profile;
+use std::io::{Write, IsTerminal};
+use std::os::fd::AsRawFd;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 use yunyou_commands::{CommandDescriptor, CommandsService};
-
-/// 追加差分判定（task-42）：新缓冲以旧为前缀且确有新增 → 返回新增尾段；
-/// 否则 None（退格/历史/面板替换/等长防御——走全行重绘）。
-/// 字符边界护栏（lead 护栏①）：字节前缀之外再验 is_char_boundary——CJK 多
-/// 字节若被劈半（防御性，prev 恒为完整快照实际不触发）一律 None 回退全行，
-/// 绝不 panic；先 diff 后写（护栏②）：本函数为纯判定，refresh 在分支选定后
-/// 才发生任何终端写入，无「先写后判」闪烁窗口。
-fn appended_suffix<'a>(prev: &str, buffer: &'a str) -> Option<&'a str> {
-    (buffer.len() > prev.len()
-        && buffer.starts_with(prev)
-        && buffer.is_char_boundary(prev.len()))
-    .then(|| &buffer[prev.len()..])
-}
 
 /// CSI final 字节判定（ECMA-48：0x40..=0x7E；票④测试锚点）。
 fn csi_is_final(byte: u8) -> bool {
@@ -112,6 +86,15 @@ impl Editor {
         // 幂等重入（tcsetattr 同值无害），Drop 只恢复到会话级形态而非 cooked
         // （防逐行守卫先 drop 把会话守卫的 cbreak 打回 cooked）。
         let _raw = RawMode::enable()?;
+        // task-39 批 A 提示行（原语义保留，调用点随编辑行手术回植）：预输入
+        // 字节计数>0 时提示（迁入件 editor_keys 供数）
+        if std::io::stdin().is_terminal() {
+        if let Ok(n) = flush_stdin_fd(std::io::stdin().as_raw_fd()) {
+            if n > 0 {
+                eprintln!("{}", pretype_hint(n));
+            }
+        }
+        }
         let mut stdout = std::io::stdout();
         let mut panel = Panel::default();
         let mut buffer = initial.unwrap_or_default();
@@ -181,16 +164,16 @@ impl Editor {
                     let key = match b {
                         0x1B => {
                             // 孤立 Esc（50ms 无后续）=收面板/取消搜索；有后续=
-                            // CSI/SS3/Alt 族
-                            match editor_keys::read_csi(&source).await {
+                            // CSI/SS3/Alt 族（解析统一在 editor_keys）
+                            match editor_keys::read_escape_key(source).await {
                                 None => continue,
-                                Some(editor_keys::CsiKey::Escape) => {
+                                Some(editor_core::Key::Escape) => {
                                     if panel.is_open() {
                                         panel.collapse(&mut stdout, &self.prompt, &buffer)?;
                                     }
                                     continue;
                                 }
-                                Some(k) => csi_to_key(k),
+                                Some(k) => k,
                             }
                         }
                         _ => match editor_keys::plain_key(b) {
@@ -365,4 +348,11 @@ impl Editor {
         }
         Ok(std::str::from_utf8(&bytes).ok().and_then(|s| s.chars().next()))
     }
+}
+
+fn appended_suffix<'a>(prev: &str, buffer: &'a str) -> Option<&'a str> {
+    (buffer.len() > prev.len()
+        && buffer.starts_with(prev)
+        && buffer.is_char_boundary(prev.len()))
+    .then(|| &buffer[prev.len()..])
 }

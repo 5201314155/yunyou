@@ -72,6 +72,12 @@ export function registerToasts(
       }),
     }, ToastEntry<PropsRuntime<'workspace.toast', 'createFailed'>>)
     yield ctx.slots.register({
+      name: 'workspace.toast', key: 'openResumed', locale: 'workspace',
+      inject: (): ToastDisplayInjected<'openResumed'> => ({
+        display: (notice, t) => ({ text: t('toast.openResumed', { count: notice.count }), tone: 'plain', holdMs: 6000 }),
+      }),
+    }, ToastEntry<PropsRuntime<'workspace.toast', 'openResumed'>>)
+    yield ctx.slots.register({
       name: 'workspace.toast', key: 'forkRequiresOpen', locale: 'workspace',
       inject: (): ToastDisplayInjected<'forkRequiresOpen'> => ({
         display: (notice, t, dismiss) => ({
