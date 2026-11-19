@@ -244,11 +244,13 @@ impl Plugin for AgentLoopPlugin {
                 ServiceId::of::<dyn crate::gate::ApprovalUiService>(),
                 gates.clone() as Arc<dyn crate::gate::ApprovalUiService>,
             )?;
-            // 模式会话态服务面（快刀卡：cli /mode 命令经此切换，runner 组装
-            // GateContext 透传——S3 引擎现成消费）
+            // 模式会话态服务面由权限插件提供（ModeGate=hub+提示段刷新+切换
+            // SystemMessage 通知三合一；本插件只供 GateHubHandle 裸句柄——
+            // set_mode 的提示段/通知副作用归策略侧，内聚单点）
             ctx.provide(
-                ServiceId::of::<dyn crate::gate::ModeStateService>(),
-                gates.clone() as Arc<dyn crate::gate::ModeStateService>,
+                ServiceId::of::<dyn crate::gate::GateHubHandle>(),
+                Arc::new(crate::gate::GateHubHandleWrapper(Arc::clone(&gates)))
+                    as Arc<dyn crate::gate::GateHubHandle>,
             )?;
             let runner: Arc<dyn AgentLoop> = Arc::new(LoopService {
                 runner: AgentLoopRunner {

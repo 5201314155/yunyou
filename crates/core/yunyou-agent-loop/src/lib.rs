@@ -44,6 +44,6 @@ pub use hooks::{
 pub use gate::{
     ApprovalDecision, ApprovalPresenter, ApprovalSubject, ApprovalSubjectKind, ApprovalUiRegistry,
     ApprovalUiService, GateContext, GateDecision, GateHub, GateRegistry, GateRegistryService,
-    ModeStateService, PreToolUseGate, ToolCallView,
+    GateHubHandle, ModeStateService, PreToolUseGate, ToolCallView,
 };
 pub use turn::{AgentLoopRunner, TurnOutcome};

@@ -2846,6 +2846,7 @@ dependencies = [
  "yunyou-retry",
  "yunyou-sandbox",
  "yunyou-session",
+ "yunyou-skills",
  "yunyou-system-prompt",
  "yunyou-team",
  "yunyou-tool-archive",
@@ -2947,8 +2948,11 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tokio-util",
  "yunyou",
  "yunyou-agent-loop",
+ "yunyou-session",
+ "yunyou-system-prompt",
  "yunyou-util",
 ]
 
@@ -3153,6 +3157,7 @@ dependencies = [
  "yunyou-credentials",
  "yunyou-plugin-sdk",
  "yunyou-session",
+ "yunyou-skills",
  "yunyou-team",
  "yunyou-tools",
  "yunyou-util",

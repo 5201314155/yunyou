@@ -56,4 +56,4 @@ export const ru = {
   'reassign.title': 'Переназначить задачу {title}',
   'reassign.owner': 'Новый ответственный (должен быть в составе)',
   'reassign.confirm': 'Переназначить',
-} } satisfies Record<TeamCenterKey, string>
+} satisfies Record<TeamCenterKey, string>

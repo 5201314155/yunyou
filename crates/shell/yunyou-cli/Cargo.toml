@@ -43,6 +43,8 @@ reqwest = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 # 命令注册缝（任务29：壳三命令 register+补全面板 list/find 数据源）
 yunyou-commands = { path = "../yunyou-commands" }
+# skills 下沉批：纯函数面下沉（本 crate 只留壳层 glue，re-export 保原路径）
+yunyou-skills = { path = "../../yunyou-skills" }
 yunyou-team = { workspace = true }
 # web 启动形态（云幕）：`yunyou web` 子命令的 serve 底座（并列前端，同装配同会话）
 yunyou-web = { path = "../../net/yunyou-web" }

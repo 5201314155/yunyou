@@ -18,11 +18,11 @@ pub const SKILLS_SECTION_NAME: &str = "harness:skills";
 /// 目录段档位。
 pub const SKILLS_SECTION_ORDER: f64 = 500.0;
 /// 目录段 token 预算（字符口径：中文 1 字≈1 token，2000 字符≈2k token）。
-const CATALOG_BUDGET_CHARS: usize = 2000;
+pub const CATALOG_BUDGET_CHARS: usize = 2000;
 /// 单条描述截断上限（字符；描述=first_heading 短句，60 字已够判相关性）。
-const CATALOG_DESC_MAX_CHARS: usize = 60;
+pub const CATALOG_DESC_MAX_CHARS: usize = 60;
 /// 目录段引导语（lead 批注 a）：模型不用自己猜「先看目录还是先读全文」。
-const CATALOG_GUIDE: &str = "以下为可用技能目录（名+描述）。写插件/查能力前先 skill_read plugins-seams；需要某技能详情时用 skill_read 按名读全文。";
+pub const CATALOG_GUIDE: &str = "以下为可用技能目录（名+描述）。写插件/查能力前先 skill_read plugins-seams；需要某技能详情时用 skill_read 按名读全文。";
 
 /// 技能目录条目：命令名 + 描述（元数据常驻面，正文不进）。
 #[derive(Debug, Clone, PartialEq, Eq)]

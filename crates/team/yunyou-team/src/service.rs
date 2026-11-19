@@ -98,19 +98,17 @@ impl TeamServiceState {
     }
 
     /// 名册在册校验（任务板 actor 必须是真实成员或 lead）。
-    fn ensure_actor(&self, actor: &str) -> Result<()> {
+    fn ensure_actor(&self, actor: &str) -> Result<(), crate::task_types::TeamOpError> {
         if actor == "lead" || self.core.roster.lock().expect("名册锁").contains(actor) {
             return Ok(());
         }
-        Err(CordisError::new(
-            ErrorKind::HubUnknownMember,
-            format!("\"{actor}\" 不在名册：任务板操作者必须是 lead 或在册成员"),
-        ))
+        Err(crate::task_types::TeamOpError::UnknownActor(actor.to_string()))
     }
 
-    /// BoardOpError → 内核错误（工具面统一走 Result；fail-loud 不吞错）。
-    fn board_err(err: BoardOpError) -> CordisError {
-        CordisError::new(ErrorKind::HubInvalidName, err.to_string())
+    /// BoardOpError → 结构化直透（挂账清理批：web details 字段化；不再经
+    /// CordisError 字符串锚——Display 人话由 TeamOpError 兼容承载）。
+    fn board_err(err: BoardOpError) -> crate::task_types::TeamOpError {
+        crate::task_types::TeamOpError::Board(err)
     }
 }
 

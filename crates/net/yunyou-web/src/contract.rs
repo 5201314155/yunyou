@@ -97,9 +97,9 @@ const METHODS: &[(&str, Status)] = &[
     // commands 域（契约 §9.1；W2 已接）
     ("commands/list", Status::Wired),
     ("commands/execute", Status::Wired),
-    // skills 域（契约 §9.2）
-    ("skills/list", Status::FrozenPending),
-    ("skills/get", Status::FrozenPending),
+    // skills 域（契约 §9.2；skills 下沉批已接——W 系桥接收口）
+    ("skills/list", Status::Wired),
+    ("skills/get", Status::Wired),
     // capabilities（契约 §9.3）
     ("capabilities/list", Status::Wired),
     // team / tasks 域（域-团队与任务.md；W3 已接）
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn 注册表三档状态查询() {
         assert_eq!(status_of("session/prompt"), Some(Status::Wired));
-        assert_eq!(status_of("skills/list"), Some(Status::FrozenPending));
+        assert_eq!(status_of("market/list"), Some(Status::Later));
         assert_eq!(status_of("market/install"), Some(Status::Later));
         assert_eq!(status_of("nope/x"), None);
     }
@@ -248,11 +248,12 @@ mod tests {
     /// not-implemented 兜底：契约内点名状态、契约外点名契约外；两态 code 一致。
     #[test]
     fn not_implemented点名() {
-        let frozen = not_implemented("skills/list");
+        // W 系收口后无 FrozenPending 方法：兜底点名改验 Later（market 域）
+        let frozen = not_implemented("market/list");
         assert_eq!(frozen["error"]["code"], code::NOT_IMPLEMENTED);
         assert!(
-            frozen["error"]["message"].as_str().unwrap_or("").contains("冻结待接"),
-            "契约内应点名状态：{frozen}"
+            frozen["error"]["message"].as_str().unwrap_or("").contains("后续"),
+            "契约内应点名状态（market=后续）：{frozen}"
         );
         assert!(!frozen["error"]["message"].as_str().unwrap_or("").contains("session/prompt"));
         let outside = not_implemented("made/up");
@@ -286,7 +287,7 @@ mod tests {
         let later = all.iter().filter(|(_, s)| *s == Status::Later).count();
         // 锚点：openapi 已接 8 方法（session 6+commands 2）+session/open（域细则
         // 冻结形状，openapi v1.1 已补录）+team/tasks 域 9 方法（W3）；待接 20；后续 2（market）
-        assert_eq!((wired, frozen, later), (36, 2, 2), "契约方法计数漂移，先同步契约再改表：{all:?}");
+        assert_eq!((wired, frozen, later), (38, 0, 2), "契约方法计数漂移，先同步契约再改表：{all:?}");
         // 已接方法必须确有分派（rpc.rs 契约面行为测试锁定形状，此处锁无遗漏）
         for (name, status) in all {
             if *status == Status::Wired {
@@ -301,7 +302,9 @@ mod tests {
                         || name.starts_with("plugins/")
                         || name.starts_with("system/")
                         || *name == "devices/current"
-                        || *name == "capabilities/list",
+                        || *name == "capabilities/list"
+                        || *name == "skills/list"
+                        || *name == "skills/get",
                     "已接面现态=session+commands+team+tasks+schedule+settings+credentials+plugins+system+devices+capabilities 域：{name}"
                 );
             }
@@ -313,7 +316,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn 未接方法经unary兜底点名() {
         let state = state();
-        let body = r#"{"type":"client-request","rpcId":"r9","method":"skills/list","payload":{}}"#;
+        let body = r#"{"type":"client-request","rpcId":"r9","method":"market/list","payload":{}}"#;
         let resp = crate::rpc::rpc_unary(
             State(state.clone()),
             axum::extract::RawQuery(None),
@@ -328,7 +331,7 @@ mod tests {
         assert_eq!(value["rpcId"], "r9", "rpcId 原样回带");
         assert_eq!(value["result"]["ok"], false);
         assert_eq!(value["result"]["error"]["code"], code::NOT_IMPLEMENTED);
-        assert!(value["result"]["error"]["message"].as_str().unwrap_or("").contains("冻结待接"));
+        assert!(value["result"]["error"]["message"].as_str().unwrap_or("").contains("后续"));
         // ServerMessage 词汇不受影响（旧 /ws 面回归锚：tag 形态仍 kebab-case）
         let tag = serde_json::to_string(&ServerMessage::Error { text: "x".into() }).unwrap();
         assert!(tag.contains(r#""type":"error""#), "{tag}");

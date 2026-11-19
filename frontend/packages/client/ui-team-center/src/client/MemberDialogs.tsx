@@ -58,7 +58,7 @@ export function MemberDialogs({ t, dialog, onClose, onKick, onMessage }: MemberD
     )
   }
   return (
-    <Modal open onClose={close} title={t('message.title', { name: dialog.name })} closeLabel={t('close')} className={css.sheet}>
+    <Modal open onClose={close} title={t('message.title', { name: dialog.name })} closeLabel={t('close')} {...(css.sheet ? { className: css.sheet } : {})}>
       <form
         className={css.form}
         onSubmit={(event) => {

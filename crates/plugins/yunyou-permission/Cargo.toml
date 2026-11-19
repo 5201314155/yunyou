@@ -10,6 +10,9 @@ tokio = { workspace = true }
 yunyou = { workspace = true }
 yunyou-agent-loop = { workspace = true }
 yunyou-util = { workspace = true }
+yunyou-system-prompt = { workspace = true }
+yunyou-session = { workspace = true }
+tokio-util = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 schemars = "1"

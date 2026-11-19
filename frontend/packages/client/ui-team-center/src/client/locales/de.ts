@@ -56,4 +56,4 @@ export const de = {
   'reassign.title': 'Aufgabe {title} neu zuweisen',
   'reassign.owner': 'Neuer Verantwortlicher (muss gelistet sein)',
   'reassign.confirm': 'Neu zuweisen',
-} } satisfies Record<TeamCenterKey, string>
+} satisfies Record<TeamCenterKey, string>

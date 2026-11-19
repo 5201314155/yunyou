@@ -12,6 +12,9 @@ import accountRemote from '@deepseek-ai/dsh-deepseek-account/remote'
 import settingsControllerRemote from '@deepseek-ai/dsh-api-settings-controller/remote'
 import officeKitRemote from '@deepseek-ai/dsh-office-kit/remote'
 import goalsRemote from '@deepseek-ai/dsh-goal/remote'
+import yunyouRemote from '@deepseek-ai/dsh-yunyou-remotes/remote'
+// web.v1 yunyou/{team,tasks,schedule} 点形端点（域细则 v1.2 终定）。
+export type {} from '@deepseek-ai/dsh-yunyou-remotes/remote'
 import scheduleRemote from '@deepseek-ai/dsh-schedule/remote'
 import llmRemote from '@deepseek-ai/dsh-llm/remote'
 import dynamicRemote from '@deepseek-ai/dsh-cordis-host-runner/remote'
@@ -198,7 +201,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   try {
     for (const contribution of [
       productAnalyticsRemote, agentPresetsRemote, commandsRemote, agentTeamsRemote, settingsControllerRemote, accountRemote,
-      goalsRemote, llmRemote, dynamicRemote, scheduleRemote,
+      goalsRemote, llmRemote, dynamicRemote, scheduleRemote, yunyouRemote,
       pluginInventoryRemote, pluginManagerRemote, mcpManagerRemote, pluginMarketRemote, pluginRegistryProbeRemote,
       toolResultsRemote,
       messageFeedbackRemote, sessionFeedbackRemote,

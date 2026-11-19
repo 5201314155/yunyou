@@ -17,6 +17,7 @@ mod authorization;
 mod boundary;
 mod denylist;
 mod gate;
+mod mode_gate;
 mod matchers;
 mod mode;
 mod plugin;
@@ -24,6 +25,7 @@ mod rules;
 
 pub use gate::PermissionGate;
 pub use authorization::{authorize_plugin, granted, AuthorizationsFile, GrantRequest, PluginGrant};
+pub use mode_gate::ModeGate;
 pub use plugin::PermissionPlugin;
 pub use mode::{Mode, ToolClass, Unmatched};
 pub use rules::{

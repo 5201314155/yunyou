@@ -32,7 +32,7 @@ export function SpawnDialog({ t, open, onClose, source, notify }: SpawnDialogPro
   }
   if (!open) return null
   return (
-    <Modal open onClose={close} title={t('spawn.title')} closeLabel={t('close')} className={css.sheet}>
+    <Modal open onClose={close} title={t('spawn.title')} closeLabel={t('close')} {...(css.sheet ? { className: css.sheet } : {})}>
       <form
         className={css.form}
         onSubmit={(event) => {

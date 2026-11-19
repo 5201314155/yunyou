@@ -56,4 +56,4 @@ export const fr = {
   'reassign.title': 'Réassigner la tâche {title}',
   'reassign.owner': 'Nouveau responsable (doit figurer au registre)',
   'reassign.confirm': 'Réassigner',
-} } satisfies Record<TeamCenterKey, string>
+} satisfies Record<TeamCenterKey, string>

@@ -45,6 +45,7 @@ mod rpc_session;
 mod rpc_capabilities;
 mod rpc_commands;
 mod rpc_schedule;
+mod rpc_skills;
 mod rpc_team;
 mod schedule_fire;
 mod server;

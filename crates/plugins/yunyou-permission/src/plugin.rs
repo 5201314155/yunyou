@@ -16,7 +16,9 @@ use yunyou::Plugin;
 use yunyou::PluginLevel;
 use yunyou::PluginManifest;
 use yunyou::ServiceId;
-use yunyou_agent_loop::GateRegistryService;
+use yunyou_agent_loop::{GateHubHandle, GateRegistryService, ModeStateService};
+use yunyou_session::SessionStore;
+use yunyou_system_prompt::SystemPrompt;
 use yunyou_util::BoxFut;
 
 /// 插件配置（段：`[plugins.yunyou-permission.config]`）。
@@ -108,6 +110,22 @@ impl Plugin for PermissionPlugin {
             let registry = ctx
                 .get::<dyn GateRegistryService>(ServiceId::of::<dyn GateRegistryService>())
                 .map_err(|err| CordisError::new(ErrorKind::Internal, format!("permission/审批缝不可见: {err}")))?;
+            // 模式服务装配（S3 补件）：hub 句柄+提示服务+会话存储 → ModeGate
+            //（set_mode 三副作用单点：hub 写+harness:mode 段重注册+切换通知）
+            let hub = ctx
+                .get::<dyn GateHubHandle>(ServiceId::of::<dyn GateHubHandle>())
+                .map_err(|err| CordisError::new(ErrorKind::Internal, format!("permission/审批缝句柄不可见: {err}")))?;
+            let prompt = ctx
+                .get::<dyn SystemPrompt>(ServiceId::of::<dyn SystemPrompt>())
+                .map_err(|err| CordisError::new(ErrorKind::Internal, format!("permission/提示服务不可见: {err}")))?;
+            let store = ctx
+                .get::<dyn SessionStore>(ServiceId::of::<dyn SessionStore>())
+                .map_err(|err| CordisError::new(ErrorKind::Internal, format!("permission/会话存储不可见: {err}")))?;
+            ctx.provide(
+                ServiceId::of::<dyn ModeStateService>(),
+                Arc::new(crate::mode_gate::ModeGate::new(hub.hub(), prompt, store))
+                    as Arc<dyn ModeStateService>,
+            )?;
             let mut gate = PermissionGate::new(rules);
             gate.set_auto_allow_sandboxed(cfg.auto_allow_sandboxed);
             registry.register(Arc::new(gate))?;

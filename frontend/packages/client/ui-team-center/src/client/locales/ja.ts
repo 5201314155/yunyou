@@ -56,4 +56,4 @@ export const ja = {
   'reassign.title': 'タスク {title} を再割り当て',
   'reassign.owner': '新しい担当者（名簿掲載者）',
   'reassign.confirm': '再割り当て',
-} } satisfies Record<TeamCenterKey, string>
+} satisfies Record<TeamCenterKey, string>

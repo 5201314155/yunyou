@@ -56,4 +56,4 @@ export const pt = {
   'reassign.title': 'Reatribuir a tarefa {title}',
   'reassign.owner': 'Novo responsável (deve estar na lista)',
   'reassign.confirm': 'Reatribuir',
-} } satisfies Record<TeamCenterKey, string>
+} satisfies Record<TeamCenterKey, string>

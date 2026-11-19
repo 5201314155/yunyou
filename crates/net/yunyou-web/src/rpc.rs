@@ -175,7 +175,13 @@ pub(crate) async fn rpc_unary(
         }        "plugins/tools" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_plugins::plugins_tools(&state, &payload)
-        }        // capabilities 域（契约规格.md §9.3；W3 挂账清偿）
+        }        // skills 域（契约规格.md §9.2；skills 下沉批——W 系收口最后两方法）
+        "skills/list" => crate::rpc_skills::skills_list(&state),
+        "skills/get" => {
+            let payload = body.get("payload").cloned().unwrap_or(json!({}));
+            crate::rpc_skills::skills_get(&state, &payload)
+        }
+        // capabilities 域（契约规格.md §9.3；W3 挂账清偿）
         "capabilities/list" => crate::rpc_capabilities::capabilities_list(&state),
         // system/devices 域（W6，契约域-配置凭据与插件.md §6）
         "system/info" => crate::rpc_system::system_info(&state),

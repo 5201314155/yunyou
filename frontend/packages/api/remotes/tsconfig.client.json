@@ -12,6 +12,7 @@
   ],
   "references": [
     { "path": "../../team/agent-team" },
+    { "path": "../yunyou-remotes" },
     { "path": "../../client/product-analytics/tsconfig.client.json" },
     {
       "path": "../../../vendor/cordis"

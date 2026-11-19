@@ -1,6 +1,9 @@
 /** 团队中心插件，浏览器半：左栏「团队」面板 + main 装配。 */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-client-locale/client'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { createTeamStore } from './stores.ts'
+import { createTeamSource } from './source.ts'
 import { TeamCenterPage } from './TeamCenterPage.tsx'
 import { TeamCenterIcon } from './TeamCenterIcon.tsx'
 import { en, ja, es, fr, de, ru, pt, NS, zh, type TeamCenterKey } from './locales.ts'
@@ -32,7 +35,7 @@ export function apply(ctx: ClientContext): void {
     key: PANEL_ID,
     locale: NS,
     store,
-    inject: () => ({ source: ctx.get('yunyouTeamSource') }),
+    inject: () => ({ source: createTeamSource(ctx) }),
   }, TeamCenterPage))
   ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
     name: 'sidebar.panellist',

@@ -56,4 +56,4 @@ export const en = {
   'reassign.title': 'Reassign task {title}',
   'reassign.owner': 'New owner (must be on the roster)',
   'reassign.confirm': 'Reassign',
-} } satisfies Record<TeamCenterKey, string>
+} satisfies Record<TeamCenterKey, string>

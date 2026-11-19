@@ -303,20 +303,29 @@ impl GateHub {
     }
 }
 
-/// 模式会话态服务面（cli /mode 命令经此切换；对齐 GateRegistryService 形态）。
+/// 模式会话态服务面（cli /mode 命令经此切换；实现=权限插件 ModeGate——
+/// set_mode 附带提示段刷新+切换 SystemMessage 通知，故为 async：会话落盘
+/// await 不阻塞装配线程，P0 协查教训同律）。
 pub trait ModeStateService: Send + Sync {
     /// 读当前模式（None=未设）。
     fn current_mode(&self) -> Option<String>;
-    /// 写模式（None=清回未设）。
-    fn set_mode(&self, mode: Option<String>);
+    /// 写模式（None=清回未设；副作用=提示段重注册+切换通知注入）。
+    fn set_mode<'a>(&'a self, mode: Option<String>) -> BoxFut<'a, ()>;
 }
 
-impl ModeStateService for GateHub {
-    fn current_mode(&self) -> Option<String> {
-        GateHub::current_mode(self)
-    }
-    fn set_mode(&self, mode: Option<String>) {
-        GateHub::set_mode(self, mode)
+/// GateHub 裸句柄（权限插件装配 ModeGate 用：hub 由本插件持有，策略侧经
+/// 本 trait 取 Arc 组装带副作用的模式服务——避免把提示段/会话依赖塞进内核）。
+pub trait GateHubHandle: Send + Sync {
+    /// 取 GateHub 共享句柄。
+    fn hub(&self) -> Arc<GateHub>;
+}
+
+/// 内部包装（plugin.rs provide 侧；Arc<GateHub> → dyn GateHubHandle）。
+pub(crate) struct GateHubHandleWrapper(pub Arc<GateHub>);
+
+impl GateHubHandle for GateHubHandleWrapper {
+    fn hub(&self) -> Arc<GateHub> {
+        Arc::clone(&self.0)
     }
 }
 

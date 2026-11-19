@@ -1,7 +1,8 @@
 /** 团队中心主面板：名册与共享任务板分栏（web.v1 team/tasks 域产品面）。 */
 import { useEffect } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { TeamStoreHandle } from './stores.ts'
 import type { TeamSource } from './contract.ts'
 import { RosterPanel } from './RosterPanel.tsx'
