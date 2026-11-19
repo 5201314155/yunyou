@@ -190,6 +190,7 @@ pub(crate) mod tests {
             session_dir: dir.join("sessions"),
             wire: Arc::new(crate::bridge::WireBridge::new("test-model".into())),
             scheduler: Arc::new(yunyou_plugin_sdk::scheduler::Scheduler::new(|| 1_000_000)),
+            switcher: Arc::new(|_| Box::pin(async { Ok::<(), yunyou::CordisError>(()) })),
             config_store: Arc::new(crate::config_store::ConfigStore::new(std::path::PathBuf::from("/tmp/yunyou-test-yunyou.toml"))),
             loopback: true,
         });

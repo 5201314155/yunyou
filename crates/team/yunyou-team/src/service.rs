@@ -98,7 +98,7 @@ impl TeamServiceState {
     }
 
     /// 名册在册校验（任务板 actor 必须是真实成员或 lead）。
-    fn ensure_actor(&self, actor: &str) -> Result<(), crate::task_types::TeamOpError> {
+    fn ensure_actor(&self, actor: &str) -> std::result::Result<(), crate::task_types::TeamOpError> {
         if actor == "lead" || self.core.roster.lock().expect("名册锁").contains(actor) {
             return Ok(());
         }
@@ -207,7 +207,7 @@ impl TeamService for TeamServiceState {
             .create(title, description, "lead", capability, blocked_by))
     }
 
-    fn task_claim(&self, task_id: u64, actor: &str) -> Result<()> {
+    fn task_claim(&self, task_id: u64, actor: &str) -> std::result::Result<(), crate::task_types::TeamOpError> {
         self.ensure_actor(actor)?;
         self.core
             .board
@@ -217,7 +217,7 @@ impl TeamService for TeamServiceState {
             .map_err(Self::board_err)
     }
 
-    fn task_submit(&self, task_id: u64, actor: &str) -> Result<()> {
+    fn task_submit(&self, task_id: u64, actor: &str) -> std::result::Result<(), crate::task_types::TeamOpError> {
         self.ensure_actor(actor)?;
         self.core
             .board
@@ -231,7 +231,7 @@ impl TeamService for TeamServiceState {
         Ok(())
     }
 
-    fn task_review(&self, task_id: u64, actor: &str, approve: bool) -> Result<()> {
+    fn task_review(&self, task_id: u64, actor: &str, approve: bool) -> std::result::Result<(), crate::task_types::TeamOpError> {
         self.ensure_actor(actor)?;
         self.core
             .board
@@ -245,7 +245,7 @@ impl TeamService for TeamServiceState {
         Ok(())
     }
 
-    fn task_reassign(&self, task_id: u64, new_owner: &str) -> Result<()> {
+    fn task_reassign(&self, task_id: u64, new_owner: &str) -> std::result::Result<(), crate::task_types::TeamOpError> {
         // 改派权=派工权：v1 仅 lead（dsh team_task_update 同语义；成员请求改派走
         // 消息面向 lead 提请）
         self.core

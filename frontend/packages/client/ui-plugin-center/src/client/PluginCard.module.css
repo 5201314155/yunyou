@@ -1,0 +1,79 @@
+/* 广场卡片：信任徽标+兼容灰置。 */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--dsw-border, var(--dsw-alias-border, #d7e0e7));
+  border-radius: 14px;
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trust {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--dsw-border, var(--dsw-alias-border, #d7e0e7));
+  color: var(--dsw-alias-text-secondary, #5d6b76);
+}
+
+.trust[data-trust='official'] {
+  color: var(--dsw-alias-state-success, #5faf5f);
+  border-color: currentColor;
+}
+
+.trust[data-trust='signature'] {
+  color: var(--dsw-alias-state-running, #5fafd7);
+  border-color: currentColor;
+}
+
+.description {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--dsw-alias-text-secondary, #5d6b76);
+}
+
+.tag {
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--dsw-border, var(--dsw-alias-border, #d7e0e7));
+}
+
+.blocked {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dsw-alias-state-warning, #d7af5f);
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}

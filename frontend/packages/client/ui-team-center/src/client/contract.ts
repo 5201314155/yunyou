@@ -1,30 +1,19 @@
 /** 团队中心数据形状与远程面接口缝（web.v1 team/tasks 域，域细则 §1–§2）。 */
 
-/** 名册行（team/roster，L1）：online/busy/task 由服务端合成，前端只读。 */
-export interface RosterEntry {
-  readonly name: string
-  readonly description: string
-  readonly online: boolean
-  readonly busy: boolean
-  readonly task?: string
-}
+import type {
+  TeamKickRequest, TeamMessageRequest, TeamRosterEntry, TeamSpawnRequest,
+  TasksListEntry,
+} from '@deepseek-ai/dsh-yunyou-remotes/types'
+
+/** 名册行（team/roster，L1）：wire 类型别名，前端只读。 */
+export type RosterEntry = TeamRosterEntry
+/** 任务板行（tasks/list 全量投影）。 */
+export type TaskEntry = TasksListEntry
+export type { TeamSpawnRequest, TeamMessageRequest, TeamKickRequest }
 
 /** 共享任务状态机（board.rs 冻结）：rejected 为终态，重做=新建。 */
 export const TASK_STATES = ['pending', 'claimed', 'submitted', 'reviewing', 'approved', 'rejected'] as const
 export type TaskState = (typeof TASK_STATES)[number]
-
-/** 任务板行（tasks/list 全量投影，L1）。 */
-export interface TaskEntry {
-  readonly id: string
-  readonly title: string
-  readonly state: TaskState
-  readonly owner?: string
-  readonly createdBy: string
-  readonly submittedBy?: string
-  readonly reviewer?: string
-  readonly capability?: string
-  readonly blockedBy: readonly string[]
-}
 
 /** 加载呈现阶段；error 携带人话 message（fail-visible，不伪装成功）。 */
 export type LoadPhase = 'idle' | 'loading' | 'ready' | 'error'
@@ -50,7 +39,17 @@ export interface MessageRequest {
  * 阶段 2 接 web.v1 真实 RPC（yunyou/team・tasks 命名空间，候云络别名）。
  * 组件只依赖此接口，不接触传输层。
  */
+/** 事件重拉接缝（web.v1 $events：tasks/changed・team/roster-changed 增量提示→重拉单真源）。 */
+export interface TeamEventsSubscription {
+  /** 订阅任务板变更；返回退订函数。 */
+  readonly tasksChanged: (listener: () => void) => () => void
+  /** 订阅名册变更；返回退订函数。 */
+  readonly rosterChanged: (listener: () => void) => () => void
+}
+
 export interface TeamSource {
+  /** 事件订阅（云络桥接后提供；缺省=仅手动刷新，诚实降级）。 */
+  readonly events?: TeamEventsSubscription
   readonly roster: () => Promise<RemoteOutcome<readonly RosterEntry[]>>
   readonly tasks: () => Promise<RemoteOutcome<readonly TaskEntry[]>>
   readonly spawn: (request: SpawnRequest) => Promise<RemoteOutcome<{ readonly name: string }>>

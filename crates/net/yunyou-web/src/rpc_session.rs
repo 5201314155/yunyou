@@ -4,6 +4,29 @@
 //! 方法分派与信封成形在 rpc.rs；契约解包 `request_of` 在 contract.rs。
 
 use crate::contract::{self, code, err_envelope};
+
+/// D2-b 换根链路（云枢裁 b 案+裁决④）：try_lock 闸门（in-flight 拒绝）→
+/// switcher 换根（slot.load() 换槽+JSONL 重绑，/new 同规全程闸门内）→ 成功后
+/// wire 派生切换。switcher 缺席（测试态）=仅 wire 面切换（诚实：物理落点无
+/// 换根能力时由装配层保证单会话）。
+pub(crate) async fn with_switch(
+    state: &Arc<WebState>,
+    _session_id: &str,
+    path: &std::path::Path,
+) -> std::result::Result<(), Value> {
+    let Some(permit) = state.turns.try_lock_gate() else {
+        return Err(err_envelope(
+            contract::code::AGENT_BUSY,
+            "当前会话正在对话中，等本回合落定再切换会话",
+        ));
+    };
+    drop(permit); // 换根闸门由 rebuild_session_to 内部装配串行（/new 同规）；
+    // 此处 permit 仅作 in-flight 探测（裁决④拒绝面），换根本身持自己的装配锁
+    (state.switcher)(Some(path.to_path_buf()))
+        .await
+        .map_err(|err| err_envelope(code::TEAM_STATE, &format!("会话切换失败（当前会话未受影响）：{err}")))?;
+    Ok(())
+}
 use crate::protocol::ServerMessage;
 use crate::server::WebState;
 use axum::http::StatusCode;
@@ -138,6 +161,11 @@ pub(crate) async fn rpc_open(state: &Arc<WebState>, body: &Value) -> Response {
             ),
             StatusCode::OK,
         );
+    }
+    // D2-b（云枢裁 b 案，裁决④）：换根前 try_lock 闸门——in-flight 中 open
+    // 拒绝（agent-busy 同族 fail-visible，不排队不带伤换槽）
+    if let Err(envelope) = with_switch(state, session_id, &path).await {
+        return rpc_response(body.get("rpcId").cloned().unwrap_or(Value::Null), envelope, StatusCode::OK);
     }
     // 锁外读（IO 不持 wire 锁）：尾部 HISTORY_CAP 封顶——完整历史在 JSONL
     let events = match yunyou_session::JsonlStore::new(path).load_all().await {

@@ -62,8 +62,9 @@ async fn 列表与启停与配置读写() {
     let event = tokio::time::timeout(std::time::Duration::from_secs(2), events.recv())
         .await.expect("事件在").expect("流在");
     assert_eq!(event.0, crate::bridge::StreamKind::Events);
-    assert_eq!(event.2["type"], "config/reloaded");
-    assert_eq!(event.2["revision"], revision + 1);
+    assert_eq!(event.2["type"], "emit");
+    assert_eq!(event.2["event"], "config/reloaded");
+    assert_eq!(event.2["args"][0]["revision"], revision + 1);
     // 读回：enable=false 落盘
     let value = call(&state, "plugins/list", "{}").await["result"]["value"].clone();
     let team = value["items"].as_array().unwrap().iter()

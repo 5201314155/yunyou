@@ -57,7 +57,7 @@ impl ToolDefinition for TaskCreateTool {
                 .unwrap_or_default();
             match service.task_create_full(title, description, capability, blocked_by) {
                 Ok(task_id) => ToolOutcome::Ok(json!({"task_id": task_id})),
-                Err(err) => crate::tools::team_err("team/task", err),
+                Err(err) => ToolOutcome::Err(ToolError::new("team/task", err.to_string())),
             }
         })
     }
@@ -113,7 +113,7 @@ impl ToolDefinition for TaskClaimTool {
             };
             match service.task_claim(task_id, &actor) {
                 Ok(()) => ToolOutcome::Ok(json!({"claimed": true})),
-                Err(err) => crate::tools::team_err("team/task", err),
+                Err(err) => ToolOutcome::Err(ToolError::new("team/task", err.to_string())),
             }
         })
     }
@@ -170,7 +170,7 @@ impl ToolDefinition for TaskSubmitTool {
             };
             match service.task_submit(task_id, &actor) {
                 Ok(()) => ToolOutcome::Ok(json!({"submitted": true})),
-                Err(err) => crate::tools::team_err("team/task", err),
+                Err(err) => ToolOutcome::Err(ToolError::new("team/task", err.to_string())),
             }
         })
     }
@@ -217,7 +217,7 @@ impl ToolDefinition for TaskReviewTool {
             // 审查人=lead（工具 lead 专属；板层另有 actor≠提交人的系统级守卫）
             match service.task_review(task_id, "lead", approve) {
                 Ok(()) => ToolOutcome::Ok(json!({"state": if approve { "approved" } else { "rejected" }})),
-                Err(err) => crate::tools::team_err("team/task", err),
+                Err(err) => ToolOutcome::Err(ToolError::new("team/task", err.to_string())),
             }
         })
     }
@@ -259,7 +259,7 @@ impl ToolDefinition for TaskReassignTool {
             };
             match service.task_reassign(task_id, &new_owner) {
                 Ok(()) => ToolOutcome::Ok(json!({"reassigned": true})),
-                Err(err) => crate::tools::team_err("team/task", err),
+                Err(err) => ToolOutcome::Err(ToolError::new("team/task", err.to_string())),
             }
         })
     }

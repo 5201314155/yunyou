@@ -46,6 +46,7 @@ pub(crate) fn terminal_cols() -> Option<usize> {
     (ok && ws.ws_col > 0).then_some(ws.ws_col as usize)
 }
 
+pub mod approval;
 pub mod banner;
 pub(crate) mod tool_render; // 云络 P6 测试面（adapter 侧跨模块调用）（tool_render.rs 本体随批，署名披露）
 pub mod sanitize;

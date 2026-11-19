@@ -30,12 +30,22 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en, ja, es, fr, de, ru, pt }), 'ui-team-center: dictionaries')
   const store = createTeamStore()
   const t = ctx.locale.bind(NS)
+  // $events 事件重拉缝（web.v1 websocket §4）：官方事件总线可达即订阅，
+  // tasks/changed・team/roster-changed 均为增量提示→触发页面刷新单真源。
+  const events = {
+    // $on 返回值即退订函数（gateway remote-events subscribe）；data 为增量提示，
+    // 消费端只重拉（单真源纪律，websocket §4.2）。
+    tasksChanged: (listener: () => void): (() => void) =>
+      ctx.remote.$on('tasks/changed', () => { listener() }),
+    rosterChanged: (listener: () => void): (() => void) =>
+      ctx.remote.$on('team/roster-changed', () => { listener() }),
+  }
   ctx.slots.inject('main', () => ctx.slots.register({
     name: 'main',
     key: PANEL_ID,
     locale: NS,
     store,
-    inject: () => ({ source: createTeamSource(ctx) }),
+    inject: () => ({ source: { ...createTeamSource(ctx), events } }),
   }, TeamCenterPage))
   ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
     name: 'sidebar.panellist',

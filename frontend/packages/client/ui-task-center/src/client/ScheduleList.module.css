@@ -1,0 +1,56 @@
+/* 定时计划三列。 */
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-top: 1px solid var(--dsw-border, var(--dsw-alias-border, #d7e0e7));
+  min-width: 0;
+}
+
+.row:first-child {
+  border-top: none;
+}
+
+.id {
+  font-family: var(--dsw-mono, ui-monospace, monospace);
+  font-size: 12px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.next {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+.message {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--dsw-alias-text-secondary, #5d6b76);
+}

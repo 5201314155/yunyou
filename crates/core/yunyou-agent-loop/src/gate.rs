@@ -122,8 +122,11 @@ pub enum ApprovalSubject<'a> {
 /// 呈现器产出（「记住本次选择」的策略落库在呈现器/策略侧，内核只取决定）。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ApprovalDecision {
-    /// 用户放行。
+    /// 用户放行（仅本次）。
     Approved,
+    /// 用户放行且「总是允许」（S5：rule=追加进 settings [permissions].allow
+    /// 的规则文本，如 "Bash(cargo:*)"；持久化经 PermissionPersistence 缝）。
+    ApprovedAlways { rule: String },
     /// 用户拒绝（message=人话，进 ToolResult）。
     Denied { message: String },
 }
@@ -288,9 +291,57 @@ pub struct GateHub {
     /// GateContext 时透传——S3 引擎现成消费；**会话内存态不落盘**，会话结束
     /// 随进程态收回=授权/模式不残留哲学；session-meta 持久化=演进项候裁）。
     pub mode: RwLock<Option<String>>,
+    /// S5 连拒熔断：连续拒绝计数（规则 Deny 或用户拒绝 +1；放行/批准清零；
+    /// 达 [`DENIAL_TRIP`] 触发熔断=后续全部工具强制人工审。denialTracking
+    /// 同律；机制计数器在缝、阈值常量随缝，模式化阈值候 [permission] 卡）。
+    denial_count: Mutex<u32>,
+    /// 熔断态（tripped=true=全工具强制人工审；会话内存态）。
+    tripped: Mutex<bool>,
+    /// S5 allow 规则持久化（「总是允许」写回；Option=策略侧装配时注入，
+    /// None= ApprovedAlways 降级为本会话放行+warn）。
+    persistence: RwLock<Option<Arc<dyn PermissionPersistence>>>,
+}
+
+/// 连拒熔断阈值（denialTracking 同律；同会话连续 5 次拒绝→暂停自动执行）。
+pub const DENIAL_TRIP: u32 = 5;
+
+/// allow 规则持久化缝（S5：ApprovedAlways「总是允许」写回 settings——
+/// 实现归权限策略侧；内核只持缝不落盘）。
+pub trait PermissionPersistence: Send + Sync {
+    /// 追加一条 allow 规则并持久化（重复规则幂等；失败=Err 人话）。
+    fn persist_allow_rule<'a>(&'a self, rule: &'a str) -> BoxFut<'a, std::result::Result<(), String>>;
 }
 
 impl GateHub {
+    /// S5 连拒熔断：记录一次拒绝（连续计数+1；达阈值置熔断态）。
+    pub fn record_denial(&self) {
+        let mut count = self.denial_count.lock().expect("连拒计数锁");
+        *count += 1;
+        if *count >= DENIAL_TRIP {
+            *self.tripped.lock().expect("熔断态锁") = true;
+        }
+    }
+
+    /// S5：记录一次放行/批准（连续计数清零——「连续」语义锚）。
+    pub fn record_approval(&self) {
+        *self.denial_count.lock().expect("连拒计数锁") = 0;
+    }
+
+    /// S5：熔断态查询（run_tool 强制人工审闸）。
+    pub fn is_tripped(&self) -> bool {
+        *self.tripped.lock().expect("熔断态锁")
+    }
+
+    /// S5：注入 allow 规则持久化实现（权限插件 setup 期调用；重复注入=替换）。
+    pub fn set_persistence(&self, persistence: Arc<dyn PermissionPersistence>) {
+        *self.persistence.write().expect("持久化缝锁") = Some(persistence);
+    }
+
+    /// S5：取持久化实现（None=策略侧未装配）。
+    pub fn persistence(&self) -> Option<Arc<dyn PermissionPersistence>> {
+        self.persistence.read().expect("持久化缝锁").clone()
+    }
+
     /// 读当前模式（None=未设=策略侧按 Default 保守处理）。
     pub fn current_mode(&self) -> Option<String> {
         self.mode.read().expect("模式态锁").clone()

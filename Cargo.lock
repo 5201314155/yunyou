@@ -2844,7 +2844,6 @@ dependencies = [
  "yunyou-permission",
  "yunyou-plugin-proto",
  "yunyou-retry",
- "yunyou-sandbox",
  "yunyou-session",
  "yunyou-skills",
  "yunyou-system-prompt",
@@ -3004,23 +3003,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "yunyou-sandbox"
-version = "0.1.0"
-dependencies = [
- "landlock",
- "libc",
- "schemars",
- "seccompiler",
- "serde",
- "serde_json",
- "tokio",
- "yunyou",
- "yunyou-system-prompt",
- "yunyou-tools",
- "yunyou-util",
-]
-
-[[package]]
 name = "yunyou-session"
 version = "0.1.0"
 dependencies = [
@@ -3055,6 +3037,7 @@ dependencies = [
 name = "yunyou-team"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "schemars",
  "serde",
  "serde_json",
@@ -3063,30 +3046,11 @@ dependencies = [
  "yunyou",
  "yunyou-agent-loop",
  "yunyou-llm",
+ "yunyou-plugin-proto",
  "yunyou-session",
  "yunyou-system-prompt",
  "yunyou-tools",
  "yunyou-util",
-]
-
-[[package]]
-name = "yunyou-team-launcher"
-version = "0.1.0"
-dependencies = [
- "libc",
- "tokio",
-]
-
-[[package]]
-name = "yunyou-team-procmgr"
-version = "0.1.0"
-
-[[package]]
-name = "yunyou-team-worker-core"
-version = "0.1.0"
-dependencies = [
- "libc",
- "yunyou-plugin-proto",
 ]
 
 [[package]]
@@ -3114,9 +3078,11 @@ name = "yunyou-tools"
 version = "0.1.0"
 dependencies = [
  "glob",
+ "landlock",
  "libc",
  "regex",
  "schemars",
+ "seccompiler",
  "serde",
  "serde_json",
  "tokio",
@@ -3124,6 +3090,7 @@ dependencies = [
  "yunyou",
  "yunyou-commands",
  "yunyou-llm",
+ "yunyou-system-prompt",
  "yunyou-util",
 ]
 
@@ -3155,9 +3122,11 @@ dependencies = [
  "yunyou-commands",
  "yunyou-config",
  "yunyou-credentials",
+ "yunyou-llm",
  "yunyou-plugin-sdk",
  "yunyou-session",
  "yunyou-skills",
+ "yunyou-system-prompt",
  "yunyou-team",
  "yunyou-tools",
  "yunyou-util",

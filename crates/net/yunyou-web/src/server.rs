@@ -54,7 +54,17 @@ pub(crate) struct WebState {
     pub(crate) config_store: Arc<crate::config_store::ConfigStore>,
     /// 监听地址回环性（devices/current loopback；W6——instance 解析后传入）。
     pub(crate) loopback: bool,
+    /// 会话换根口（D2-b；真源=slot 换根结果，wire 仅被动投影派生）。
+    pub(crate) switcher: SessionSwitcher,
 }
+
+/// 会话换根口类型（D2-b 云枢裁 b 案）：target=None=铸新会话路径；
+/// 返回换根结果人话（CommandOutput）。web 不依赖 ShellCore 类型（闭包解耦）。
+pub(crate) type SessionSwitcher = Arc<
+    dyn Fn(Option<std::path::PathBuf>) -> yunyou_util::BoxFut<'static, std::result::Result<(), yunyou::CordisError>>
+        + Send
+        + Sync,
+>;
 
 /// 路由表：全部路由先过 token 鉴权中间件（from_fn_with_state），无匿名通道。
 /// v2 形态（dist 可用）：`/` 与 `/{*path}` 服务官方移植前端产物；v1 vanilla
@@ -71,7 +81,10 @@ pub(crate) fn router(state: Arc<WebState>) -> Router {
         .route("/api", post(crate::rpc::rpc_unary))
         // 方法即路径：对端 client 按 method 名 POST /api/<method>（线体同名）
         .route("/api/{*path}", post(crate::rpc::rpc_unary))
-        .route("/{*path}", get(dist_asset))
+        // P0 修复（云尺 E2E 实测）：catch-all .route("/{*path}") 抢占全部 POST
+        // 匹配（matchit 优先级，POST /api 实测 405=web RPC 全阻）——dist 静态面
+        // 改 Router::fallback（axum 惯用法，优先级最低，静态与 POST 天然不抢）
+        .fallback(fallback_asset)
         .route("/ws", get(ws_upgrade))
         .layer(middleware::from_fn_with_state(state.clone(), require_token))
         .with_state(state)
@@ -147,11 +160,25 @@ async fn index() -> Response {
 /// v2 产物服务：dist 内相对路径精确命中 → 字节+按扩展名 Content-Type；
 /// 未命中且路径无扩展名（深链形态）→ SPA 回退 index.html；其余 404。
 /// dist 缺席 → 404（v1 形态下无此路由语义）。
-async fn dist_asset(axum::extract::Path(path): axum::extract::Path<String>) -> Response {
+async fn fallback_asset(
+    State(state): State<Arc<WebState>>,
+    req: axum::extract::Request,
+) -> Response {
+    // 静态面只应答 GET/HEAD（原 catch-all 同语义：其余方法 405——POST 打资产名
+    // 不再被 catch-all 吞成 405 全阻，但也不冒充资产成功）
+    if req.method() != axum::http::Method::GET && req.method() != axum::http::Method::HEAD {
+        return (StatusCode::METHOD_NOT_ALLOWED, "静态资产仅支持 GET/HEAD").into_response();
+    }
+    let _ = state; // 鉴权中间件已先行（layer 覆盖 fallback）
+    fallback_asset_impl(req.uri().path())
+}
+
+/// fallback 静态资产（原 dist_asset；路径自取 uri——fallback 无 Path extractor）。
+fn fallback_asset_impl(path: &str) -> Response {
     if !crate::dist::available() {
         return (StatusCode::NOT_FOUND, "v2 前端未构建（dist 缺席）").into_response();
     }
-    let full = format!("/{path}");
+    let full = path.to_string();
     let hit = match crate::dist::get(&full) {
         Some(bytes) => Some((bytes, crate::dist::content_type(&full))),
         // 无产物扩展名 = 页面深链（如 /sessions/abc）→ 回单页入口

@@ -43,6 +43,8 @@ export const API_REMOTE_FORWARDED_EVENTS = [
     { event: 'plugin-market/changed', mode: 'emit' },
     { event: 'settings/document-updated', mode: 'emit' },
     { event: 'schedule/changed', mode: 'emit' },
+    { event: 'tasks/changed', mode: 'emit' },
+    { event: 'team/roster-changed', mode: 'emit' },
     { event: 'user-questions/request', mode: 'waterfall' },
     { event: 'web/providers-changed', mode: 'emit' },
 ];

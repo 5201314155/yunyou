@@ -213,6 +213,7 @@ yunyou plugin check <插件目录>
 
 ## 下一步
 
+> 配置级安装（bundled 投影/开关，零编译 walkthrough）见 `docs/设计/插件开发指南.md`（L1 篇）。
 - 抄 `hello-sdk` 示例改造成你的第一个插件；
 - 读 SDK crate 内 `tests/` 与 `SDK.md`（即本文）；
 - 技能文档《yunyou-plugin-dev》SDK 章有进阶问答。

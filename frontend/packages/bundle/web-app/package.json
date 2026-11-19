@@ -202,7 +202,10 @@
     "@deepseek-ai/dsh-workspace-changes": "workspace:*",
     "@deepseek-ai/schemastery": "workspace:~",
     "commander": "^15.0.0",
-    "open": "^11.0.2"
+    "open": "^11.0.2",
+    "@deepseek-ai/dsh-client-ui-task-center": "workspace:*",
+    "@deepseek-ai/dsh-client-ui-team-center": "workspace:*",
+    "@deepseek-ai/dsh-client-ui-plugin-center": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",

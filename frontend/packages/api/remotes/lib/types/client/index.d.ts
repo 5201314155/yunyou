@@ -2,6 +2,7 @@
 import type { Context } from '@deepseek-ai/cordis';
 export type {} from '@deepseek-ai/dsh-client-product-analytics/remote';
 export type {} from '@deepseek-ai/dsh-agent-team/remote';
+export type {} from '@deepseek-ai/dsh-yunyou-remotes/remote';
 import type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client';
 export type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client';
 export type { BundleDetail, BundleInfo, BundleRowInfo, ChangeResult, IncompatiblePlugin, InspectOptions, InstallBundleOptions, InstallSpecKind, ManagementError, PackageResult, PluginChange, PluginEntryId, PluginInfo, PluginInspectProblem, PluginInstallCancellation, PluginInstallFailureKind, PluginInstallLogChunk, PluginInstallProgress, PluginInstallRequestId, PluginRegistries, PluginSpecInspection, PluginUpdateProgress, PluginUpdateResult, PluginUpdateStep, PluginVersion, PluginVersionList, RegistryAttempt, ReadOnlyReason, Registry, RestartReason, } from '@deepseek-ai/dsh-plugin-manager/types';

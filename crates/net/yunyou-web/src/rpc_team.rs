@@ -4,11 +4,13 @@
 //! TeamCore 板锁保证——lead 2026-11-19 裁决）；写成功即广播 tasks/changed
 //! （websocket.md §4 增量提示，前端重拉 tasks/list，单真源不轮询）。
 //!
-//! # 错误映射（板层 Display 文案为冻结锚点，board.rs）
-//! HubUnknownMember→team/unknown-member｜「不得自审」→team/self-review｜
-//! 「无权操作」→team/not-owner｜其余板违例→team/state（details 恒无 secret/栈）。
+//! # 错误映射（挂账清理批：结构化直透——TeamOpError 枚举，不再依赖 Display
+//! 文案锚）
+//! Board(SelfReview)→team/self-review｜Board(NotOwner)→team/not-owner｜
+//! Board(其余)→team/state｜UnknownActor→team/unknown-member；details 字段化
+//! （from/op/owner/actor/submitter/task_id），恒无 secret/栈。
 
-use crate::contract::{self, code, err_envelope};
+use crate::contract::{self, code, err_body_details, err_envelope};
 use crate::server::WebState;
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -32,17 +34,51 @@ fn service(state: &Arc<WebState>) -> Result<Arc<dyn TeamService>, Value> {
 
 /// 内核错误 → 契约错误信封（映射规则见模块头）。
 fn service_err(err: &yunyou::CordisError) -> Value {
-    let message = err.to_string();
+    // 服务级错误（spawn/message/kick 等 hub 面）：kind 映射（HubUnknownMember→
+    // team/unknown-member；其余原样透传 team/state 人话）
     let code_str = if *err.kind() == ErrorKind::HubUnknownMember {
         code::TEAM_UNKNOWN_MEMBER
-    } else if message.contains("不得自审") {
-        code::TEAM_SELF_REVIEW
-    } else if message.contains("无权操作") {
-        code::TEAM_NOT_OWNER
     } else {
         code::TEAM_STATE
     };
-    err_envelope(code_str, &message)
+    err_envelope(code_str, &err.to_string())
+}
+
+/// 任务板写操作结构化错误映射（挂账清理批：TeamOpError 直透，details 字段化）。
+fn board_op_err(err: &yunyou_team::TeamOpError) -> Value {
+    use yunyou_team::{BoardOpError, TeamOpError};
+    let mut details = serde_json::Map::new();
+    let code_str = match err {
+        TeamOpError::Board(BoardOpError::SelfReview { task_id, submitter, actor }) => {
+            details.insert("task_id".into(), json!(task_id));
+            details.insert("submitter".into(), json!(submitter));
+            details.insert("actor".into(), json!(actor));
+            code::TEAM_SELF_REVIEW
+        }
+        TeamOpError::Board(BoardOpError::NotOwner { task_id, owner, actor }) => {
+            details.insert("task_id".into(), json!(task_id));
+            details.insert("owner".into(), json!(owner));
+            details.insert("actor".into(), json!(actor));
+            code::TEAM_NOT_OWNER
+        }
+        TeamOpError::Board(BoardOpError::InvalidState { task_id, from, op }) => {
+            details.insert("task_id".into(), json!(task_id));
+            details.insert("from".into(), json!(from));
+            details.insert("op".into(), json!(op));
+            code::TEAM_STATE
+        }
+        TeamOpError::Board(BoardOpError::UnknownTask(task_id)) => {
+            details.insert("task_id".into(), json!(task_id));
+            code::TEAM_STATE
+        }
+        TeamOpError::UnknownActor(name) => {
+            details.insert("actor".into(), json!(name));
+            code::TEAM_UNKNOWN_MEMBER
+        }
+    };
+    // D3 修复（云尺 E2E 实测 details:{} 空）：err_envelope 丢 details——
+    // details 字段化必经 err_body_details 组装
+    json!({"ok": false, "error": err_body_details(code_str, &err.to_string(), details)})
 }
 
 /// 写操作成功后的 tasks/changed 事件（增量提示：taskId/state/owner?）。
@@ -159,11 +195,20 @@ pub(crate) async fn team_spawn(state: &Arc<WebState>, payload: &Value) -> Value 
         })
         .await
     {
-        Ok(spawned) => json!({"ok": true, "value": {
-            "name": spawned.name,
-            "description": spawned.description,
-            "note": spawned.note,
-        }}),
+        Ok(spawned) => {
+            // roster-changed（A 线补齐，websocket.md §4）：W3 漏项——名册增量
+            // （spawn 上线）推流，前端收到后重拉 team/roster（单真源不轮询）
+            state.wire.broadcast_event(
+                crate::bridge::StreamKind::Events,
+                json!({"type": "team/roster-changed", "name": spawned.name,
+                       "online": true, "busy": false}),
+            );
+            json!({"ok": true, "value": {
+                "name": spawned.name,
+                "description": spawned.description,
+                "note": spawned.note,
+            }})
+        }
         Err(err) => service_err(&err),
     }
 }
@@ -220,7 +265,15 @@ pub(crate) async fn team_kick(state: &Arc<WebState>, payload: &Value) -> Value {
         return err_envelope(code::BAD_REQUEST, "kick 缺 name（成员名）");
     };
     match service.kick(name).await {
-        Ok(()) => json!({"ok": true, "value": {"kicked": true}}),
+        Ok(()) => {
+            // roster-changed（A 线补齐）：kick 离场增量推流
+            state.wire.broadcast_event(
+                crate::bridge::StreamKind::Events,
+                json!({"type": "team/roster-changed", "name": name,
+                       "online": false, "busy": false}),
+            );
+            json!({"ok": true, "value": {"kicked": true}})
+        }
         Err(err) => service_err(&err),
     }
 }
@@ -280,7 +333,7 @@ pub(crate) fn tasks_claim(state: &Arc<WebState>, payload: &Value) -> Value {
             notify_task_changed(state, task_id, "claimed", Some(owner));
             json!({"ok": true, "value": {"claimed": true}})
         }
-        Err(err) => service_err(&err),
+        Err(err) => board_op_err(&err),
     }
 }
 
@@ -299,7 +352,7 @@ pub(crate) fn tasks_submit(state: &Arc<WebState>, payload: &Value) -> Value {
             notify_task_changed(state, task_id, "submitted", None);
             json!({"ok": true, "value": {"submitted": true}})
         }
-        Err(err) => service_err(&err),
+        Err(err) => board_op_err(&err),
     }
 }
 
@@ -323,7 +376,7 @@ pub(crate) fn tasks_review(state: &Arc<WebState>, payload: &Value) -> Value {
             notify_task_changed(state, task_id, state_name, None);
             json!({"ok": true, "value": {"approved": approve}})
         }
-        Err(err) => service_err(&err),
+        Err(err) => board_op_err(&err),
     }
 }
 
@@ -345,7 +398,7 @@ pub(crate) fn tasks_reassign(state: &Arc<WebState>, payload: &Value) -> Value {
             notify_task_changed(state, task_id, "claimed", Some(new_owner.to_string()));
             json!({"ok": true, "value": {"reassigned": true}})
         }
-        Err(err) => service_err(&err),
+        Err(err) => board_op_err(&err),
     }
 }
 

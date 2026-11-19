@@ -34,7 +34,6 @@ yunyou-tool-archive = { workspace = true }
 yunyou-permission = { workspace = true }
 yunyou-web-search = { workspace = true }
 yunyou-retry = { path = "../../llm/yunyou-retry" }
-yunyou-sandbox = { path = "../../tools/yunyou-sandbox" }
 # 取消令牌（REPL Ctrl-C → run_turn 中断）
 tokio-util = { workspace = true }
 # /model 模型列表拉取（task-30：GET {base_url}/models；版本与 llm-openai 同源收敛）

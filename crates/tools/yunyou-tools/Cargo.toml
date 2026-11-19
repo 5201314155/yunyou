@@ -17,9 +17,11 @@ tokio-util = { workspace = true }
 regex = { workspace = true }
 glob = { workspace = true }
 schemars = "1"
-# killpg/kill 探活（task-14 组收割；版本对齐 cli crate 直引先例——libc workspace
-# 单源化系台账挂账 52 行既有事项，不在本卡范围）
+# 沙箱实现面依赖（原 yunyou-sandbox 并档，2026-11-19）
 libc = "0.2"
+landlock = "0.4.4"
+seccompiler = "0.5.0"
+yunyou-system-prompt = { path = "../../shell/yunyou-system-prompt" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

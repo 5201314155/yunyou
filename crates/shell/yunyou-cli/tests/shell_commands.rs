@@ -2,7 +2,8 @@
 //! 硬顶纪律；rebuild_session_to 提 pub 后自集成测试可达）。
 
 use yunyou::{Context, ServiceId};
-use yunyou_commands::CommandsService;
+use yunyou_commands::{CommandsPlugin, CommandsService};
+use yunyou_tools::ToolsPlugin;
 use yunyou_cli::shell_commands::{register_shell_commands, ActiveSession, SessionSlot, ShellCore};
 use yunyou_config::DshConfig;
 use yunyou_commands::{CommandDefinition, CommandInvocation, CommandKind, CommandOutput};
@@ -175,4 +176,50 @@ mod tests {
         );
         assert!(!exit.is_cancelled(), "失败可逆：退出令牌不得触发（旧语义已废）");
     }
+
+
+/// 真实装配冒烟（云尺 E2E 抓 P0 双注册崩溃的回归锚，lead 派）：tools 插件
+/// （/tools 别名「工具」既有产品语义）+ 壳命令全家桶（config_cmd 家族）共存
+/// 注册零冲突——批㉖只跑 --lib 漏注册面的口径补验。
+#[tokio::test(flavor = "multi_thread")]
+async fn tools插件与壳命令双注册共存冒烟() {
+    let root = Context::new();
+    let handle = root.plugin(CommandsPlugin, serde_json::json!({}));
+    handle.await_ready().await.expect("commands 插件应装载");
+    let tools_handle = root.plugin(ToolsPlugin, serde_json::json!({}));
+    tools_handle.await_ready().await.expect("tools 插件应装载");
+    let exit = CancellationToken::new();
+    let slot = SessionSlot::new(ActiveSession {
+        root: root.clone(),
+        handler: Arc::new(|_line: &str, _cancel: CancellationToken| {
+            Box::pin(async { Ok::<(), yunyou_cli::run::AppError>(()) })
+        }),
+        plugin_status: Vec::new(),
+    });
+    let shell = Arc::new(ShellCore {
+        config: DshConfig::default(),
+        home: std::env::temp_dir().join("yunyou-smoke-test"),
+        config_path: std::env::temp_dir().join("yunyou-smoke-test/yunyou.toml"),
+        session_dir: std::env::temp_dir().join("yunyou-smoke-test/sessions"),
+        slot,
+        render_config: yunyou_cli::repl::RenderConfig {
+            profile: yunyou_cli::render::Profile::NoColor,
+            interactive: false,
+            model: "test-model".into(),
+            thinking: yunyou_cli::repl::ThinkingMode::Collapse,
+        },
+        current_session_path: std::sync::Mutex::new(
+            std::env::temp_dir().join("yunyou-smoke-test/sessions/default.jsonl"),
+        ),
+        exit: exit.clone(),
+    });
+    // 双注册面全量走缝：任一 ServiceDuplicate 即 fail-loud 崩（P0 回归锚）
+    register_shell_commands(&root, shell.clone()).expect("壳命令全家桶注册应零冲突");
+    // 三形态解析对账：tools 插件别名「工具」+壳「工具开关」各自可达
+    let commands = root.get::<dyn CommandsService>(ServiceId::of::<dyn CommandsService>()).unwrap();
+    let tools_alias = commands.find("工具").expect("tools 插件别名「工具」应可达");
+    assert_eq!(tools_alias.name, "tools-info", "「工具」归 tools 插件（既有产品语义）：{tools_alias:?}");
+    let shell_alias = commands.find("工具开关").expect("壳别名「工具开关」应可达");
+    assert_eq!(shell_alias.name, "tools", "「工具开关」归壳 tools 开关：{shell_alias:?}");
+}
 }

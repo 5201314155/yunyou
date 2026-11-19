@@ -33,6 +33,9 @@ pub struct WebParams {
     pub scheduled_rx: Option<tokio::sync::mpsc::Receiver<String>>,
     /// 配置文件路径（W5 settings 修订写落点；run.rs 传实际 yunyou.toml 路径）。
     pub config_path: std::path::PathBuf,
+    /// 会话换根口（D2-b 云枢裁 b 案：web 驱动 slot.load() 换根+JSONL 重绑，
+    /// 复用 CLI /new rebuild_session 机制；None=测试态无换根能力）。
+    pub switcher: crate::server::SessionSwitcher,
 }
 
 /// 运行中的 web 服务实例（start_instance 产物；测试与嵌入方持有真实地址与令牌）。
@@ -82,10 +85,13 @@ pub async fn start_instance(params: &mut WebParams) -> Result<WebInstance, WebEr
         wire: Arc::new(WireBridge::new(params.model.clone())),
         config_store: Arc::new(crate::config_store::ConfigStore::new(params.config_path.clone())),
         loopback: addr.ip().is_loopback(),
+        switcher: params.switcher.clone(),
         scheduler: {
             scheduler.set_trigger(Arc::new(crate::schedule_fire::TurnFireTrigger {
                 turns: Arc::new(TurnRunner::new(params.root_getter.clone(), params.model.clone())),
                 broadcast: broadcast_tx.clone(),
+                // D5：serve 装配处=runtime 上下文内，捕获 handle 供调度线程用
+                handle: tokio::runtime::Handle::current(),
             }));
             scheduler.spawn_thread();
             scheduler

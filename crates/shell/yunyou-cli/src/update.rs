@@ -48,6 +48,14 @@ pub fn download_to(dir: &Path) -> Result<PathBuf, String> {
     if !unpacked.success() {
         return Err("解包失败（gz 损坏？重试或 --from-source）".into());
     }
+    // 解包后即授权 0755（gunzip 产物权限继承 gz 文件=非可执行，直接 --version
+    // 自检=Permission denied——业主 ARM 真机实证「update 通道断」）
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(dir.join("yunyou"), std::fs::Permissions::from_mode(0o755))
+            .map_err(|err| format!("解包件授权失败：{err}"))?;
+    }
     Ok(dir.join("yunyou"))
 }
 
@@ -253,6 +261,35 @@ mod tests {
         let new_binary = fake_binary(&dir, "yunyou 2.0.0");
         replace_binary(&new_binary, &real).expect("替换应成功");
         assert!(std::fs::read_to_string(&real).unwrap().contains("2.0.0"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 解包件可执行位锁（业主 ARM 真机「update 通道断 Permission denied」回归锚）：
+    /// 本地造 gz→download_to 等价段（gunzip+chmod）→--version 可执行。
+    #[test]
+    fn 解包件授权0755_自检可执行() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("yunyou-upd-chmod-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // 造「远端 gz」：真二进制（假脚本）→gzip
+        let src = fake_binary(&dir, "yunyou 9.8.7");
+        let gz = dir.join("yunyou.gz");
+        {
+            let raw = std::fs::read(&src).unwrap();
+            // 最小 gzip 容器：用 gzip 命令（环境必有——install.sh 同款依赖）
+            std::fs::write(dir.join("raw"), raw).unwrap();
+            let st = Command::new("gzip").arg("-f").arg(dir.join("raw")).status().unwrap();
+            assert!(st.success());
+            std::fs::rename(dir.join("raw.gz"), &gz).unwrap();
+        }
+        // download_to 的解包+授权段（本地等价：gunzip+chmod 0755）
+        let st = Command::new("gunzip").arg("-f").arg(dir.join("yunyou.gz")).status().unwrap();
+        assert!(st.success());
+        std::fs::set_permissions(dir.join("yunyou"), std::fs::Permissions::from_mode(0o755)).unwrap();
+        // 自检可执行（Permission denied 回归锚：修前此行失败）
+        let version = read_version(&dir.join("yunyou")).expect("解包件应可执行（0755）");
+        assert!(version.contains("9.8.7"), "{version}");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

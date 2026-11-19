@@ -18,42 +18,8 @@ use axum::response::{IntoResponse, Response};
 use serde_json::{json, Value};
 use std::sync::Arc;
 
-/// 方法名前缀归一（云织反骨审查 A 案，lead 2026-11-19 裁）：三方命名对不上
-/// 实测在据——分派对 team/tasks/schedule 三域接 `yunyou/` 前缀别名（openapi
-/// 回写 yunyou/* 由云枢复审），**裸名保留兼容**（现态客户端已用裸名实测）；
-/// 两态同效由锚点测试锁死。其余域不归一（session/commands 等无前缀争议）。
-fn normalize_method(method: &str) -> String {
-    // B2 三域 wire 形定（云织反骨二次上报，lead 裁）：`yunyou/<域>.<动作>` 点形；
-    // 斜杠形别名（openapi 首版）+裸名（现态客户端实测）保留——三形态同效锚点锁死。
-    // 返回 String（每请求一次小分配；leak 归一=内存泄漏禁）。
-    let Some(rest) = method.strip_prefix("yunyou/") else { return method.to_string() };
-    let domain = rest.split(['.', '/']).next().unwrap_or("");
-    match domain {
-        "team" | "tasks" | "schedule" => {
-            if let Some((head, tail)) = rest.split_once('.') {
-                if tail.contains('.') || tail.contains('/') {
-                    return method.to_string(); // 多级/异常形态不归一（fail-visible 兜底）
-                }
-                return match head {
-                    "team" => format!("team/{tail}"),
-                    "tasks" => format!("tasks/{tail}"),
-                    "schedule" => format!("schedule/{tail}"),
-                    _ => method.to_string(),
-                };
-            }
-            // 斜杠形别名（无点）：rest 已是规范形（team/roster）直接归一
-            if tail_slash_ok(rest) { return rest.to_string(); }
-            method.to_string()
-        }
-        _ => method.to_string(),
-    }
-}
+use crate::rpc_normalize::normalize_method;
 
-/// 斜杠形别名合法性（单级动作，无二级分隔）。
-fn tail_slash_ok(rest: &str) -> bool {
-    let Some((_, tail)) = rest.split_once('/') else { return false };
-    !tail.is_empty() && !tail.contains('/') && !tail.contains('.')
-}
 /// unary RPC（POST /api/<method>）：client-request 信封 → server-response 信封。
 pub(crate) async fn rpc_unary(
     State(state): State<Arc<WebState>>,
@@ -107,6 +73,26 @@ pub(crate) async fn rpc_unary(
         "session/create" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             let requested = request_of(&payload).get("sessionId").and_then(Value::as_str);
+            // D2-b（云枢裁决：create 铸造或复用语义含切换）：显式 id 且与当前
+            // 活跃不同→换根（裁决④ in-flight 拒绝）+重置重灌；否则原单会话路径
+            if let Some(id) = requested.filter(|id| !id.is_empty()) {
+                let active = state.wire.session_ids().into_iter().next();
+                if active.as_deref() != Some(id) {
+                    let path = state.session_dir.join(format!("{id}.jsonl"));
+                    if let Err(envelope) = crate::rpc_session::with_switch(&state, id, &path).await {
+                        return rpc_response(body.get("rpcId").cloned().unwrap_or(Value::Null), envelope, StatusCode::OK);
+                    }
+                    // 换根成功：重置重灌（目标 JSONL 存在则灌尾部；新会话=空灌）
+                    let store = yunyou_session::JsonlStore::new(&path);
+                    let mut events = yunyou_session::SessionStore::load_all(&*store)
+                        .await
+                        .unwrap_or_default();
+                    if events.len() > crate::wire_frames::HISTORY_CAP {
+                        events.split_off(events.len() - crate::wire_frames::HISTORY_CAP);
+                    }
+                    state.wire.open_session(id, &events);
+                }
+            }
             json!({"ok": true, "value": {"sessionId": state.wire.create_session(requested)}})
         }        // loadOlder 向上翻页兜底：空页（本进程会话流不超快照重放环）
         "session/page" => json!({"ok": true, "value": {"records": [], "hasMore": false}}),
@@ -231,6 +217,7 @@ mod tests {
             session_dir: PathBuf::from("/tmp/yunyou-rpc-test-sessions"),
             wire: Arc::new(WireBridge::new("test-model".into())),
             scheduler: Arc::new(yunyou_plugin_sdk::scheduler::Scheduler::new(|| 1_000_000)),
+            switcher: Arc::new(|_| Box::pin(async { Ok::<(), yunyou::CordisError>(()) })),
             config_store: Arc::new(crate::config_store::ConfigStore::new(std::path::PathBuf::from("/tmp/yunyou-test-yunyou.toml"))),
             loopback: true,
         })
@@ -253,39 +240,6 @@ mod tests {
             .await
             .expect("响应体可读");
         serde_json::from_slice(&bytes).expect("响应是合法 JSON")
-    }
-    /// yunyou/ 前缀别名归一（A 案）：三域两态同效（team/roster 与
-    /// yunyou/team/roster 同响应）；非三域前缀不归一（session/yunyou-x 不动）。
-    #[tokio::test(flavor = "multi_thread")]
-    async fn 前缀别名两态同效() {
-        let state = state();
-        // 无团队插件环境：roster 返回「服务未就绪」人话信封——两态同信封即归一成立
-        let bare = call(&state, "team/roster", "{}").await;
-        let prefixed = call(&state, "yunyou/team/roster", "{}").await;
-        assert_eq!(prefixed["result"], bare["result"], "前缀别名同效：{prefixed}");
-        let bare = call(&state, "tasks/list", "{}").await;
-        let prefixed = call(&state, "yunyou/tasks/list", "{}").await;
-        assert_eq!(prefixed["result"], bare["result"], "tasks 域前缀同效：{prefixed}");
-        let bare = call(&state, "schedule/list", "{}").await;
-        let prefixed = call(&state, "yunyou/schedule/list", "{}").await;
-        // nowMs 毫秒级漂移不进比对（比对 entries+ok——归一语义锚）
-        assert_eq!(prefixed["result"]["ok"], bare["result"]["ok"], "schedule 域前缀同效：{prefixed}");
-        assert_eq!(prefixed["result"]["value"]["entries"], bare["result"]["value"]["entries"]);
-        // 点形（B2 wire 形定）：yunyou/<域>.<动作> 三态同效
-        for method in ["yunyou/team.roster", "yunyou/tasks.list", "yunyou/schedule.list"] {
-            let bare = call(&state, &method["yunyou/".len()..].replace('.', "/"), "{}").await;
-            let dotted = call(&state, method, "{}").await;
-            assert_eq!(
-                dotted["result"]["error"], bare["result"]["error"],
-                "点形同效（无插件环境=同款人话信封）：{method} → {dotted}"
-            );
-        }
-        // 多级/异常形态不归一（fail-visible 兜底，不猜）
-        let weird = call(&state, "yunyou/team.roster.x", "{}").await;
-        assert_eq!(weird["result"]["error"]["code"], "gateway/not-implemented", "{weird}");
-        // 非三域不归一：yunyou/session/list 未知（fail-visible，不扩面）
-        let outside = call(&state, "yunyou/session/list", "{}").await;
-        assert_eq!(outside["result"]["error"]["code"], "gateway/not-implemented", "{outside}");
     }
     /// 方法分派：list 空 items / create 铸造并登记 / page 空页 / 未知方法
     /// not-implemented / 坏信封 400。
@@ -434,5 +388,100 @@ mod tests {
         ] {
             let resp = call(&state, "session/open", payload).await;
             assert_eq!(resp["result"]["error"]["code"], "gateway/bad-request", "{why}: {resp}");
-        }        let _ = std::fs::remove_dir_all(&dir);
-    }}
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// D2-b 五证锚点：②持久化落点（prompt 后目标 JSONL 产生且事件落该文件，
+    /// 不落旧文件——split-brain 盲区补正）+④in-flight 换根拒绝；③旧残留清除
+    /// 断言（重放环重置）；①⑤（follow 帧/取消落款）由 server 级与 E2E 面
+    /// 覆盖（此处标注口径）。
+    #[tokio::test(flavor = "multi_thread")]
+    async fn d2b_持久化落点与inflight拒绝() {
+        use std::sync::Mutex as StdMutex;
+        // 模拟 slot：可变 Context 槽（root_getter 动态取）
+        let slot: Arc<StdMutex<Context>> = Arc::new(StdMutex::new(Context::new()));
+        let dir = std::env::temp_dir().join(format!("yunyou-d2b-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let old_path = dir.join("old.jsonl");
+        let new_path = dir.join("new.jsonl");
+        // 旧装配 store（SessionPlugin 绑 old.jsonl）
+        let old_root = Context::new();
+        let handle = old_root.plugin(
+            yunyou_session::SessionPlugin,
+            serde_json::json!({"path": old_path.display().to_string()}),
+        );
+        handle.await_ready().await.expect("session 插件装载");
+        *slot.lock().expect("槽锁") = old_root;
+        let (sender, _) = broadcast::channel(16);
+        let slot_for_state = slot.clone();
+        let state = Arc::new(WebState {
+            token: "t".into(),
+            model: "test-model".into(),
+            turns: Arc::new(TurnRunner::new(
+                Arc::new(move || slot_for_state.lock().expect("槽锁").clone()),
+                "test-model".into(),
+            )),
+            broadcast: sender,
+            session_dir: dir.clone(),
+            wire: Arc::new(crate::bridge::WireBridge::new("test-model".into())),
+            scheduler: Arc::new(yunyou_plugin_sdk::scheduler::Scheduler::new(|| 1_000_000)),
+            config_store: Arc::new(crate::config_store::ConfigStore::new(dir.join("yunyou.toml"))),
+            loopback: true,
+            switcher: {
+                // 真换根：新装配 root（SessionPlugin 绑 new.jsonl）写入槽
+                let slot = slot.clone();
+                let new_path = new_path.clone();
+                Arc::new(move |_| {
+                    let slot = slot.clone();
+                    let new_path = new_path.clone();
+                    Box::pin(async move {
+                        let new_root = Context::new();
+                        let handle = new_root.plugin(
+                            yunyou_session::SessionPlugin,
+                            serde_json::json!({"path": new_path.display().to_string()}),
+                        );
+                        handle.await_ready().await.expect("新装配 session 插件装载");
+                        *slot.lock().expect("槽锁") = new_root;
+                        Ok(())
+                    }) as yunyou_util::BoxFut<'static, std::result::Result<(), yunyou::CordisError>>
+                })
+            },
+        });
+        // ④ in-flight：占闸门调 create(显式 id)→拒绝
+        let _permit = state.turns.try_lock_gate().expect("闸门空闲可取");
+        let busy = call(&state, "session/create", r#"{"sessionId":"new"}"#).await;
+        assert_eq!(busy["result"]["error"]["code"], "session/agent-busy", "in-flight 拒绝（裁决④）：{busy}");
+        drop(_permit);
+        // ② 持久化落点：create("new") 换根→prompt→目标 JSONL 产生且事件落该文件
+        let create = call(&state, "session/create", r#"{"sessionId":"new"}"#).await;
+        assert_eq!(create["result"]["value"]["sessionId"], "new", "{create}");
+        // 落点锚（证②）：换根后经 turns.root_getter（=slot）取到的装配 store
+        // 即新路径——split-brain 本质是「换根后装配绑定」，此断言直击该绑定；
+        // prompt 端到端落盘（含 agentLoop 全家）由云尺 E2E 真装配终验
+        {
+            let root = state.turns.root();
+            let store = root
+                .get::<dyn yunyou_session::SessionStore>(yunyou::ServiceId::of::<dyn yunyou_session::SessionStore>())
+                .expect("新装配 store 应就绪");
+            store
+                .append(&yunyou_session::SessionEvent::UserMessage { text: "落位验证".into() })
+                .await
+                .expect("落盘应成功");
+        }
+        // 落点断言：新 JSONL 产生且含 user/message；旧 JSONL 不含本轮消息
+        let new_text = std::fs::read_to_string(&new_path).unwrap_or_default();
+        assert!(new_text.contains("user-message") && new_text.contains("落位验证"), "落点=新 JSONL：{new_text}");
+        let old_text = std::fs::read_to_string(&old_path).unwrap_or_default();
+        assert!(!old_text.contains("落位验证"), "旧 JSONL 不串写：{old_text}");
+        // ③ 旧残留清除：open_session 重置（重放环=新 JSONL 尾部，不含旧事件）
+        let snapshot = state.wire.snapshot(None);
+        assert_eq!(snapshot["header"]["id"], "new");
+        for record in snapshot["records"].as_array().expect("records 在") {
+            let serialized = record.to_string();
+            assert!(!serialized.contains("自动会话消息"), "不串旧残留（裁决③）：{serialized}");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}

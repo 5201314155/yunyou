@@ -1,0 +1,64 @@
+/* 插件广场主面板。 */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  padding: 16px;
+  overflow: auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.search {
+  flex: 1;
+  max-width: 420px;
+  padding: 8px;
+  border: 1px solid var(--dsw-border, var(--dsw-alias-border, #d7e0e7));
+  border-radius: 10px;
+  font: inherit;
+}
+
+.categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.category {
+  padding: 4px 10px;
+  border: 1px solid var(--dsw-border, var(--dsw-alias-border, #d7e0e7));
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.category[aria-selected='true'] {
+  border-color: currentColor;
+  font-weight: 600;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.empty {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--dsw-alias-text-secondary, #5d6b76);
+}

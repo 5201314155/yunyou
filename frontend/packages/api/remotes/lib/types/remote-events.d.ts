@@ -117,6 +117,12 @@ export declare const API_REMOTE_FORWARDED_EVENTS: readonly [{
     readonly event: "schedule/changed";
     readonly mode: "emit";
 }, {
+    readonly event: "tasks/changed";
+    readonly mode: "emit";
+}, {
+    readonly event: "team/roster-changed";
+    readonly mode: "emit";
+}, {
     readonly event: "user-questions/request";
     readonly mode: "waterfall";
 }, {

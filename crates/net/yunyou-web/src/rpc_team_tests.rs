@@ -11,8 +11,26 @@ use crate::commands::tests::setup as cmd_setup;
     use yunyou_tools::RegistryService;
     use yunyou_team::TeamPlugin;
 
+    /// 最小 FakeLlm（team.rs 集成测试同款自足复制——spawn 成员回合需 Llm
+    /// 服务，否则信箱等待挂死；纯文本脚本耗尽=占位回复）。
+    struct FakeLlm;
+    impl yunyou_llm::Llm for FakeLlm {
+        fn stream(
+            &self,
+            _req: yunyou_llm::GenerateRequest,
+        ) -> yunyou_util::BoxFut<'static, yunyou::Result<Box<dyn yunyou_llm::LlmStream>>> {
+            Box::pin(async move { Ok(Box::new(FakeStream) as Box<dyn yunyou_llm::LlmStream>) })
+        }
+    }
+    struct FakeStream;
+    impl yunyou_llm::LlmStream for FakeStream {
+        fn next(&mut self) -> yunyou_util::BoxFut<'_, yunyou::Result<Option<yunyou_llm::StreamDelta>>> {
+            Box::pin(async { Ok(None) })
+        }
+    }
+
     /// 装配：真 TeamPlugin（SessionStore 由 cmd_setup 的 SessionPlugin 提供；
-    /// RegistryService 显式补；不装 Llm——本测试不拉成员回合）。返回
+    /// RegistryService+Llm 显式补——spawn 成员回合需要）。返回
     /// (state, 会话文件路径)——TeamPlugin config.path 需真实会话路径。
     pub(crate) async fn team_setup() -> (Arc<WebState>, std::path::PathBuf) {
         let (state, session_file) = cmd_setup().await;
@@ -20,6 +38,20 @@ use crate::commands::tests::setup as cmd_setup;
         let registry: Arc<dyn RegistryService> = yunyou_tools::ToolsRegistry::new();
         root.provide(ServiceId::of::<dyn RegistryService>(), registry)
             .expect("provide registry");
+        let llm: Arc<dyn yunyou_llm::Llm> = Arc::new(FakeLlm);
+        root.provide(ServiceId::of::<dyn yunyou_llm::Llm>(), llm)
+            .expect("provide llm");
+        // team.rs 集成测试装配同款：SystemPromptPlugin 先立（成员人设槽依赖）
+        let sp = root.plugin(
+            yunyou_system_prompt::SystemPromptPlugin,
+            serde_json::json!({}),
+        );
+        let mut sp_active = false;
+        for _ in 0..200 {
+            if sp.state() == yunyou::FiberState::Active { sp_active = true; break; }
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        }
+        assert!(sp_active, "SystemPromptPlugin 应装载");
         let handle = root.plugin(
             TeamPlugin,
             serde_json::json!({"path": session_file.display().to_string()}),
@@ -81,8 +113,9 @@ use crate::commands::tests::setup as cmd_setup;
         let event = tokio::time::timeout(std::time::Duration::from_secs(2), events.recv())
             .await.expect("事件在").expect("流在");
         assert_eq!(event.0, crate::bridge::StreamKind::Events);
-        assert_eq!(event.2["type"], "tasks/changed");
-        assert_eq!(event.2["state"], "pending");
+        assert_eq!(event.2["type"], "emit");
+        assert_eq!(event.2["event"], "tasks/changed");
+        assert_eq!(event.2["args"][0]["state"], "pending");
         // claim（lead 代派）
         let value = call(&state, "tasks/claim", &format!(r#"{{"args":{{"request":{{"taskId":{task_id},"owner":"lead"}}}}}}"#))
             .await["result"]["value"].clone();
@@ -97,6 +130,10 @@ use crate::commands::tests::setup as cmd_setup;
         // review：lead 自审自己的提交 → 板层强制 team/self-review（lead 不可绕过）
         let resp = call(&state, "tasks/review", &format!(r#"{{"args":{{"request":{{"taskId":{task_id},"approve":true}}}}}}"#)).await;
         assert_eq!(resp["result"]["error"]["code"], "team/self-review", "{resp}");
+        // D3 回归锚（云尺 E2E 实测 details:{} 空）：details 字段化必达
+        assert_eq!(resp["result"]["error"]["details"]["task_id"], task_id, "{resp}");
+        assert_eq!(resp["result"]["error"]["details"]["submitter"], "lead");
+        assert_eq!(resp["result"]["error"]["details"]["actor"], "lead");
         // tasks/list 全量投影：submittedBy 在列
         let value = call(&state, "tasks/list", "{}").await["result"]["value"].clone();
         let items = value["items"].as_array().expect("items 在");
@@ -139,4 +176,161 @@ use crate::commands::tests::setup as cmd_setup;
         let resp = call(&state, "team/message",
             r#"{"args":{"request":{"to":"ghost","body":"hi"}}}"#).await;
         assert_eq!(resp["result"]["error"]["code"], "team/unknown-member", "{resp}");
+    
+
+    }
+    /// A 线①根因测试（WS open $events→unary create→断言流收到 tasks/changed）：
+    /// 过=服务端推流无缺（根因在前端订阅，转云织）；不过=推流缺失再挖。
+    #[tokio::test(flavor = "multi_thread")]
+    async fn events根因_tasks_changed推流实证() {
+        let (state, _) = team_setup().await;
+        let mut ws = crate::server::tests::test_ws_connect(state.clone()).await;
+        use futures_util::{SinkExt, StreamExt};
+        use tokio_tungstenite::tungstenite::Message as WsMessage;
+        // open $events（ready 帧先行）
+        ws.send(WsMessage::text(
+            r#"{"type":"open","streamId":"ev1","endpoint":"$events","payload":{}}"#,
+        ))
+        .await
+        .expect("open 可写");
+        let _ready = ws.next().await.expect("ready 帧").expect("帧可读");
+        // unary create（经真实 router 走 RPC 面——推流源）
+        let body = r#"{"type":"client-request","rpcId":"ev","method":"tasks/create","payload":{"args":{"request":{"title":"事件测试","description":"推流实证"}}}}"#;
+        let resp = rpc_unary(
+            State(state.clone()),
+            axum::extract::RawQuery(None),
+            HeaderMap::new(),
+            axum::body::Bytes::from(body),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        // $events 流应收到 tasks/changed item
+        let mut saw = false;
+        for _ in 0..6 {
+            match tokio::time::timeout(std::time::Duration::from_millis(800), ws.next()).await {
+                Ok(Some(Ok(WsMessage::Text(data)))) => {
+                    if data.contains(r#""type":"emit""#)
+                        && data.contains(r#""event":"tasks/changed""#)
+                        && data.contains(r#""streamId":"ev1""#)
+                    {
+                        saw = true;
+                        break;
+                    }
+                }
+                Ok(Some(Ok(_))) => {}
+                _ => break,
+            }
+        }
+        assert!(saw, "$events 流应收到 tasks/changed（服务端推流实证）：未收到=推流缺失");
+        let _ = ws.close(None).await;
+    }
+
+    /// A 线①roster-changed 补齐：spawn 后 $events 流收到名册增量。
+    #[tokio::test(flavor = "multi_thread")]
+    async fn roster_changed_spawn推流() {
+        let (state, _) = team_setup().await;
+        let mut rx = state.wire.subscribe();
+        // spawn（FakeLlm 未装——成员回合循环无 Llm 会失败？spawn 只建 fiber，
+        // 成员回合由消息驱动——信箱等待不炸）
+        let _ = call(&state, "team/spawn",
+            r#"{"args":{"request":{"name":"reviewer","description":"评审员","prompt":"评审"}}}"#).await;
+        let mut saw = false;
+        for _ in 0..8 {
+            match tokio::time::timeout(std::time::Duration::from_millis(400), rx.recv()).await {
+                Ok(Ok((crate::bridge::StreamKind::Events, _, value))) => {
+                    if value["type"] == "emit" && value["event"] == "team/roster-changed"
+                        && value["args"][0]["name"] == "reviewer"
+                    {
+                        saw = true;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        assert!(saw, "spawn 后 roster-changed 应推流：{saw}");
+    
+    }
+
+    /// approve→approved 通知回流）：tasks/changed 事件序列+tasks/list 终态。
+    #[tokio::test(flavor = "multi_thread")]
+    async fn 团队全生命周期_spawn到approve() {
+        let (state, _) = team_setup().await;
+        let mut rx = state.wire.subscribe();
+        // lead spawn 成员（web 面）
+        let value = call(&state, "team/spawn",
+            r#"{"args":{"request":{"name":"reviewer","description":"评审员","prompt":"评审"}}}"#)
+            .await["result"]["value"].clone();
+        assert_eq!(value["name"], "reviewer", "{value}");
+        // 创建任务（web 面）
+        let task_id = call(&state, "tasks/create",
+            r#"{"args":{"request":{"title":"评审任务","description":"写审分离闭环"}}}"#)
+            .await["result"]["value"]["taskId"].as_u64().expect("taskId");
+        // 成员工具面 claim（service 直调=工具面语义；web 面代提交不在本批，lead 批④）
+        let root = state.turns.root();
+        let service = root
+            .get::<dyn yunyou_team::TeamService>(yunyou::ServiceId::of::<dyn yunyou_team::TeamService>())
+            .expect("团队服务在");
+        service.task_claim(task_id, "reviewer").expect("成员认领");
+        service.task_submit(task_id, "reviewer").expect("成员提交");
+        // lead web approve（L3）
+        let value = call(&state, "tasks/review",
+            &serde_json::json!({"args":{"request":{"taskId":task_id,"approve":true}}}).to_string())
+            .await["result"]["value"].clone();
+        assert_eq!(value["approved"], true, "{value}");
+        // tasks/changed 事件序列：pending→claimed→submitted→approved（四推）
+        let mut states: Vec<String> = Vec::new();
+        for _ in 0..12 {
+            match tokio::time::timeout(std::time::Duration::from_millis(300), rx.recv()).await {
+                Ok(Ok((crate::bridge::StreamKind::Events, _, v))) => {
+                    if v["type"] == "emit" && v["event"] == "tasks/changed" && v["args"][0]["taskId"] == task_id {
+                        states.push(v["args"][0]["state"].as_str().unwrap_or("").to_string());
+                        if states.last().map(|s| s == "approved").unwrap_or(false) {
+                            break;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        // 已知缺口（如实断言+备案 lead）：claimed/submitted 由成员工具面写路径
+        // 产生，service 层无广播位（web 通知面只盖 web 写路径）——事件序列含
+        // pending（web create）与 approved（web review）；工具面增量广播候裁决
+        assert_eq!(
+            states,
+            vec!["pending", "approved"],
+            "事件序列（工具面写路径无广播=已知缺口备案）：{states:?}"
+        );
+        // tasks/list 终态 approved+reviewer 落档
+        let value = call(&state, "tasks/list", "{}").await["result"]["value"].clone();
+        let item = value["items"].as_array().expect("items 在")
+            .iter().find(|i| i["id"] == task_id).expect("任务在");
+        assert_eq!(item["state"], "approved", "{item}");
+        assert_eq!(item["owner"], "reviewer");
+        assert_eq!(item["reviewer"], "lead");
+    }
+
+    /// A 线③D4 断言锚：open 灌入后 session/list 活跃行 title=derive_title 派生
+    /// （侦察结论=投影链在位；E2E 现象若为 create 未发消息=诚实缺席非缺陷）。
+    #[tokio::test(flavor = "multi_thread")]
+    async fn d4_活跃行title派生() {
+        let (state, session_file) = team_setup().await;
+        // 预置历史会话（含用户消息→标题可派生）
+        use yunyou_session::{JsonlStore, SessionEvent, SessionStore};
+        // 历史文件落 state.session_dir（open 按目录寻文件；session_file 在
+        // dir 根而 session_dir=dir/sessions——cmd_setup 形态）
+        let hist = state.session_dir.join("hist-d4.jsonl");
+        let store = JsonlStore::new(hist.clone());
+        store.append(&SessionEvent::UserMessage { text: "D4 标题验证\n第二行".into() }).await.unwrap();
+        // open 切换+灌入
+        let value = call(&state, "session/open",
+            &serde_json::json!({"args":{"request":{"sessionId":"hist-d4"}}}).to_string())
+            .await["result"]["value"].clone();
+        assert_eq!(value["ingested"], 1, "{value}");
+        // 活跃行 title=首行派生
+        let value = call(&state, "session/list", "{}").await["result"]["value"].clone();
+        let row = value["items"].as_array().expect("items 在")
+            .iter().find(|i| i["sessionId"] == "hist-d4").expect("活跃行在");
+        assert_eq!(row["agentAvailable"], true);
+        assert_eq!(row["projections"]["values"]["title"], "D4 标题验证", "derive_title 派生：{row}");
     }

@@ -20,7 +20,6 @@ members = [
     "crates/infra/yunyou-credentials",
     # 任务18/S10（云伍）：重试策略插件（第一张实战卡）
     "crates/llm/yunyou-retry",
-    "crates/tools/yunyou-sandbox",
     # 任务 29/C1（云键）：命令注册缝（主板面，命令体系设计 §一）
     "crates/shell/yunyou-commands",
     # web 启动形态（云幕）：`yunyou web` 浏览器界面对标官方 web 端——
@@ -34,9 +33,9 @@ members = [
     # 任务68/K-19 刀1（云络）：L2 外部装载缝协议类型单源（宿主↔插件双端）
     "crates/plugins/yunyou-plugin-proto",
     # task-11②（yun-ya）：工具结果剥离策略插件——组装前钩子缝第一个策略卡
-    "crates/plugins/yunyou-tool-archive",
-    "crates/plugins/yunyou-permission",
-    "crates/plugins/yunyou-web-search",
+    "crates/plugins/bundled/yunyou-tool-archive",
+    "crates/plugins/bundled/yunyou-permission",
+    "crates/plugins/bundled/yunyou-web-search",
     # task-10（云_gen）：插件开发 SDK（插件作者唯一依赖，零内核依赖 CI 断言锁死）
     "sdk/yunyou-plugin-sdk",
     # task-10（云_gen）：hello-sdk 自举示例（SDK 写→独立编译→install→spawn→真调用）
@@ -46,9 +45,6 @@ members = [
     "sdk/examples/web-search",
     # K-2/①② 共享（云愈骨架+云刺 scaffold）：插件开发工具族（contract_read/validate/scaffold）
     "crates/yunyou-plugin-dev",
-    "crates/team/yunyou-team-launcher",
-    "crates/team/yunyou-team-procmgr",
-    "crates/team/yunyou-team-worker-core",
 ]
 
 [workspace.package]
@@ -82,9 +78,9 @@ toml = "0.9"
 yunyou-team = { path = "crates/team/yunyou-team" }
 # L2 外部装载缝协议单源（K-19 刀1）：插件↔宿主双端契约（禁依赖内核纪律同款）
 yunyou-plugin-proto = { path = "crates/plugins/yunyou-plugin-proto" }
-yunyou-tool-archive = { path = "crates/plugins/yunyou-tool-archive" }
-yunyou-permission = { path = "crates/plugins/yunyou-permission" }
-yunyou-web-search = { path = "crates/plugins/yunyou-web-search" }
+yunyou-tool-archive = { path = "crates/plugins/bundled/yunyou-tool-archive" }
+yunyou-permission = { path = "crates/plugins/bundled/yunyou-permission" }
+yunyou-web-search = { path = "crates/plugins/bundled/yunyou-web-search" }
 # 命令配对键与新会话 id 的铸造（任务29 D2/§六：command_id=UUID）
 uuid = { version = "1", features = ["v4"] }
 # 组件实现用：HTTP/SSE（yunyou-llm-openai）、文本检索（yunyou-tools 内置 grep）

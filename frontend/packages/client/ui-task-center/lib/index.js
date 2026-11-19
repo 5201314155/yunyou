@@ -1,0 +1,8 @@
+// lib/types/index.js
+/**
+* 云悠任务中心 Web 插件，node 半。
+* 产品面在浏览器半（src/client）；schedule 域由 yunyou-web 网关桥接。
+*/
+/** 宿主插件体。 */
+function apply() {}
+export { apply };

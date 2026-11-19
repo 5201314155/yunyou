@@ -163,6 +163,21 @@ impl Scheduler {
                     message: format!("时刻 {at_ms} 已过（当前 {now}）——请给未来时刻"),
                 });
             }
+            // 量级防御（D1，云尺 E2E 实测纳秒回显）：毫秒时刻合理域=now+100 年
+            // 内（≈3.2e15）；纳秒形（~1e18）直接拒——At 型原样回显，无此闸则
+            // 永不到期且面板时间全错
+            ScheduleSpec::At { at_ms } if *at_ms > now + 100 * 365 * 24 * 3600 * 1000 => {
+                return Err(ScheduleError {
+                    message: format!(
+                        "时刻 {at_ms} 超出合理域（毫秒 epoch 应为 13 位数；当前 {now}）——疑似纳秒单位，请换毫秒"
+                    ),
+                });
+            }
+            ScheduleSpec::Interval { every_ms } if *every_ms > 100 * 365 * 24 * 3600 * 1000 => {
+                return Err(ScheduleError {
+                    message: format!("间隔 {every_ms} 毫秒超出合理域（疑似纳秒/微秒单位）"),
+                });
+            }
             ScheduleSpec::Interval { every_ms } if *every_ms == 0 => {
                 return Err(ScheduleError { message: "间隔必须大于 0".into() });
             }

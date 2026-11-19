@@ -8,7 +8,7 @@ fn main() -> ExitCode {
     // Landlock+seccomp 后 execvp 用户命令（永不返回）；未命中=正常 CLI 路径。
     // 必须先于 clap 解析——finder 隐患防线：helper 参数集（--policy-json 等）
     // 不进 clap 参数面，哨兵分支不可达=策略喂 clap 的事故形态被入口卡死。
-    if let Some(code) = yunyou_sandbox::helper::try_helper(&std::env::args().collect::<Vec<_>>()) {
+    if let Some(code) = yunyou_tools::sandbox_helper::try_helper(&std::env::args().collect::<Vec<_>>()) {
         return code;
     }
     // task-38②：clap 原生报错为英文，与全中文 UI 混排——参数错误给中文一行+

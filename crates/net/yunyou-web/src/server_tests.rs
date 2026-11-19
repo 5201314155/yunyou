@@ -4,6 +4,7 @@
 use super::*;
 use crate::instance::{start_instance, start_with_state, WebParams};
 use yunyou::Context;
+use serde_json::Value;
 
 /// 测试辅助（gateway 测试共用）：传入态直接起服务（start_with_state——
 /// 测试态即服务态，事件广播走同一通道）→ 真 WS 连 /api/remote.mux。
@@ -30,6 +31,7 @@ fn params() -> WebParams {
     WebParams {
         scheduled_rx: None,
         config_path: std::env::temp_dir().join("yunyou-web-server-test.toml"),
+        switcher: Arc::new(|_| Box::pin(async { Ok::<(), yunyou::CordisError>(()) })),
         root_getter: Arc::new(Context::new),
         session_dir: PathBuf::from("/tmp/yunyou-web-test-sessions"),
         model: "test-model".into(),
@@ -191,4 +193,44 @@ async fn ws握手hello与回合失败路径() {
     let _ = ws_stream.close(None).await;
     instance.stop.cancel();
     instance.task.await.expect("任务 join").expect("serve 正常返回");
+}
+
+/// router 层 POST 端到端回归锚（云尺 E2E 抓 P0 的回归锁：此前测试全直调
+/// rpc_unary 没打路由——catch-all 抢占致 POST /api 405 全阻）。真 Router+
+/// 真端口：POST /api 与 /api/<method> 均 200+信封形状；GET 静态面行为保持。
+#[tokio::test(flavor = "multi_thread")]
+async fn router层POST端到端与静态面行为() {
+    let mut params = params();
+    let instance = start_instance(&mut params).await.expect("启动实例");
+    let base = format!("http://{}", instance.addr);
+    let client = reqwest::Client::new();
+    let url_with_token = |path: &str| format!("{base}{path}?token={}", instance.token);
+    // POST /api（点形/裸名双形态过路由）→ 200 + server-response 信封
+    for path in ["/api", "/api/team/roster"] {
+        let resp = client
+            .post(&url_with_token(path))
+            .header("Content-Type", "application/json")
+            .body(r#"{"type":"client-request","rpcId":"e1","method":"team/roster","payload":{}}"#)
+            .send()
+            .await
+            .expect("请求发出");
+        assert_eq!(resp.status(), 200, "POST {path} 应 200（信封内报业务）：{resp:?}");
+        let value: Value = serde_json::from_slice(&resp.bytes().await.expect("体可读")).expect("合法 JSON");
+        assert_eq!(value["type"], "server-response");
+        assert_eq!(value["rpcId"], "e1");
+        assert!(value["result"].is_object(), "信封 result 在：{value}");
+    }
+    // 静态面行为保持：GET 未知路径=SPA 回退语义（dist 缺席测试态=404 或 v2 index）；
+    // POST 资产名=405（不再被 catch-all 吞成全阻 405——但也不冒充资产成功）
+    let get_unknown = reqwest::get(&url_with_token("/nothing")).await.expect("请求发出");
+    assert!(
+        get_unknown.status() == 404 || get_unknown.status() == 200,
+        "dist 缺席测试态=404 / dist 在=200 SPA 回退：{get_unknown:?}"
+    );
+    let post_asset = client
+        .post(&url_with_token("/app.css"))
+        .send()
+        .await
+        .expect("请求发出");
+    assert_eq!(post_asset.status(), 405, "POST 资产名=405（方法守卫）：{post_asset:?}");
 }

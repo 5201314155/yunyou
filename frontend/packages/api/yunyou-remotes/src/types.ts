@@ -172,3 +172,12 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'schedule/unknown-id': { readonly entries?: readonly string[] }
   }
 }
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    /** 任务板任意迁移后推（增量提示：拉 tasks/list 单真源）。@mode emit */
+    'tasks/changed': (data: { readonly taskId: string; readonly state: string; readonly owner?: string }) => void
+    /** 名册观测变化推（增量提示：拉 team/roster 单真源）。@mode emit */
+    'team/roster-changed': (data: { readonly name: string; readonly online: boolean; readonly busy: boolean }) => void
+  }
+}

@@ -2,7 +2,7 @@
 //! 插件设计 20261118+2026-11-19 国内优先重排）：单工具六后端（Bing CN 零配置
 //! 默认国内直连/Baidu 备选/SearXNG/DDG 降位/Brave/Tavily）。
 //!
-//! 检索实现复用 crates/plugins/yunyou-web-search 的 `search` 核心函数——
+//! 检索实现复用 crates/plugins/bundled/yunyou-web-search 的 `search` 核心函数——
 //! bundled 内置与外部分发不两套逻辑（citations 三纪律/≤8 条/10s 超时换后端
 //! 全部单源）。工具执行是同步签名（SDK `tool()`），HTTP 经一次性 tokio
 //! runtime block_on（搜索调用低频，代价可接受；注释留痕）。

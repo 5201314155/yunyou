@@ -25,11 +25,17 @@ async function call<T>(promise: Promise<{ ok: true; value: T } | { ok: false; er
 export function createTeamSource(ctx: ClientContext): TeamSource {
   const remote: YunyouRemote = ctx.remote.yunyou
   return {
-    roster: () => call(remote['team.roster']()),
-    tasks: () => call(remote['tasks.list']()),
+    roster: async () => {
+      const result = await call(remote['team.roster']())
+      return result.ok ? { ok: true as const, value: result.value.items } : result
+    },
+    tasks: async () => {
+      const result = await call(remote['tasks.list']())
+      return result.ok ? { ok: true as const, value: result.value.items } : result
+    },
     spawn: request => call(remote['team.spawn'](request)),
     message: request => call(remote['team.message'](request)),
-    kick: request => call(remote['team.kick'](request)),
+    kick: name => call(remote['team.kick']({ name })),
     claim: (taskId, owner) => call(remote['tasks.claim']({ taskId, ...(owner === undefined ? {} : { owner }) })),
     submit: taskId => call(remote['tasks.submit']({ taskId })),
     review: (taskId, approve) => call(remote['tasks.review']({ taskId, approve })),

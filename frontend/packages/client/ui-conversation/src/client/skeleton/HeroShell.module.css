@@ -207,3 +207,13 @@
   line-height: 18px;
   color: var(--dsw-alias-state-error-primary);
 }
+
+/* Touch sizing (task-40 P5 defect D1 补件): under coarse pointers the 28px
+   workspace chip grows to a >=44px hit target (InputBar L477 同款写法——
+   同包漏网收口). */
+@media (pointer: coarse) {
+  .workspace {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

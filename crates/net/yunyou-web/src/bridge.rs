@@ -44,8 +44,16 @@ impl WireBridge {
     }
 
     /// 跨域事件广播（$events 流；写操作后推 tasks/changed 等——别让前端轮询）。
+    ///
+    /// # emit 包裹（联调最后一刀，云织定位 bridge.rs vs stream-protocol.ts:45）
+    /// 客户端 parseRemoteEventFrame 只认 `{type:'emit',event:<type>,args:[data]}`
+    /// 包裹帧——此处单点统一包裹（只包 Events 别；Session/Workspace/Control
+    /// 既有帧=wire 词汇契约，不动）。
     pub(crate) fn broadcast_event(&self, kind: StreamKind, value: Value) {
-        let _ = self.frames.send((kind, None, Arc::new(value)));
+        assert!(kind == StreamKind::Events, "broadcast_event 仅限 Events 别（其余帧走 wire 词汇契约）");
+        let event_type = value["type"].as_str().unwrap_or_default().to_string();
+        let wrapped = json!({"type": "emit", "event": event_type, "args": [value]});
+        let _ = self.frames.send((kind, None, Arc::new(wrapped)));
     }
 
     /// mux 订阅端（每条 mux 连接一个；无订阅者时事件安全丢弃）。

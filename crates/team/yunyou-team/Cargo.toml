@@ -18,6 +18,9 @@ serde_json = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 schemars = "1"
+# K-11 三层并入依赖（原 launcher/procmgr/worker-core 三 crate 的依赖并档）
+yunyou-plugin-proto = { path = "../../plugins/yunyou-plugin-proto" }
+libc = "0.2"
 # K-14 第 1 步/观察期：继承 workspace lints（unwrap_used/expect_used=warn）
 [lints]
 workspace = true

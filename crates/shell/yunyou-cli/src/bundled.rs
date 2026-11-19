@@ -16,7 +16,7 @@ use yunyou_commands::CommandsPlugin;
 use yunyou_credentials::CredentialsPlugin;
 use yunyou_llm_openai::OpenAiPlugin;
 use yunyou_retry::RetryPlugin;
-use yunyou_sandbox::SandboxPlugin;
+use yunyou_tools::sandbox_impl::SandboxPlugin;
 use yunyou_session::SessionPlugin;
 use yunyou_system_prompt::SystemPromptPlugin;
 use yunyou_team::TeamPlugin;
@@ -123,17 +123,6 @@ pub(crate) static BUNDLED_PLUGINS: &[BundledEntry] = &[
         validate: || check_manifest(RetryPlugin),
         manifest: || RetryPlugin.manifest(),
     },
-    // task-16 S2（yun-suo）：权限审批策略卡——审批缝（gate.v1）第一个策略插件。
-    // 注册序在 agent-loop 之后（inject dyn GateRegistryService 由其 provide）；
-    // [permission] 顶层段可关（enabled=false），规则源 ~/.yunyou/settings.json
-    // [permissions] 三值分列（缺文件=空规则集+denylist 内置层仍生效）。
-    BundledEntry {
-        id: "yunyou-permission",
-        segment: "permission",
-        register: |ctx, cfg| ctx.plugin(PermissionPlugin, cfg),
-        validate: || check_manifest(PermissionPlugin),
-        manifest: || PermissionPlugin.manifest(),
-    },
     // web_search（yun-tie）：注册序在 tools 之后（inject dyn RegistryService）；
     // [web_search] 顶层段可关（enabled=false），provider 切换只改配置一行。
     BundledEntry {
@@ -149,6 +138,17 @@ pub(crate) static BUNDLED_PLUGINS: &[BundledEntry] = &[
         register: |ctx, cfg| ctx.plugin(AgentLoopPlugin, cfg),
         validate: || check_manifest(AgentLoopPlugin),
         manifest: || AgentLoopPlugin.manifest(),
+    },
+    // task-16 S2（yun-suo）：权限审批策略卡——审批缝（gate.v1）第一个策略插件。
+    // 注册序在 agent-loop 之后（inject dyn GateRegistryService 由其 provide）；
+    // [permission] 顶层段可关（enabled=false），规则源 ~/.yunyou/settings.json
+    // [permissions] 三值分列（缺文件=空规则集+denylist 内置层仍生效）。
+    BundledEntry {
+        id: "yunyou-permission",
+        segment: "permission",
+        register: |ctx, cfg| ctx.plugin(PermissionPlugin, cfg),
+        validate: || check_manifest(PermissionPlugin),
+        manifest: || PermissionPlugin.manifest(),
     },
     // task-11②（yun-ya）：工具结果剥离策略卡——组装前钩子缝第一个策略插件。
     // 注册序在 agent-loop 之后（inject dyn HooksRegistryService 由其 provide，

@@ -35,7 +35,7 @@ paths:
       operationId: sessionCreate
       x-method: session/create
       x-status: 已接
-      summary: 铸造或复用会话
+      summary: 铸造或复用会话（成功后必须置为活跃会话——prompt 恒落活跃，单一真源）
       requestBody: { $ref: "#/components/requestBodies/Rpc" }
       responses: { "200": { $ref: "#/components/responses/Envelope" } }
   /api/session/open:

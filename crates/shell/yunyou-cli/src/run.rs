@@ -233,6 +233,28 @@ pub async fn run(command: crate::cli::Cli) -> Result<(), AppError> {
     };
     let mut banner_renderer = repl_render(&render_config);
     banner_renderer.banner(&config.llm.model, &session_dir(&config, &home), credential_notice.as_deref(), command.task.is_none())?;
+    // 批 7（权限对话框骨架，lead 批 2026-11-19）：交互态注册 TUI 呈现器到
+    // 内核 ApprovalUiRegistry（对象类型注册缝，yun-suo ccce206f 三型现成）；
+    // 非交互/无头不注册=无呈现器→内核 fail-closed Deny（规格 B6 降级既定，
+    // 与 GateHub Default 逐字节一致）。
+    if render_config.interactive {
+        if let Ok(ui) =
+            assembled.root.get::<dyn yunyou_agent_loop::ApprovalUiService>(yunyou::ServiceId::of::<dyn yunyou_agent_loop::ApprovalUiService>())
+        {
+            for presenter in [
+                std::sync::Arc::new(crate::render::approval::ToolCallApprovalPresenter::default())
+                    as std::sync::Arc<dyn yunyou_agent_loop::ApprovalPresenter>,
+                std::sync::Arc::new(crate::render::approval::FileReviewApprovalPresenter::default())
+                    as std::sync::Arc<dyn yunyou_agent_loop::ApprovalPresenter>,
+                std::sync::Arc::new(crate::render::approval::PluginPermissionApprovalPresenter::default())
+                    as std::sync::Arc<dyn yunyou_agent_loop::ApprovalPresenter>,
+            ] {
+                if let Err(err) = ui.register(presenter) {
+                    eprintln!("[装配] 审批呈现器注册失败（不影响启动，Ask 决策 fail-closed）：{err}");
+                }
+            }
+        }
+    }
     // task-27①：横幅后显式空行——prompt_string 前置换行移除后，首提示符的
     // 间距由横幅侧承担（回合后提示符紧贴落款，首提示符与横幅仍空一行）。
     println!();
@@ -347,6 +369,17 @@ pub async fn run(command: crate::cli::Cli) -> Result<(), AppError> {
                     scheduled_rx: assembled.scheduled_rx.take(),
                     // 配置修订写落点（W5 settings 域）
                     config_path: config_path.clone(),
+                    // D2-b（云枢裁 b 案）：web 驱动 slot 换根口——闭包解耦
+                    //（web 不依赖 ShellCore 类型；换根全流程复用 /new 机制）
+                    switcher: {
+                        let shell = shell.clone();
+                        std::sync::Arc::new(move |target: Option<std::path::PathBuf>| {
+                            let shell = shell.clone();
+                            Box::pin(async move {
+                                shell.rebuild_session_to(target).await.map(|_| ())
+                            })
+                        })
+                    },
                 };
                 yunyou_web::serve(params).await.map_err(|err| AppError::Assemble(err.to_string()))
             }

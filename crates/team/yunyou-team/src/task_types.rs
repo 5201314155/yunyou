@@ -173,10 +173,10 @@ pub trait TeamService: Send + Sync + 'static {
         blocked_by: Vec<u64>,
     ) -> Result<u64>;
     /// 提交成果（claimed→submitted，仅 owner；记录提交人=自审拒绝锚点）。
-    fn task_submit(&self, task_id: u64, actor: &str) -> Result<(), crate::task_types::TeamOpError>;
+    fn task_submit(&self, task_id: u64, actor: &str) -> std::result::Result<(), crate::task_types::TeamOpError>;
     /// 审查裁决（submitted→approved/rejected；审查人=提交人时系统拒绝——K-8）。
-    fn task_review(&self, task_id: u64, actor: &str, approve: bool) -> Result<(), crate::task_types::TeamOpError>;
-    fn task_reassign(&self, task_id: u64, new_owner: &str) -> Result<(), crate::task_types::TeamOpError>;
+    fn task_review(&self, task_id: u64, actor: &str, approve: bool) -> std::result::Result<(), crate::task_types::TeamOpError>;
+    fn task_reassign(&self, task_id: u64, new_owner: &str) -> std::result::Result<(), crate::task_types::TeamOpError>;
 
     /// 踢人（主 agent 管理/踢人）：dispose 成员 fiber（hub 条目降回 Pending，
     /// 信箱保留）；名册条目同步清簿记。
@@ -194,7 +194,7 @@ pub trait TeamService: Send + Sync + 'static {
     /// 任务板写操作四方法返回（挂账清理批，lead 2026-11-19 批）：结构化错误
     /// 直透（web details 字段化 from/op/owner/actor/submitter；Display 人话=板层
     /// 文案不变兼容）；UnknownActor=ensure_actor 失败（不在名册）。
-    fn task_claim(&self, task_id: u64, actor: &str) -> Result<(), crate::task_types::TeamOpError>;
+    fn task_claim(&self, task_id: u64, actor: &str) -> std::result::Result<(), crate::task_types::TeamOpError>;
 
     /// Web 全量投影口（web.v1 tasks/list，lead 2026-11-19 批）：板内全字段
     /// 只读快照（createdBy/submittedBy/reviewer/capability/blockedBy——看板

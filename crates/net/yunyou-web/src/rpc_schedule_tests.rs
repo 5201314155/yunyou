@@ -55,6 +55,8 @@ async fn 创建_受理与规格违例() {
         (r#"{"args":{"request":{"message":"x"}}}"#, "零选"),
         (r#"{"args":{"request":{"at_ms":2000000,"every_minutes":10,"message":"x"}}}"#, "双选"),
         (r#"{"args":{"request":{"at_ms":1,"message":"x"}}}"#, "at 过去"),
+        // D1 回归锚（云尺 E2E 实测纳秒回显）：19 位纳秒形=量级域拒绝
+        (r#"{"args":{"request":{"at_ms":1795073649630915843,"message":"x"}}}"#, "纳秒形"),
         (r#"{"args":{"request":{"every_minutes":4,"message":"x"}}}"#, "低于下限"),
         (r#"{"args":{"request":{"every_minutes":10}}}"#, "缺 message"),
     ] {

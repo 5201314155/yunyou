@@ -23,7 +23,7 @@ mod aggregate;
 mod cancel;
 mod compaction;
 mod fold;
-mod gate;
+pub mod gate;
 mod hooks;
 mod observer;
 mod plugin;
@@ -44,6 +44,7 @@ pub use hooks::{
 pub use gate::{
     ApprovalDecision, ApprovalPresenter, ApprovalSubject, ApprovalSubjectKind, ApprovalUiRegistry,
     ApprovalUiService, GateContext, GateDecision, GateHub, GateRegistry, GateRegistryService,
-    GateHubHandle, ModeStateService, PreToolUseGate, ToolCallView,
+    DENIAL_TRIP, GateHubHandle, ModeStateService, PermissionPersistence, PreToolUseGate,
+    ToolCallView,
 };
 pub use turn::{AgentLoopRunner, TurnOutcome};

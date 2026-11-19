@@ -1,8 +1,0 @@
-[package]
-name = "yunyou-team-worker-core"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-yunyou-plugin-proto = { path = "../../plugins/yunyou-plugin-proto" }
-libc = "0.2"

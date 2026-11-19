@@ -41,6 +41,7 @@ mod instance;
 mod observer;
 mod protocol;
 mod rpc;
+mod rpc_normalize;
 mod rpc_session;
 mod rpc_capabilities;
 mod rpc_commands;

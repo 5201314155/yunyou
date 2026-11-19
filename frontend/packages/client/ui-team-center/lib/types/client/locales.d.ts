@@ -1,0 +1,70 @@
+/** 团队中心文案（web.v1 team/tasks 域产品面；8 席同键 satisfies 锁齐性）。 */
+/** 字典命名空间。 */
+export declare const NS = "teamCenter";
+/** 简体中文（键集真源）。 */
+export declare const zh: {
+    'panel.label': string;
+    'page.title': string;
+    'page.refresh': string;
+    'page.unavailable': string;
+    'roster.title': string;
+    'roster.empty': string;
+    'roster.spawn': string;
+    'roster.online': string;
+    'roster.offline': string;
+    'roster.busy': string;
+    'roster.idle': string;
+    'roster.kick': string;
+    'roster.message': string;
+    'tasks.title': string;
+    'tasks.empty': string;
+    'tasks.blockedBy': string;
+    'task.claim': string;
+    'task.submit': string;
+    'task.review.approve': string;
+    'task.review.reject': string;
+    'task.reassign': string;
+    'state.pending': string;
+    'state.claimed': string;
+    'state.submitted': string;
+    'state.reviewing': string;
+    'state.approved': string;
+    'state.rejected': string;
+    'spawn.title': string;
+    'spawn.name': string;
+    'spawn.description': string;
+    'spawn.prompt': string;
+    'spawn.context': string;
+    'spawn.context.fresh': string;
+    'spawn.context.fork': string;
+    'spawn.forkNote': string;
+    'spawn.submit': string;
+    'spawn.cancel': string;
+    'message.title': string;
+    'message.body': string;
+    'message.send': string;
+    'message.cancel': string;
+    'confirm.kick.title': string;
+    'confirm.kick.body': string;
+    'confirm.kick.acknowledge': string;
+    'confirm.review.title': string;
+    'confirm.review.body': string;
+    'confirm.review.acknowledge': string;
+    'confirm.submit': string;
+    'confirm.cancel': string;
+    close: string;
+    opFailed: string;
+    'reassign.title': string;
+    'reassign.owner': string;
+    'reassign.confirm': string;
+};
+/** 团队中心键联合。 */
+export type TeamCenterKey = keyof typeof zh;
+export { en } from './locales/en.ts';
+export { ja } from './locales/ja.ts';
+export { es } from './locales/es.ts';
+export { fr } from './locales/fr.ts';
+export { de } from './locales/de.ts';
+export { ru } from './locales/ru.ts';
+export { pt } from './locales/pt.ts';
+//# sourceMappingURL=locales.d.ts.map

@@ -444,8 +444,8 @@ async fn load_market_plugins(
         // 沙箱衔接（§4.1）：[sandbox] enabled=false → 拒装该插件（不降级直跑）
         let enforcer: Option<Arc<dyn yunyou_tools::sandbox::SandboxEnforcer>> =
             if config.sandbox.enabled {
-                Some(Arc::new(yunyou_sandbox::LandlockEnforcer::new(
-                    yunyou_sandbox::SandboxPluginConfig {
+                Some(Arc::new(yunyou_tools::sandbox_impl::LandlockEnforcer::new(
+                    yunyou_tools::sandbox_impl::SandboxPluginConfig {
                         enabled: true,
                         writable_tmp: config.sandbox.writable_tmp,
                         network_denied: config.sandbox.network_denied,

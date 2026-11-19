@@ -53,6 +53,9 @@ reqwest = { workspace = true }
 # 团队域测试装配（TeamPlugin 需 RegistryService 注入；yunyou-team 主依赖经
 # re-export 也含此类型，此处直引工具缝 crate 与 team.rs 集成测试同源）
 yunyou-tools = { path = "../../tools/yunyou-tools" }
+# 团队域成员回合测试（spawn 需 Llm 服务——FakeLlm 自足实现用）
+yunyou-llm = { path = "../../llm/yunyou-llm" }
+yunyou-system-prompt = { path = "../../shell/yunyou-system-prompt" }
 # WS 端到端自测（hello/回合失败路径）：两者皆 axum/hyper 的既有传递依赖，
 # 提为 dev 只补测试引用，零新增编译产物（依赖纪律内说明见 P2 简报）
 tokio-tungstenite = "0.29"

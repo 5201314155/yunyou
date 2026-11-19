@@ -69,4 +69,11 @@ pub use observe::stalled_members;
 pub use board::{BoardOpError, TeamTask, TeamTaskState, TeamTaskView};
 pub use plugin::TeamPlugin;
 pub use roster::RosterEntry;
-pub use task_types::{ContextMode, TeamConfig, TeamService, TeammateSpec};
+pub use task_types::{ContextMode, TeamConfig, TeamOpError, TeamService, TeammateSpec};
+
+// K-11 三层并入（结构归一收敛批 2026-11-19，业主裁「team 四合一」）：原
+// yunyou-team-launcher/procmgr/worker-core 三 crate 以 module 化并入，对外
+// API 零变化（git mv 保历史，lib 头注职责锚点原样保留）。
+pub mod launcher;
+pub mod procmgr;
+pub mod worker_core;

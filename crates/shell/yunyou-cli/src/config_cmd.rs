@@ -67,7 +67,9 @@ pub fn definitions(shell: &Arc<ShellCore>) -> Vec<CommandDefinition> {
         },
         CommandDefinition {
             name: "tools".into(),
-            aliases: vec!["工具".into()],
+            // 「工具开关」：tools 插件 /tools 别名「工具」是既有产品语义（云尺 E2E
+            // 实测双注册 ServiceDuplicate fail-loud=P0 崩溃；让位裁定 a，lead 批）
+            aliases: vec!["工具开关".into()],
             description: "开关工具：/tools on|off <工具名>（写 [tools.builtin]，重启生效）".into(),
             kind: CommandKind::Action,
             accepts_args: true,

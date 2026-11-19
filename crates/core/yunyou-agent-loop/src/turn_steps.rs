@@ -329,17 +329,62 @@ impl AgentLoopRunner {
             };
             match self.gates.gates.check(&view, &ctx).await {
                 crate::gate::GateDecision::Pass
-                | crate::gate::GateDecision::Allow { .. } => {}
+                | crate::gate::GateDecision::Allow { .. } => {
+                    // S5 连拒熔断闸：tripped 时 gate 放行也强制人工审
+                    //（denialTracking 同律：暂停自动执行，逐条审批）
+                    if self.gates.is_tripped() {
+                        match self
+                            .gates
+                            .approval
+                            .present(crate::gate::ApprovalSubject::ToolCall(&view))
+                            .await
+                        {
+                            Some(crate::gate::ApprovalDecision::Approved)
+                            | Some(crate::gate::ApprovalDecision::ApprovedAlways { .. }) => {
+                                self.gates.record_approval();
+                            }
+                            Some(crate::gate::ApprovalDecision::Denied { message }) => {
+                                self.gates.record_denial();
+                                return yunyou_tools::ToolOutcome::err("tool/denied", message);
+                            }
+                            None => {
+                                return yunyou_tools::ToolOutcome::err(
+                                    "tool/denied",
+                                    "连拒熔断中：需逐条人工审批，但审批呈现器未注册（fail-closed）。",
+                                );
+                            }
+                        }
+                    } else {
+                        self.gates.record_approval();
+                    }
+                }
                 crate::gate::GateDecision::Deny { message } => {
+                    self.gates.record_denial();
                     return yunyou_tools::ToolOutcome::err("tool/denied", message);
                 }
                 crate::gate::GateDecision::Ask { .. } => {
                     match self.gates.approval.present(crate::gate::ApprovalSubject::ToolCall(&view)).await {
-                        Some(crate::gate::ApprovalDecision::Approved) => {}
+                        Some(crate::gate::ApprovalDecision::Approved) => {
+                            self.gates.record_approval();
+                        }
+                        Some(crate::gate::ApprovalDecision::ApprovedAlways { rule }) => {
+                            self.gates.record_approval();
+                            // S5「总是允许」：写回 settings（策略侧实现；失败
+                            // 不阻断本次放行——人话留痕，用户下次再看到询问）
+                            if let Some(persistence) = self.gates.persistence() {
+                                if let Err(err) = persistence.persist_allow_rule(&rule).await {
+                                    eprintln!("[permission] allow 规则写回失败（本次放行不受影响）：{err}");
+                                }
+                            } else {
+                                eprintln!("[permission] 「总是允许」无持久化实现（降级本会话放行）");
+                            }
+                        }
                         Some(crate::gate::ApprovalDecision::Denied { message }) => {
+                            self.gates.record_denial();
                             return yunyou_tools::ToolOutcome::err("tool/denied", message);
                         }
                         None => {
+                            self.gates.record_denial();
                             return yunyou_tools::ToolOutcome::err(
                                 "tool/denied",
                                 "工具调用待审批，但审批呈现器未注册（无头场景 fail-closed）：已拒绝执行。",

@@ -18,6 +18,11 @@
 pub mod builtin;
 pub mod contract;
 pub mod sandbox;
+// 沙箱实现面（结构归一收敛批 2026-11-19，业主裁「工具域归一」）：原
+// yunyou-sandbox crate 以 module 并入（Landlock/seccomp helper 链+插件装配），
+// 契约 trait 仍在 sandbox.rs（enforcer 可选消费面不变）
+pub mod sandbox_impl;
+pub mod sandbox_helper;
 pub mod executor;
 pub mod plugin;
 pub mod registry;

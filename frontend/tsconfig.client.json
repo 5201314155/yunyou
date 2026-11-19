@@ -226,6 +226,15 @@
       "path": "./packages/client/ui-jobs"
     },
     {
+      "path": "./packages/client/ui-team-center"
+    },
+    {
+      "path": "./packages/client/ui-task-center"
+    },
+    {
+      "path": "./packages/client/ui-plugin-center"
+    },
+    {
       "path": "./packages/client/ui-schedule"
     },
     {

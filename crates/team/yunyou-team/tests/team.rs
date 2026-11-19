@@ -365,7 +365,7 @@ async fn lead自审系统拒绝() {
     team.task_submit(task_id, "lead").expect("lead 提交应成功");
     let err = team.task_review(task_id, "lead", true).expect_err("lead 自审必须被系统拒绝");
     assert!(
-        err.message().contains("写审分离拒绝") && err.message().contains("不得自审自过"),
+        err.to_string().contains("写审分离拒绝") && err.to_string().contains("不得自审自过"),
         "自审拒绝人话: {err}"
     );
 }

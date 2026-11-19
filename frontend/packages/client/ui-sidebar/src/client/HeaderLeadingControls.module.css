@@ -29,3 +29,13 @@
     background: var(--dsw-alias-interactive-bg-hover);
   }
 }
+
+/* Touch sizing (task-40 P5 defect D1 补件): under coarse pointers the 28px
+   header toggle / new-session buttons grow to a >=44px hit target while the
+   icon glyph itself stays unchanged (SidebarRoot L826 同款写法——同包漏网收口). */
+@media (pointer: coarse) {
+  .iconButton {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

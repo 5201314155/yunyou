@@ -58,9 +58,25 @@ impl WireState {
         (out.session, out.control)
     }
 
-    /// 会话创建：活跃会话未铸 id → 就地铸（保留已有事件，多会话步 2 起按 id
-    /// 分立）；已铸 → 复用（返回现有 id）。返回会话 id。
+    /// 会话创建（契约裁决，云枢 2026-11-19：create 成功后必须置活跃——铸造或
+    /// 复用语义含切换）：requested 有值→该 id 成活跃（无状态则新建）；无值→
+    /// 活跃未铸则就地铸、已铸则复用现值。返回会话 id。
     pub(crate) fn create_session(&mut self, requested: Option<&str>) -> String {
+        // 显式 requested=切换活跃（铸或复用同语义）；E2E 实证「create 后 prompt
+        // 落自动会话」系本处未切活跃的实现违例，已修
+        if let Some(requested) = requested.filter(|id| !id.is_empty()) {
+            if self.active.as_deref() != Some(requested) {
+                self.active = Some(requested.to_string());
+                self.sessions
+                    .entry(requested.to_string())
+                    .or_insert_with(|| SessionWire::new(self.model.clone(), Some(requested.to_string())));
+            }
+            let wire = self.sessions.get_mut(requested).expect("entry 在");
+            if wire.session_id.is_none() {
+                wire.session_id = Some(requested.to_string());
+            }
+            return requested.to_string();
+        }
         let key = self.active.clone().unwrap_or_default();
         let wire = self.active_mut();
         if let Some(existing) = wire.session_id.as_deref().filter(|id| !id.is_empty()) {
@@ -146,13 +162,11 @@ impl WireState {
         events: &[yunyou_session::SessionEvent],
     ) -> (usize, usize) {
         self.active = Some(id.to_string());
-        let wire = self
-            .sessions
-            .entry(id.to_string())
-            .or_insert_with(|| SessionWire::new(self.model.clone(), Some(id.to_string())));
-        if wire.session_id.is_none() {
-            wire.session_id = Some(id.to_string());
-        }
+        // 裁决③（D2-b 五证）：重放环重置重建——不串旧残留（换根后该会话
+        // wire 面必须对齐目标 JSONL 尾部，旧状态作废）
+        let wire = SessionWire::new(self.model.clone(), Some(id.to_string()));
+        self.sessions.insert(id.to_string(), wire);
+        let wire = self.sessions.get_mut(id).expect("insert 后在");
         wire.ingest_history(events)
     }
 
