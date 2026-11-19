@@ -267,3 +267,54 @@ async fn p0_沉默插件装配限时Failed非hang() {
     let _ = root.dispose().await;
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// P0 锁（业主 ARM 实证链）：spawn 后 stdin 不得丢——握手后仍可写（若句柄被
+/// drop→插件 EOF 退出→后续 tools_list 无响应=此测红）。行为面锁（写泵存活+
+/// rx 非空语义），替代不可直测的句柄断言。
+#[tokio::test(flavor = "multi_thread")]
+async fn p0_spawn后stdin存活_握手后仍可写() {
+    let dir = tmp_dir("p0-stdin");
+    let plugin_dir = write_hello_plugin(&dir, &["python3", "hello_proto.py"]);
+    let manifest_path = plugin_dir.join("manifest.toml");
+    std::fs::write(
+        &manifest_path,
+        "id = \"hello\"\nversion = \"0.1.0\"\nformat = 2\nlevel = \"market\"\ncontracts = [\"tools.v1\"]\nauto_enable = true\n\n[runtime]\ntype = \"subprocess\"\nentry = [\"python3\", \"hello_proto.py\"]\nrequest_timeout_ms = 5000\n",
+    )
+    .unwrap();
+    std::fs::write(plugin_dir.join("hello_proto.py"), PLUGIN_MAIN).unwrap();
+    let toml_text = std::fs::read_to_string(&manifest_path).unwrap();
+    let manifest_v2 = yunyou_cli::market_manifest::parse_and_validate(&toml_text, &plugin_dir)
+        .expect("manifest 应过五类校验");
+    let proxy = yunyou_cli::proxy_plugin::ProxyPlugin {
+        manifest_v2,
+        plugin_dir: plugin_dir.clone(),
+        enforcer: None,
+        spawn_form: yunyou_cli::proxy_plugin::SpawnForm::Direct,
+        deliver: None,
+    };
+    let root = Context::new();
+    let registry: Arc<dyn RegistryService> = yunyou_tools::ToolsRegistry::new();
+    root.provide(ServiceId::of::<dyn RegistryService>(), registry.clone()).unwrap();
+    let handle = root.plugin(proxy, serde_json::json!({}));
+    wait_active(&handle, "hello").await;
+    // 握手+tools_list 落定后静置 300ms（模拟时间流逝——若 stdin 已 drop，插件
+    // EOF 退出、代理失效），再调工具=stdin 存活的行为证据
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    assert!(handle.is_active(), "静置后 fiber 应仍 Active（stdin 存活=插件存活）");
+    let tool = registry.get("hello_greet").expect("工具应在");
+    let outcome = tool
+        .execute(
+            serde_json::json!({ "name": "存活锁" }),
+            ToolExec { call_id: "stdin".into(), cancel: tokio_util::sync::CancellationToken::new(), workspace: None },
+        )
+        .await;
+    match outcome {
+        ToolOutcome::Ok(v) => assert!(
+            v.to_string().contains("存活锁") || !v.to_string().is_empty(),
+            "stdin 存活=调用应往返，实际 {v:?}"
+        ),
+        other => panic!("stdin 存活锁：静置后调用应成功（EOF=句柄丢失回归），实际 {other:?}"),
+    }
+    let _ = root.dispose().await;
+    let _ = std::fs::remove_dir_all(&dir);
+}

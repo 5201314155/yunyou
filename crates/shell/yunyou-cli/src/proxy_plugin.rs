@@ -144,7 +144,7 @@ pub struct ProxyPlugin {
     pub spawn_form: SpawnForm,
     /// 会话消息投递回调（v1.1 真投递，task-14 续）：DeliverMessage→注入会话。
     /// 装配层注入（接 REPL 定时注入队列）；None=降级日志留痕+Ack ok（不悬挂插件）。
-    pub deliver: Option<Arc<dyn Fn(Option<String>, String) -> Result<String, String> + Send + Sync>>,
+    pub deliver: Option<crate::plugin_cmd::DeliverCallback>,
 }
 
 impl Plugin for ProxyPlugin {
@@ -206,10 +206,27 @@ impl Plugin for ProxyPlugin {
                     let prepared = enforcer.prepare(&policy).map_err(|err| {
                         yunyou::CordisError::new(yunyou::ErrorKind::FiberFailed, format!("沙箱 prepare 失败：{err}"))
                     })?;
+                    // P0 修复（业主 ARM 真机 EOF 铁证）：Sandboxed 分支与 Direct
+                    // 同款两件——①current_dir=插件目录（$SELF 语义+产物相对锚）；
+                    // ②entry[0] 裸名→插件目录内存在同名文件则转相对 ./ 形态
+                    // （execvp 裸名走 PATH 不走 cwd，helper exec 找不到产物=退
+                    // 127=子进程死=宿主读到 EOF「awaiting handshake line」即终）。
+                    // 此前 Direct 修复未同步到本分支=ARM 生产全走 Sandboxed 全灭。
+                    let entry0 = entry[0].clone();
+                    let entry0 = if entry0.contains('/') {
+                        entry0
+                    } else if self.plugin_dir.join(&entry0).is_file() {
+                        format!("./{entry0}")
+                    } else {
+                        entry0
+                    };
+                    let mut entry = entry.clone();
+                    entry[0] = entry0;
                     let (program, argv) = prepared.helper_argv(&entry);
                     let mut c = tokio::process::Command::new(&program);
                     c.as_std_mut().arg0(&argv[0]);
                     c.args(&argv[1..]);
+                    c.current_dir(&self.plugin_dir);
                     c
                 }
             };
@@ -256,7 +273,17 @@ impl Plugin for ProxyPlugin {
                         format!("插件握手超时（{}ms）——子进程活着但不回帧，已收割", io_timeout.as_millis()),
                     )
                 })?
-                .map_err(|e| yunyou::CordisError::new(yunyou::ErrorKind::FiberFailed, format!("握手读取：{e}")))?;
+                .map_err(|e| {
+                    // EOF 读零=子进程提前退出（entry 不可执行/沙箱链失败/插件崩溃）
+                    // ——killpg 收割+人话指路（ARM 真机实证链：helper exec 失败即此形态）
+                    kill_stale_child(&child_pid_for_timeout);
+                    yunyou::CordisError::new(
+                        yunyou::ErrorKind::FiberFailed,
+                        format!(
+                            "插件握手读取 EOF：插件进程已提前退出（entry 不可执行？沙箱链在本架构失败？）——原始 IO 错误：{e}；stderr 透传见上方 [plugin:*] 行"
+                        ),
+                    )
+                })?;
             eprintln!("[p6-diag] handshake line: {}", line.trim());
             match decode_frame(line.trim()).map_err(|e| yunyou::CordisError::new(yunyou::ErrorKind::FiberFailed, format!("握手帧解码：{e}")))? {
                 PluginProtoFrame::HelloOk(HelloOk { protocol_version, .. }) if protocol_version == PROTOCOL_VERSION => {}

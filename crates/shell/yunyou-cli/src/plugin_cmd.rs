@@ -233,6 +233,10 @@ pub async fn install_authorized(source: &str, home: &Path) -> Result<String, Str
     Ok(msg)
 }
 
+/// 会话消息投递回调（proto v1.1；装配注入点，ProxyPlugin 与 market 分支共用形态）。
+pub type DeliverCallback =
+    std::sync::Arc<dyn Fn(Option<String>, String) -> Result<String, String> + Send + Sync>;
+
 /// `plugin install` 入口三态分派（task-27 一条命令装插件）：
 /// ①本地目录（存在且含 manifest.toml）→既有本地安装；
 /// ②git/https url→clone 浅拷后按本地目录安装（产物须已在仓/可执行）；

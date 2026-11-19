@@ -2788,7 +2788,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "arc-swap",
  "jsonschema",
@@ -2802,7 +2802,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou-agent-loop"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "schemars",
  "serde",
@@ -2822,7 +2822,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "libc",
@@ -2857,7 +2857,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou-commands"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "tokio",
  "yunyou",
@@ -2866,7 +2866,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou-config"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "schemars",
  "serde",
@@ -2877,7 +2877,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou-credentials"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "schemars",
  "serde",
@@ -2914,7 +2914,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou-llm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2925,7 +2925,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou-llm-openai"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "reqwest",
  "schemars",
@@ -2941,7 +2941,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou-permission"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "schemars",
  "serde",
@@ -2957,7 +2957,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou-plugin-dev"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2992,7 +2992,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou-retry"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "schemars",
  "serde",
@@ -3004,7 +3004,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou-session"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libc",
  "schemars",
@@ -3017,11 +3017,11 @@ dependencies = [
 
 [[package]]
 name = "yunyou-skills"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "yunyou-system-prompt"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "schemars",
  "serde",
@@ -3035,7 +3035,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou-team"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "libc",
  "schemars",
@@ -3055,7 +3055,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou-tool-archive"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "schemars",
  "serde",
@@ -3075,7 +3075,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou-tools"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "glob",
  "landlock",
@@ -3096,7 +3096,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou-util"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde_json",
  "tokio",
@@ -3104,7 +3104,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou-web"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "axum 0.8.9",
  "futures-util",
@@ -3134,7 +3134,7 @@ dependencies = [
 
 [[package]]
 name = "yunyou-web-search"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "reqwest",
  "schemars",
