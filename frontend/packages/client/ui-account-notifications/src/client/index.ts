@@ -1,9 +1,17 @@
 /** Account notifications driven by the existing account UI stream. */
+
+/**
+ * 最小内联类型（结构归一批 2026-11-20：ui-settings-account 移出后原类型源不在
+ * workspace——本包仅消费 view?.status/failed 两字段，按消费面内联保持兼容）。
+ */
+type AccountUiState = {
+  failed?: boolean
+  view?: { status?: string }
+}
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
-import type { AccountUiState } from '@deepseek-ai/dsh-client-ui-settings-account/client'
 import { Config, NOTIFICATIONS_CONFIG_GLOBAL } from '../config.ts'
 import { AccountNotifications, type AccountNotificationsInjected } from './AccountNotifications.tsx'
 import { createNotificationController, type AccountNotice } from './notification-controller.ts'

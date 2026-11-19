@@ -61,7 +61,6 @@
     "@deepseek-ai/dsh-sandbox-policy": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
     "@deepseek-ai/dsh-session-projection": "workspace:*",
-    "@deepseek-ai/dsh-session-persistence-jsonl": "workspace:*",
     "@deepseek-ai/dsh-subagent": "workspace:*",
     "@deepseek-ai/dsh-subprocess-local": "workspace:*",
     "@deepseek-ai/node-addon-system": "workspace:~",

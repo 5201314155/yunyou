@@ -66,8 +66,7 @@
     "@deepseek-ai/dsh-tool-executor-ptc": "workspace:*",
     "@deepseek-ai/dsh-typert-protocol": "workspace:*",
     "@deepseek-ai/dsh-session": "workspace:*",
-    "@deepseek-ai/dsh-session-projection": "workspace:*",
-    "@deepseek-ai/dsh-session-persistence-jsonl": "workspace:*"
+    "@deepseek-ai/dsh-session-projection": "workspace:*"
   },
   "dependencies": {
     "zod": "4.6.6",
