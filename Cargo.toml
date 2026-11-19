@@ -9,6 +9,8 @@ members = [
     "crates/llm/yunyou-llm-openai",
     "crates/session/yunyou-session",
     "crates/tools/yunyou-tools",
+    # skills 下沉批（云络 2026-11-19）：技能纯函数面宿主资源 crate（零内核依赖断言锁死）
+    "crates/yunyou-skills",
     "crates/shell/yunyou-system-prompt",
     "crates/core/yunyou-agent-loop",
     # 任务 3B（云门）：配置库 + CLI 外壳
@@ -62,6 +64,7 @@ yunyou-llm = { path = "crates/llm/yunyou-llm" }
 yunyou-session = { path = "crates/session/yunyou-session" }
 yunyou-agent-loop = { path = "crates/core/yunyou-agent-loop" }
 yunyou-tools = { path = "crates/tools/yunyou-tools" }
+yunyou-skills = { path = "crates/yunyou-skills" }
 yunyou-system-prompt = { path = "crates/shell/yunyou-system-prompt" }
 # 凭据服务（S5）依赖配置模型（迁移器读 DshConfig；依赖方向 credentials → config 单向）
 yunyou-config = { path = "crates/infra/yunyou-config" }

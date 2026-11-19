@@ -320,7 +320,13 @@ impl AgentLoopRunner {
         // fail-closed Deny。内核零规则知识：判定全在策略插件侧。
         if !self.gates.gates.is_empty() {
             let view = crate::gate::ToolCallView { name: &call.name, arguments: &call.arguments };
-            let ctx = crate::gate::GateContext::default();
+            let ctx = crate::gate::GateContext {
+                // 模式会话态（快刀卡：/mode 切换写 GateHub.mode，此处透传——
+                // S3 引擎消费；None=未设=策略侧按 Default 保守）
+                mode: self.gates.current_mode(),
+                workspace_root: None,
+                sandbox_willing: None,
+            };
             match self.gates.gates.check(&view, &ctx).await {
                 crate::gate::GateDecision::Pass
                 | crate::gate::GateDecision::Allow { .. } => {}

@@ -131,10 +131,16 @@ export interface ScheduleCreateValue {
   readonly note: string
 }
 
+/** 定时规格（三选一必填恰一，schedule/spec 校验面）。 */
+export type ScheduleSpec =
+  | { readonly kind: 'once'; readonly atMs: number }
+  | { readonly kind: 'interval'; readonly everyMinutes: number }
+  | { readonly kind: 'cron'; readonly cron: string }
+
 /** schedule/list 行。 */
 export interface ScheduleListEntry {
   readonly id: string
-  readonly spec: Record<string, unknown>
+  readonly spec: ScheduleSpec
   readonly nextFireMs: number
   readonly message: string
 }
@@ -153,4 +159,16 @@ export interface ScheduleDeleteRequest {
 /** schedule/delete 值。 */
 export interface ScheduleDeleteValue {
   readonly deleted: string
+}
+
+declare module '@deepseek-ai/dsh-typert-protocol' {
+  interface RemoteErrorDetailsMap {
+    'gateway/not-implemented': Record<string, never>
+    'team/state': { readonly from?: string; readonly op?: string }
+    'team/not-owner': { readonly owner?: string; readonly actor?: string }
+    'team/self-review': Record<string, never>
+    'team/unknown-member': { readonly name?: string }
+    'schedule/spec': Record<string, never>
+    'schedule/unknown-id': { readonly entries?: readonly string[] }
+  }
 }

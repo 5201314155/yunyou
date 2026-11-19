@@ -235,6 +235,9 @@ fn shell_command_definitions(shell: &Arc<ShellCore>) -> Vec<CommandDefinition> {
         crate::compact_cmd::definition(shell),
         // task-21：/team 命令族（同款增量外置；业主令「团队命令呢」）
         crate::team_cmd::definition(shell),
+        // task-16 快刀卡：/mode 权限模式切换（同款增量外置；写 GateHub.mode
+        // 会话内存态，run_tool GateContext 立即生效——S3 引擎消费）
+        crate::mode_cmd::definition(shell),
     ]
     .into_iter()
     .chain(crate::config_cmd::definitions(shell))

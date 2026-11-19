@@ -477,9 +477,9 @@
     },
     {
       "path": "./packages/api/remotes/tsconfig.host.json"
-      {
-        "path": "./packages/api/yunyou-remotes"
-      },
+    },
+    {
+      "path": "./packages/api/yunyou-remotes"
     },
     {
       "path": "./packages/api/job-controller/tsconfig.host.json"

@@ -5,7 +5,7 @@ import type {
   ScheduleCreateRequest, ScheduleCreateValue, ScheduleDeleteRequest, ScheduleDeleteValue,
   ScheduleListValue, TeamKickRequest, TeamKickValue, TeamMessageRequest, TeamMessageValue,
   TeamRosterValue, TeamSpawnRequest, TeamSpawnValue, TasksClaimRequest, TasksCreateRequest,
-  TasksCreateValue, TasksListValue, TasksReassignRequest, TasksReviewRequest, TasksSubmitRequest,
+  TasksCreateValue, TasksListValue, TasksReassignRequest, TasksReviewRequest, TasksReviewValue, TasksSubmitRequest,
 } from './types.ts'
 
 export type * from './types.ts'
@@ -25,31 +25,31 @@ function bridgeOnly(): never {
 export class YunyouTeamFace extends TypertRemoteService {
   /** @param ctx - 宿主上下文（形状声明面无业务读取）。 */
   constructor(ctx: Context) {
-    super(ctx, 'yunyouTeam', { namespace: 'yunyou/team' })
+    super(ctx, 'yunyouTeam', { namespace: 'yunyou' })
   }
 
   /** 名册投影（L1）。 */
-  @Remote
+  @Remote('team.roster')
   roster(): Promise<TeamRosterValue> {
     return bridgeOnly()
   }
 
   /** 拉起成员（L4，需显式授权）。 */
-  @Remote
+  @Remote('team.spawn')
   spawn(request: TeamSpawnRequest): Promise<TeamSpawnValue> {
     void request
     return bridgeOnly()
   }
 
   /** 成员消息（L2，身份=lead 服务端强制）。 */
-  @Remote
+  @Remote('team.message')
   message(request: TeamMessageRequest): Promise<TeamMessageValue> {
     void request
     return bridgeOnly()
   }
 
   /** 踢人（L3）。 */
-  @Remote
+  @Remote('team.kick')
   kick(request: TeamKickRequest): Promise<TeamKickValue> {
     void request
     return bridgeOnly()
@@ -60,45 +60,45 @@ export class YunyouTeamFace extends TypertRemoteService {
 export class YunyouTasksFace extends TypertRemoteService {
   /** @param ctx - 宿主上下文（形状声明面无业务读取）。 */
   constructor(ctx: Context) {
-    super(ctx, 'yunyouTasks', { namespace: 'yunyou/tasks' })
+    super(ctx, 'yunyouTasks', { namespace: 'yunyou' })
   }
 
   /** 任务板全量投影（L1）。 */
-  @Remote
+  @Remote('tasks.list')
   list(): Promise<TasksListValue> {
     return bridgeOnly()
   }
 
   /** 创建任务（L2）。 */
-  @Remote
+  @Remote('tasks.create')
   create(request: TasksCreateRequest): Promise<TasksCreateValue> {
     void request
     return bridgeOnly()
   }
 
   /** 认领（L2，owner 可代派）。 */
-  @Remote
+  @Remote('tasks.claim')
   claim(request: TasksClaimRequest): Promise<{ readonly claimed: true }> {
     void request
     return bridgeOnly()
   }
 
   /** 提交（L2，仅 owner）。 */
-  @Remote
+  @Remote('tasks.submit')
   submit(request: TasksSubmitRequest): Promise<{ readonly submitted: true }> {
     void request
     return bridgeOnly()
   }
 
   /** 审查裁决（L3，自审服务端拒绝）。 */
-  @Remote
+  @Remote('tasks.review')
   review(request: TasksReviewRequest): Promise<TasksReviewValue> {
     void request
     return bridgeOnly()
   }
 
   /** 改派（L3）。 */
-  @Remote
+  @Remote('tasks.reassign')
   reassign(request: TasksReassignRequest): Promise<{ readonly reassigned: true }> {
     void request
     return bridgeOnly()
@@ -109,24 +109,24 @@ export class YunyouTasksFace extends TypertRemoteService {
 export class YunyouScheduleFace extends TypertRemoteService {
   /** @param ctx - 宿主上下文（形状声明面无业务读取）。 */
   constructor(ctx: Context) {
-    super(ctx, 'yunyouSchedule', { namespace: 'yunyou/schedule' })
+    super(ctx, 'yunyouSchedule', { namespace: 'yunyou' })
   }
 
   /** 创建（L2，nextFireMs 回显即确认）。 */
-  @Remote
+  @Remote('schedule.create')
   create(request: ScheduleCreateRequest): Promise<ScheduleCreateValue> {
     void request
     return bridgeOnly()
   }
 
   /** 列表（L1）。 */
-  @Remote
+  @Remote('schedule.list')
   list(): Promise<ScheduleListValue> {
     return bridgeOnly()
   }
 
   /** 删除（L3）。 */
-  @Remote
+  @Remote('schedule.delete')
   delete(request: ScheduleDeleteRequest): Promise<ScheduleDeleteValue> {
     void request
     return bridgeOnly()

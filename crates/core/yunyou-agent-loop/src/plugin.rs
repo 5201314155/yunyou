@@ -244,6 +244,12 @@ impl Plugin for AgentLoopPlugin {
                 ServiceId::of::<dyn crate::gate::ApprovalUiService>(),
                 gates.clone() as Arc<dyn crate::gate::ApprovalUiService>,
             )?;
+            // 模式会话态服务面（快刀卡：cli /mode 命令经此切换，runner 组装
+            // GateContext 透传——S3 引擎现成消费）
+            ctx.provide(
+                ServiceId::of::<dyn crate::gate::ModeStateService>(),
+                gates.clone() as Arc<dyn crate::gate::ModeStateService>,
+            )?;
             let runner: Arc<dyn AgentLoop> = Arc::new(LoopService {
                 runner: AgentLoopRunner {
                     // K-16① 字段缺省（79f29da TurnOutcome 演进接缝补件）：

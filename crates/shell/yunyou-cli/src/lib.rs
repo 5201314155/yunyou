@@ -38,6 +38,7 @@ pub mod bundled;
 pub mod credentials;
 pub mod cli;
 pub mod compact_cmd;
+pub mod mode_cmd;
 pub mod config_cmd;
 pub mod config_edit;
 mod command_exec;

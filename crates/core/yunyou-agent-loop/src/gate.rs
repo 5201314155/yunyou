@@ -284,6 +284,40 @@ pub struct GateHub {
     pub gates: GateRegistry,
     /// 审批呈现器表。
     pub approval: ApprovalUiRegistry,
+    /// 权限模式会话态（task-16 快刀卡：/mode 运行期切换写此处，run_tool 组装
+    /// GateContext 时透传——S3 引擎现成消费；**会话内存态不落盘**，会话结束
+    /// 随进程态收回=授权/模式不残留哲学；session-meta 持久化=演进项候裁）。
+    pub mode: RwLock<Option<String>>,
+}
+
+impl GateHub {
+    /// 读当前模式（None=未设=策略侧按 Default 保守处理）。
+    pub fn current_mode(&self) -> Option<String> {
+        self.mode.read().expect("模式态锁").clone()
+    }
+
+    /// 写模式（/mode 命令切换入口；任意字符串由策略侧 Mode::parse 校验——
+    /// 未知词在策略侧保守降 Default，此处不拒收=服务面零词汇知识）。
+    pub fn set_mode(&self, mode: Option<String>) {
+        *self.mode.write().expect("模式态锁") = mode;
+    }
+}
+
+/// 模式会话态服务面（cli /mode 命令经此切换；对齐 GateRegistryService 形态）。
+pub trait ModeStateService: Send + Sync {
+    /// 读当前模式（None=未设）。
+    fn current_mode(&self) -> Option<String>;
+    /// 写模式（None=清回未设）。
+    fn set_mode(&self, mode: Option<String>);
+}
+
+impl ModeStateService for GateHub {
+    fn current_mode(&self) -> Option<String> {
+        GateHub::current_mode(self)
+    }
+    fn set_mode(&self, mode: Option<String>) {
+        GateHub::set_mode(self, mode)
+    }
 }
 
 /// gate 注册服务面（策略插件 inject 注册；对齐 HooksRegistryService 形态）。
@@ -379,6 +413,17 @@ mod tests {
         }
         hub.approval.register(Arc::new(P)).unwrap();
         assert!(hub.approval.register(Arc::new(P)).is_err());
+    }
+
+    /// 模式会话态：set/get 透传（/mode 命令写 GateHub.mode，run_tool 读同源）。
+    #[test]
+    fn 模式会话态写读() {
+        let hub = GateHub::default();
+        assert_eq!(hub.current_mode(), None, "未设=None");
+        hub.set_mode(Some("plan".into()));
+        assert_eq!(hub.current_mode().as_deref(), Some("plan"));
+        hub.set_mode(None);
+        assert_eq!(hub.current_mode(), None, "清回未设");
     }
 
     /// 链序：小序先跑+第一个非 Pass 短路（后位 Deny 不得覆盖先位 Allow）。

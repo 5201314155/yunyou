@@ -1,0 +1,12 @@
+[package]
+name = "yunyou-skills"
+description = "技能纯函数面（skills 下沉批，lead 2026-11-19 派）：双槽扫描/frontmatter 解析/目录段文本/按名读全文——宿主资源面零内核依赖（web 与 cli 平行消费）"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# 零依赖纪律（tests/zero_kernel_dep.rs CI 断言）：纯函数面全 std，不引任何 crate
+[dependencies]
+
+[lints]
+workspace = true

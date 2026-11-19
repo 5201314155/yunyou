@@ -3030,6 +3030,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "yunyou-skills"
+version = "0.1.0"
+
+[[package]]
 name = "yunyou-system-prompt"
 version = "0.1.0"
 dependencies = [
