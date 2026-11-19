@@ -89,14 +89,20 @@ mod tests {
     use crate::commands::tests::setup;
     use crate::rpc::rpc_unary;
     use axum::extract::State;
-    use axum::http::StatusCode;
+    use axum::http::{HeaderMap, StatusCode};
 
     /// 经真实 unary 通道发一封 client-request（走 rpc.rs 分派到本模块）。
     async fn call(state: &Arc<WebState>, method: &str, payload: &str) -> Value {
         let body = format!(
             r#"{{"type":"client-request","rpcId":"c1","method":"{method}","payload":{payload}}}"#
         );
-        let resp = rpc_unary(State(state.clone()), axum::body::Bytes::from(body)).await;
+        let resp = rpc_unary(
+        State(state.clone()),
+        axum::extract::RawQuery(None),
+        HeaderMap::new(),
+        axum::body::Bytes::from(body),
+    )
+    .await;
         assert_eq!(resp.status(), StatusCode::OK);
         let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.expect("体可读");
         serde_json::from_slice(&bytes).expect("合法 JSON")

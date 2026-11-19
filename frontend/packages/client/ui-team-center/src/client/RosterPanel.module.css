@@ -1,0 +1,84 @@
+/* 名册栏：行内状态点+名字+当前任务，操作按钮右贴。 */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--dsw-border, var(--dsw-alias-border, #d7e0e7));
+  border-radius: 14px;
+  min-width: 0;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-top: 1px solid var(--dsw-border, var(--dsw-alias-border, #d7e0e7));
+  min-width: 0;
+}
+
+.row:first-child {
+  border-top: none;
+}
+
+.availability {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  font-size: 12px;
+  color: var(--dsw-alias-text-secondary, #5d6b76);
+}
+
+.name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--dsw-alias-text-secondary, #5d6b76);
+}
+
+.rowActions {
+  display: inline-flex;
+  gap: 4px;
+  flex: none;
+}
+
+.empty,
+.unavailable {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--dsw-alias-text-secondary, #5d6b76);
+}

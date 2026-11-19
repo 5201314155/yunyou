@@ -107,7 +107,10 @@ or code. Env fallback: `DSH_TEST_LLM_BASE_URL` / `DSH_TEST_LLM_API_KEY` / `DSH_T
 ## Slash commands
 
 `/help` `/new` `/sessions` `/plugins` `/quit` — plus anything registered by plugins
-(skills are auto-registered as commands too). Non-interactive: `yunyou "summarize this repo"`.
+(skills are auto-registered as commands too). Configuration family: `/login` (wizard),
+`/config` (`$EDITOR`), `/model`, `/key`, `/tools on|off <name>` — every write is
+validated against the real config loader before an atomic replace (`yunyou.toml.bak`
+rollback), so a bad edit can never break startup. Non-interactive: `yunyou "summarize this repo"`.
 
 ## Sandbox (Linux)
 

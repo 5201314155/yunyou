@@ -37,6 +37,8 @@ yunyou-retry = { path = "../../llm/yunyou-retry" }
 yunyou-sandbox = { path = "../../tools/yunyou-sandbox" }
 # 取消令牌（REPL Ctrl-C → run_turn 中断）
 tokio-util = { workspace = true }
+# /model 模型列表拉取（task-30：GET {base_url}/models；版本与 llm-openai 同源收敛）
+reqwest = { workspace = true }
 # 命令行参数（--config/--home/--task）
 clap = { version = "4", features = ["derive"] }
 # 命令注册缝（任务29：壳三命令 register+补全面板 list/find 数据源）

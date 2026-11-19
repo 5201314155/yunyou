@@ -17,9 +17,7 @@ use std::sync::Arc;
 /// 磁盘插件清单（discover_plugins 投影；目录缺席=空——bundled 不在磁盘）。
 fn discovered(state: &Arc<WebState>) -> Vec<yunyou_config::manifest_file::DiscoveredPlugin> {
     let dir = state.config_store.path().with_file_name("plugins");
-    yunyou_config::manifest_file::discover_plugins(&dir)
-        .map(|found| found)
-        .unwrap_or_default()
+    yunyou_config::manifest_file::discover_plugins(&dir).unwrap_or_default()
 }
 
 /// config [plugins] 段值（缺席=空对象）。
@@ -48,7 +46,7 @@ pub(crate) fn plugins_list(state: &Arc<WebState>) -> Value {
     let mut seen: Vec<String> = Vec::new();
     let mut items: Vec<Value> = Vec::new();
     for plugin in discovered(state) {
-        let manifest = &plugin.manifest;
+        let manifest = &plugin.file;
         seen.push(manifest.id.clone());
         items.push(json!({
             "id": manifest.id,
@@ -109,14 +107,13 @@ pub(crate) fn plugins_enable(state: &Arc<WebState>, payload: &Value) -> Value {
             "details": details,
         })});
     }
-    // 写 [plugins.<id>] 条目（保留该插件既有 config 键——浅合并）
+    // 写 [plugins.<id>] 条目（保留该插件既有 config 键——就地改外层文档，
+    // 克隆值与外层不联动）
     let mut config = plugins_config(state);
-    let entry = config
-        .as_object_mut()
-        .and_then(|object| object.get_mut(plugin_id).cloned())
-        .unwrap_or_else(|| json!({}));
-    let mut entry = entry;
-    entry["enable"] = json!(enable);
+    if !config.get(plugin_id).map(Value::is_object).unwrap_or(false) {
+        config[plugin_id] = json!({});
+    }
+    config[plugin_id]["enable"] = json!(enable);
     match state.config_store.write_section("plugins", &config) {
         Ok(_) => {
             notify_config_reloaded(state);
@@ -177,7 +174,7 @@ pub(crate) fn plugins_config_read_write(state: &Arc<WebState>, payload: &Value) 
 }
 
 /// plugins/tools（L1，方案 A）：诚实空 items+status.errors 人话指路。
-pub(crate) fn plugins_tools(state: &Arc<WebState>, payload: &Value) -> Value {
+pub(crate) fn plugins_tools(_state: &Arc<WebState>, payload: &Value) -> Value {
     let request = contract::request_of(payload);
     let plugin_id = request.get("pluginId").and_then(Value::as_str).unwrap_or("");
     json!({"ok": true, "value": {

@@ -211,6 +211,7 @@ async fn send(socket: &mut WebSocket, frame: Value) -> Result<(), axum::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::http::HeaderMap;
     use crate::protocol::ServerMessage;
     use crate::server::tests::test_ws_connect;
     use crate::server::WebState;
@@ -383,7 +384,13 @@ mod tests {
         let body = format!(
             r#"{{"type":"client-request","rpcId":"c","method":"session/create","payload":{{"args":{{"request":{{"sessionId":"{session_id}"}}}}}}}}"#
         );
-        let resp = crate::rpc::rpc_unary(State(state.clone()), axum::body::Bytes::from(body)).await;
+        let resp = crate::rpc::rpc_unary(
+            State(state.clone()),
+            axum::extract::RawQuery(None),
+            HeaderMap::new(),
+            axum::body::Bytes::from(body),
+        )
+        .await;
         let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.expect("体可读");
         serde_json::from_slice(&bytes).expect("合法 JSON")
     }

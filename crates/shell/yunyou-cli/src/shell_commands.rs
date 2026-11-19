@@ -236,6 +236,9 @@ fn shell_command_definitions(shell: &Arc<ShellCore>) -> Vec<CommandDefinition> {
         // task-21：/team 命令族（同款增量外置；业主令「团队命令呢」）
         crate::team_cmd::definition(shell),
     ]
+    .into_iter()
+    .chain(crate::config_cmd::definitions(shell))
+    .collect()
 }
 
 /// /help：文案从注册表生成（新增命令自动出现，禁硬编码——设计 §三）。

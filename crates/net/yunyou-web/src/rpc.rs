@@ -18,6 +18,18 @@ use axum::response::{IntoResponse, Response};
 use serde_json::{json, Value};
 use std::sync::Arc;
 
+/// 方法名前缀归一（云织反骨审查 A 案，lead 2026-11-19 裁）：三方命名对不上
+/// 实测在据——分派对 team/tasks/schedule 三域接 `yunyou/` 前缀别名（openapi
+/// 回写 yunyou/* 由云枢复审），**裸名保留兼容**（现态客户端已用裸名实测）；
+/// 两态同效由锚点测试锁死。其余域不归一（session/commands 等无前缀争议）。
+fn normalize_method(method: &str) -> &str {
+    match method.strip_prefix("yunyou/") {
+        Some(rest)
+            if rest.starts_with("team/") || rest.starts_with("tasks/") || rest.starts_with("schedule/") =>
+        {
+            rest
+        }        _ => method,
+    }}
 /// unary RPC（POST /api/<method>）：client-request 信封 → server-response 信封。
 pub(crate) async fn rpc_unary(
     State(state): State<Arc<WebState>>,
@@ -40,9 +52,12 @@ pub(crate) async fn rpc_unary(
             json!({"ok": false, "error": err_body(code::BAD_REQUEST, "非 client-request 信封")}),
             StatusCode::BAD_REQUEST,
         );
-    }
-    let rpc_id = body.get("rpcId").cloned().unwrap_or(Value::Null);
-    let method = body.get("method").and_then(Value::as_str).unwrap_or("");
+    }    let rpc_id = body.get("rpcId").cloned().unwrap_or(Value::Null);
+    let method = body
+        .get("method")
+        .and_then(Value::as_str)
+        .map(normalize_method)
+        .unwrap_or("");
     let result = match method {
         // 侧栏会话列表（批⑬投影面）：单会话真名行（title 投影键——
         // manager.ts:755 消费路径）；未铸会话=空表
@@ -55,9 +70,7 @@ pub(crate) async fn rpc_unary(
                 json!({"ok": true, "value": {"accepted": true}})
             } else {
                 err_envelope(code::NO_ACTIVE_TURN, "当前没有正在执行的回合，无需停止")
-            }
-        }
-        // 模型触达面（ModelCatalog，types.ts:135）：单模型单供应商的诚实
+            }        }        // 模型触达面（ModelCatalog，types.ts:135）：单模型单供应商的诚实
         // 目录——default=服务配置模型，无失败面（failures 空=无目录加载失败）
         "session/modelCatalog" | "modelCatalog" => json!({"ok": true, "value": {
             "default": {"provider": "yunyou", "model": state.model},
@@ -71,8 +84,7 @@ pub(crate) async fn rpc_unary(
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             let requested = request_of(&payload).get("sessionId").and_then(Value::as_str);
             json!({"ok": true, "value": {"sessionId": state.wire.create_session(requested)}})
-        }
-        // loadOlder 向上翻页兜底：空页（本进程会话流不超快照重放环）
+        }        // loadOlder 向上翻页兜底：空页（本进程会话流不超快照重放环）
         "session/page" => json!({"ok": true, "value": {"records": [], "hasMore": false}}),
         "session/prompt" => crate::rpc_session::rpc_prompt(&state, &body).await,
         // 会话恢复（多会话步 2，域细则 §1.1-3）：切活跃+JSONL 尾部灌入重放环
@@ -83,79 +95,64 @@ pub(crate) async fn rpc_unary(
         "team/spawn" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_team::team_spawn(&state, &payload).await
-        }
-        "team/message" => {
+        }        "team/message" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_team::team_message(&state, &payload)
-        }
-        "team/kick" => {
+        }        "team/kick" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_team::team_kick(&state, &payload).await
-        }
-        "tasks/create" => {
+        }        "tasks/create" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_team::tasks_create(&state, &payload)
-        }
-        "tasks/claim" => {
+        }        "tasks/claim" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_team::tasks_claim(&state, &payload)
-        }
-        "tasks/submit" => {
+        }        "tasks/submit" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_team::tasks_submit(&state, &payload)
-        }
-        "tasks/review" => {
+        }        "tasks/review" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_team::tasks_review(&state, &payload)
-        }
-        "tasks/reassign" => {
+        }        "tasks/reassign" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_team::tasks_reassign(&state, &payload)
-        }
-        // schedule 域（W4，契约域-配置凭据与插件.md §3）：三方法管理面
+        }        // schedule 域（W4，契约域-配置凭据与插件.md §3）：三方法管理面
         "schedule/create" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_schedule::schedule_create(&state, &payload)
-        }
-        "schedule/list" => crate::rpc_schedule::schedule_list(&state),
+        }        "schedule/list" => crate::rpc_schedule::schedule_list(&state),
         "schedule/delete" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_schedule::schedule_delete(&state, &payload)
-        }
-        // settings 域（W5，契约域-配置凭据与插件.md §1）：段清单/表单投影/修订写
+        }        // settings 域（W5，契约域-配置凭据与插件.md §1）：段清单/表单投影/修订写
         "settings/sections" => crate::rpc_settings::settings_sections(&state),
         "settings/form" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_settings::settings_form(&state, &payload)
-        }
-        "settings/write" => {
+        }        "settings/write" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_settings::settings_write(&state, &payload)
-        }
-        // credentials 域（W5，契约域-配置凭据与插件.md §2）：目录/写入/删除
+        }        // credentials 域（W5，契约域-配置凭据与插件.md §2）：目录/写入/删除
         "credentials/list" => crate::rpc_credentials::credentials_list(&state).await,
         "credentials/set" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_credentials::credentials_set(&state, &payload).await
-        }
-        "credentials/delete" => {
+        }        "credentials/delete" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_credentials::credentials_delete(&state, &payload).await
-        }
-        // plugins 域（W6，契约域-配置凭据与插件.md §4）
+        }        // plugins 域（W6，契约域-配置凭据与插件.md §4）
         "plugins/list" => crate::rpc_plugins::plugins_list(&state),
         "plugins/enable" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_plugins::plugins_enable(&state, &payload)
-        }
-        "plugins/config" => {
+        }        "plugins/config" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_plugins::plugins_config_read_write(&state, &payload)
-        }
-        "plugins/tools" => {
+        }        "plugins/tools" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_plugins::plugins_tools(&state, &payload)
-        }
+        }        // capabilities 域（契约规格.md §9.3；W3 挂账清偿）
+        "capabilities/list" => crate::rpc_capabilities::capabilities_list(&state),
         // system/devices 域（W6，契约域-配置凭据与插件.md §6）
         "system/info" => crate::rpc_system::system_info(&state),
         "system/health" => crate::rpc_system::system_health(&state),
@@ -165,13 +162,11 @@ pub(crate) async fn rpc_unary(
         "commands/execute" => {
             let payload = body.get("payload").cloned().unwrap_or(json!({}));
             crate::rpc_commands::commands_execute(&state, &payload).await
-        }
-        // 未接方法：契约注册表点名状态（fail-visible，不伪造值——contract.rs）
+        }        // 未接方法：契约注册表点名状态（fail-visible，不伪造值——contract.rs）
         _ => contract::not_implemented(method),
     };
     rpc_response(rpc_id, result, StatusCode::OK)
 }
-
 /// typert 线约定解包：契约统一实现移至 contract::request_of（rpc_commands 同用）。
 use contract::request_of;
 
@@ -184,7 +179,6 @@ pub(crate) fn rpc_response(rpc_id: Value, result: Value, status: StatusCode) -> 
     )
         .into_response()
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -211,21 +205,46 @@ mod tests {
             loopback: true,
         })
     }
-
     /// 发一封 client-request 并解响应信封（真机 HTTP 走 server.rs 鉴权测试，
     /// 此处直调处理器专注方法分派）。
     async fn call(state: &Arc<WebState>, method: &str, payload: &str) -> Value {
         let body = format!(
             r#"{{"type":"client-request","rpcId":"r1","method":"{method}","payload":{payload}}}"#
         );
-        let resp = rpc_unary(State(state.clone()), axum::body::Bytes::from(body)).await;
+        let resp = rpc_unary(
+        State(state.clone()),
+        axum::extract::RawQuery(None),
+        HeaderMap::new(),
+        axum::body::Bytes::from(body),
+    )
+    .await;
         assert_eq!(resp.status(), StatusCode::OK, "{method} 应走信封（200）");
         let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
             .await
             .expect("响应体可读");
         serde_json::from_slice(&bytes).expect("响应是合法 JSON")
     }
-
+    /// yunyou/ 前缀别名归一（A 案）：三域两态同效（team/roster 与
+    /// yunyou/team/roster 同响应）；非三域前缀不归一（session/yunyou-x 不动）。
+    #[tokio::test(flavor = "multi_thread")]
+    async fn 前缀别名两态同效() {
+        let state = state();
+        // 无团队插件环境：roster 返回「服务未就绪」人话信封——两态同信封即归一成立
+        let bare = call(&state, "team/roster", "{}").await;
+        let prefixed = call(&state, "yunyou/team/roster", "{}").await;
+        assert_eq!(prefixed["result"], bare["result"], "前缀别名同效：{prefixed}");
+        let bare = call(&state, "tasks/list", "{}").await;
+        let prefixed = call(&state, "yunyou/tasks/list", "{}").await;
+        assert_eq!(prefixed["result"], bare["result"], "tasks 域前缀同效：{prefixed}");
+        let bare = call(&state, "schedule/list", "{}").await;
+        let prefixed = call(&state, "yunyou/schedule/list", "{}").await;
+        // nowMs 毫秒级漂移不进比对（比对 entries+ok——归一语义锚）
+        assert_eq!(prefixed["result"]["ok"], bare["result"]["ok"], "schedule 域前缀同效：{prefixed}");
+        assert_eq!(prefixed["result"]["value"]["entries"], bare["result"]["value"]["entries"]);
+        // 非三域不归一：yunyou/session/list 未知（fail-visible，不扩面）
+        let outside = call(&state, "yunyou/session/list", "{}").await;
+        assert_eq!(outside["result"]["error"]["code"], "gateway/not-implemented", "{outside}");
+    }
     /// 方法分派：list 空 items / create 铸造并登记 / page 空页 / 未知方法
     /// not-implemented / 坏信封 400。
     #[tokio::test(flavor = "multi_thread")]
@@ -241,11 +260,15 @@ mod tests {
         assert_eq!(unknown["result"]["ok"], false, "未知方法 fail-visible");
         assert!(unknown["result"]["error"]["code"] == "gateway/not-implemented");
         // 坏信封：400
-        let bad = rpc_unary(State(state.clone()), axum::body::Bytes::from(r#"{"type":"nope"}"#))
-            .await;
+        let bad = rpc_unary(
+            State(state.clone()),
+            axum::extract::RawQuery(None),
+            HeaderMap::new(),
+            axum::body::Bytes::from(r#"{"type":"nope"}"#),
+        )
+        .await;
         assert_eq!(bad.status(), StatusCode::BAD_REQUEST, "非 client-request 应 400");
     }
-
     /// 提交桥：合法载荷受理（accepted+echo 登记+后台回合失败人话回流）；
     /// 载荷缺陷四态拒绝；闸门占住=agent-busy。
     #[tokio::test(flavor = "multi_thread")]
@@ -277,8 +300,7 @@ mod tests {
             assert_eq!(reject["result"]["ok"], false, "{why} 应拒绝：{reject}");
             // 契约 §2.2：prompt 缺陷专用码 session/prompt-invalid（W1 对表）
             assert_eq!(reject["result"]["error"]["code"], "session/prompt-invalid");
-        }
-        // 闸门占住：对端 agent-busy（人话文案与 ws 层同源）
+        }        // 闸门占住：对端 agent-busy（人话文案与 ws 层同源）
         let busy = call(
             &busy_state,
             "session/prompt",
@@ -291,7 +313,6 @@ mod tests {
             "人话文案：{busy}"
         );
     }
-
     /// 触达面（批⑬）：list 真名行（未铸=空）/cancel 空闲人话拒绝/
     /// modelCatalog 形状（default/groups/failures 空面）。
     #[tokio::test(flavor = "multi_thread")]
@@ -322,7 +343,6 @@ mod tests {
             "投影块在列"
         );
     }
-
     /// 会话恢复桥端到端（步 2）：真实 JSONL → open → 灌入计数回显 →
     /// follow 快照带历史记录 → list 行 agentAvailable=true（活跃）。
     /// 不存在/非法 id=bad-request 人话。
@@ -372,7 +392,5 @@ mod tests {
         ] {
             let resp = call(&state, "session/open", payload).await;
             assert_eq!(resp["result"]["error"]["code"], "gateway/bad-request", "{why}: {resp}");
-        }
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-}
+        }        let _ = std::fs::remove_dir_all(&dir);
+    }}

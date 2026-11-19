@@ -114,31 +114,31 @@ paths:
       summary: 能力开闸投影（available=false 必带 gate 说明）
       responses: { "200": { $ref: "#/components/responses/Envelope" } }
   /api/team/spawn:
-    post: { operationId: teamSpawn, x-method: team/spawn, x-status: 冻结待接, x-level: L4, summary: 拉起成员（fresh/fork），需显式授权, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+    post: { operationId: teamSpawn, x-alias: "裸名兼容 team/…（两态同效）", x-method: yunyou/team/spawn, x-status: 冻结待接, x-level: L4, summary: 拉起成员（fresh/fork），需显式授权, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
   /api/team/message:
-    post: { operationId: teamMessage, x-method: team/message, x-status: 冻结待接, x-level: L2, summary: 以 lead 身份发成员消息, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+    post: { operationId: teamMessage, x-alias: "裸名兼容 team/…（两态同效）", x-method: yunyou/team/message, x-status: 冻结待接, x-level: L2, summary: 以 lead 身份发成员消息, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
   /api/team/roster:
-    post: { operationId: teamRoster, x-method: team/roster, x-status: 冻结待接, x-level: L1, summary: 名册投影（name/description/online/busy/task）, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+    post: { operationId: teamRoster, x-alias: "裸名兼容 team/…（两态同效）", x-method: yunyou/team/roster, x-status: 冻结待接, x-level: L1, summary: 名册投影（name/description/online/busy/task）, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
   /api/team/kick:
-    post: { operationId: teamKick, x-method: team/kick, x-status: 冻结待接, x-level: L3, summary: 踢人（dispose fiber；信箱保留）, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+    post: { operationId: teamKick, x-alias: "裸名兼容 team/…（两态同效）", x-method: yunyou/team/kick, x-status: 冻结待接, x-level: L3, summary: 踢人（dispose fiber；信箱保留）, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
   /api/tasks/create:
-    post: { operationId: tasksCreate, x-method: tasks/create, x-status: 冻结待接, x-level: L2, summary: 创建共享任务（title/description 必填，capability/blocked_by 可选）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+    post: { operationId: tasksCreate, x-alias: "裸名兼容 tasks/…（两态同效）", x-method: yunyou/tasks/create, x-status: 冻结待接, x-level: L2, summary: 创建共享任务（title/description 必填，capability/blocked_by 可选）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
   /api/tasks/claim:
-    post: { operationId: tasksClaim, x-method: tasks/claim, x-status: 冻结待接, x-level: L2, summary: 认领（pending→claimed；owner 须在册）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+    post: { operationId: tasksClaim, x-alias: "裸名兼容 tasks/…（两态同效）", x-method: yunyou/tasks/claim, x-status: 冻结待接, x-level: L2, summary: 认领（pending→claimed；owner 须在册）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
   /api/tasks/submit:
-    post: { operationId: tasksSubmit, x-method: tasks/submit, x-status: 冻结待接, x-level: L2, summary: 提交成果（仅 owner）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+    post: { operationId: tasksSubmit, x-alias: "裸名兼容 tasks/…（两态同效）", x-method: yunyou/tasks/submit, x-status: 冻结待接, x-level: L2, summary: 提交成果（仅 owner）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
   /api/tasks/review:
-    post: { operationId: tasksReview, x-method: tasks/review, x-status: 冻结待接, x-level: L3, summary: 审查裁决（approve/reject；板层强制拒绝自审）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+    post: { operationId: tasksReview, x-alias: "裸名兼容 tasks/…（两态同效）", x-method: yunyou/tasks/review, x-status: 冻结待接, x-level: L3, summary: 审查裁决（approve/reject；板层强制拒绝自审）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
   /api/tasks/reassign:
-    post: { operationId: tasksReassign, x-method: tasks/reassign, x-status: 冻结待接, x-level: L3, summary: 改派负责人, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+    post: { operationId: tasksReassign, x-alias: "裸名兼容 tasks/…（两态同效）", x-method: yunyou/tasks/reassign, x-status: 冻结待接, x-level: L3, summary: 改派负责人, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
   /api/tasks/list:
-    post: { operationId: tasksList, x-method: tasks/list, x-status: 冻结待接, x-level: L1, summary: 任务板投影, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+    post: { operationId: tasksList, x-alias: "裸名兼容 tasks/…（两态同效）", x-method: yunyou/tasks/list, x-status: 冻结待接, x-level: L1, summary: 任务板投影, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
   /api/schedule/create:
-    post: { operationId: scheduleCreate, x-method: schedule/create, x-status: 冻结待接, x-level: L2, summary: 创建定时任务（at_ms/every_minutes/cron 三选一必填恰一；回显即确认）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+    post: { operationId: scheduleCreate, x-alias: "裸名兼容 schedule/…（两态同效）", x-method: yunyou/schedule/create, x-status: 冻结待接, x-level: L2, summary: 创建定时任务（at_ms/every_minutes/cron 三选一必填恰一；回显即确认）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
   /api/schedule/list:
-    post: { operationId: scheduleList, x-method: schedule/list, x-status: 冻结待接, x-level: L1, summary: 在规定时列表, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+    post: { operationId: scheduleList, x-alias: "裸名兼容 schedule/…（两态同效）", x-method: yunyou/schedule/list, x-status: 冻结待接, x-level: L1, summary: 在规定时列表, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
   /api/schedule/delete:
-    post: { operationId: scheduleDelete, x-method: schedule/delete, x-status: 冻结待接, x-level: L3, summary: 按 id 删除（不存在= schedule/unknown-id + 现有清单）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
+    post: { operationId: scheduleDelete, x-alias: "裸名兼容 schedule/…（两态同效）", x-method: yunyou/schedule/delete, x-status: 冻结待接, x-level: L3, summary: 按 id 删除（不存在= schedule/unknown-id + 现有清单）, requestBody: { $ref: "#/components/requestBodies/Rpc" }, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
   /api/plugins/list:
     post: { operationId: pluginsList, x-method: plugins/list, x-status: 冻结待接, x-level: L1, summary: 本地插件目录（manifest 投影+启用态）, responses: { "200": { $ref: "#/components/responses/Envelope" } } }
   /api/plugins/enable:

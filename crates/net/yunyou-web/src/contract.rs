@@ -101,7 +101,7 @@ const METHODS: &[(&str, Status)] = &[
     ("skills/list", Status::FrozenPending),
     ("skills/get", Status::FrozenPending),
     // capabilities（契约 §9.3）
-    ("capabilities/list", Status::FrozenPending),
+    ("capabilities/list", Status::Wired),
     // team / tasks 域（域-团队与任务.md；W3 已接）
     ("team/spawn", Status::Wired),
     ("team/message", Status::Wired),
@@ -191,7 +191,7 @@ mod tests {
     use super::*;
     use crate::protocol::ServerMessage;
     use axum::extract::State;
-    use axum::http::StatusCode;
+    use axum::http::{HeaderMap, StatusCode};
     use crate::server::WebState;
     use crate::turns::TurnRunner;
     use crate::bridge::WireBridge;
@@ -286,7 +286,7 @@ mod tests {
         let later = all.iter().filter(|(_, s)| *s == Status::Later).count();
         // 锚点：openapi 已接 8 方法（session 6+commands 2）+session/open（域细则
         // 冻结形状，openapi v1.1 已补录）+team/tasks 域 9 方法（W3）；待接 20；后续 2（market）
-        assert_eq!((wired, frozen, later), (34, 4, 2), "契约方法计数漂移，先同步契约再改表：{all:?}");
+        assert_eq!((wired, frozen, later), (36, 2, 2), "契约方法计数漂移，先同步契约再改表：{all:?}");
         // 已接方法必须确有分派（rpc.rs 契约面行为测试锁定形状，此处锁无遗漏）
         for (name, status) in all {
             if *status == Status::Wired {
@@ -300,8 +300,9 @@ mod tests {
                         || name.starts_with("credentials/")
                         || name.starts_with("plugins/")
                         || name.starts_with("system/")
-                        || name == "devices/current",
-                    "已接面现态=session+commands+team+tasks 域：{name}"
+                        || *name == "devices/current"
+                        || *name == "capabilities/list",
+                    "已接面现态=session+commands+team+tasks+schedule+settings+credentials+plugins+system+devices+capabilities 域：{name}"
                 );
             }
         }
@@ -313,7 +314,13 @@ mod tests {
     async fn 未接方法经unary兜底点名() {
         let state = state();
         let body = r#"{"type":"client-request","rpcId":"r9","method":"skills/list","payload":{}}"#;
-        let resp = crate::rpc::rpc_unary(State(state.clone()), axum::body::Bytes::from(body)).await;
+        let resp = crate::rpc::rpc_unary(
+            State(state.clone()),
+            axum::extract::RawQuery(None),
+            HeaderMap::new(),
+            axum::body::Bytes::from(body),
+        )
+        .await;
         assert_eq!(resp.status(), StatusCode::OK);
         let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await.expect("体可读");
         let value: Value = serde_json::from_slice(&bytes).expect("合法 JSON");

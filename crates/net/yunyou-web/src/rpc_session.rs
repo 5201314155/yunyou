@@ -189,6 +189,7 @@ pub(crate) fn rpc_response(rpc_id: Value, result: Value, status: StatusCode) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::http::HeaderMap;
     use crate::commands::tests::setup as cmd_setup;
     use axum::extract::State;
 
@@ -215,6 +216,8 @@ mod tests {
         // 铸活跃会话（内存行）
         let create = crate::rpc::rpc_unary(
             State(state.clone()),
+            axum::extract::RawQuery(None),
+            HeaderMap::new(),
             axum::body::Bytes::from(
                 r#"{"type":"client-request","rpcId":"c","method":"session/create","payload":{"args":{"request":{"sessionId":"live-1"}}}}"#,
             ),

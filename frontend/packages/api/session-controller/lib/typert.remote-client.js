@@ -2569,7 +2569,7 @@ export const TYPERT_REMOTE = createTypertRemoteInfo({
         description: 'the skill metadata and its raw body text.',
         jsonSchema: {"type":"object","properties":{"name":{"type":"string"},"description":{"type":"string"},"body":{"type":"string"}},"required":["name","description","body"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/skill-catalog.ts","line":76,"column":9},
+      sourceLocation: {"file":"packages/api/session-controller/src/skill-catalog.ts","line":77,"column":9},
     },
     'skills/list': {
       service: 'sessionSkillCatalog',
@@ -2602,7 +2602,7 @@ export const TYPERT_REMOTE = createTypertRemoteInfo({
         description: 'user-invocable skill metadata without loading skill bodies.',
         jsonSchema: {"type":"object","properties":{"skills":{"type":"array","items":{"type":"object","properties":{"path":{"type":"string","description":"Absolute SKILL.md path when supplied by a filesystem provider."},"name":{"type":"string","description":"Kebab-case identifier referenced as `/name`."},"description":{"type":"string","description":"Short routing description."},"whenToUse":{"type":"string","description":"Optional extra routing guidance."},"modelInvocable":{"type":"boolean","description":"Whether the same skill is also advertised to the model."}},"required":["name","description","modelInvocable"],"additionalProperties":true}}},"required":["skills"],"additionalProperties":true},
       },
-      sourceLocation: {"file":"packages/api/session-controller/src/skill-catalog.ts","line":48,"column":9},
+      sourceLocation: {"file":"packages/api/session-controller/src/skill-catalog.ts","line":49,"column":9},
     },
   },
 }, z)

@@ -351,4 +351,4 @@ pub(crate) fn tasks_reassign(state: &Arc<WebState>, payload: &Value) -> Value {
 
 #[cfg(test)]
 #[path = "rpc_team_tests.rs"]
-mod rpc_team_tests;
+pub(crate) mod rpc_team_tests;

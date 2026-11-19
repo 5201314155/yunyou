@@ -1,0 +1,106 @@
+/* 任务板：状态徽标+标题+负责人；操作右贴。 */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--dsw-border, var(--dsw-alias-border, #d7e0e7));
+  border-radius: 14px;
+  min-width: 0;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panelTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-top: 1px solid var(--dsw-border, var(--dsw-alias-border, #d7e0e7));
+}
+
+.row:first-child {
+  border-top: none;
+}
+
+.rowMain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.stateBadge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--dsw-border, var(--dsw-alias-border, #d7e0e7));
+  color: var(--dsw-alias-text-secondary, #5d6b76);
+}
+
+.stateBadge[data-tone='ongoing'] {
+  color: var(--dsw-alias-state-running, #5fafd7);
+  border-color: currentColor;
+}
+
+.stateBadge[data-tone='done'] {
+  color: var(--dsw-alias-state-success, #5faf5f);
+  border-color: currentColor;
+}
+
+.stateBadge[data-tone='error'] {
+  color: var(--dsw-alias-state-error-primary, #d75f5f);
+  border-color: currentColor;
+}
+
+.title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  font-size: 12px;
+  color: var(--dsw-alias-text-secondary, #5d6b76);
+}
+
+.blocked {
+  font-size: 12px;
+  color: var(--dsw-alias-state-warning, #d7af5f);
+}
+
+.rowActions {
+  display: inline-flex;
+  gap: 4px;
+  flex: none;
+}
+
+.empty,
+.unavailable {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--dsw-alias-text-secondary, #5d6b76);
+}
